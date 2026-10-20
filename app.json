@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "strategic-game",
+    "name": "Strategic Game",
     "slug": "strategic-game",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "strategicgame",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true
     },
@@ -31,7 +31,7 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#081220"
         }
       ],
       "expo-image",
