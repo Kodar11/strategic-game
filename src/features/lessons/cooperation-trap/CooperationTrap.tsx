@@ -33,7 +33,7 @@ import { Slider } from '@/src/components/ui/Slider';
 import type { LessonMeta } from '@/src/content/lessons';
 import { pricingRevealClips, pricingWhyClip } from '@/src/features/audio/reactions';
 import { NarrateOn } from '@/src/features/audio/useNarration';
-import { BASE_CUT_ADVANTAGE, BASE_PRICING_GAME, PENALTY_RANGE, type PriceAction, applyCutPenalty, regimeFor, rivalPolicy } from '@/src/game/incentives';
+import { BASE_CUT_ADVANTAGE, BASE_PRICING_GAME, PENALTY_RANGE, type PriceAction, applyCutPenalty, rivalPolicy } from '@/src/game/incentives';
 import { payoffAt, rowBestResponses } from '@/src/game/payoff-matrix';
 import { useMotionReduced } from '@/src/utils/feedback';
 import { colors, space } from '@/src/theme/tokens';
@@ -42,7 +42,10 @@ import {
   PENALTY_GUESSES,
   RIVAL_REASONS,
   cooperationRecap,
+  cooperationRecords,
   explainOutcome,
+  movePenalty,
+  penaltyExperimentState,
   penaltyExplanation,
   penaltyGuessFeedback,
   predictionCheck,
@@ -139,7 +142,7 @@ const TRANSFER_ANALOGY = {
 
 export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
   const TOTAL = 12;
-  const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL);
+  const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL, cooperationRecords);
   const enter = useEnter();
 
   const outcome = data.choice && data.rival ? { row: data.choice, col: data.rival } : null;
@@ -460,7 +463,7 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
     {
       // Experiment: predict, then change one incentive and watch the best replies move.
       key: 'penalty',
-      canContinue: data.foundFlip,
+      canContinue: penaltyExperimentState(data.penalty, data.foundFlip).canContinue,
       blockedHint: data.penaltyPrediction.locked
         ? 'Find a penalty that changes the predicted outcome.'
         : missingForLock(data.penaltyPrediction) === 'confidence'
@@ -468,6 +471,7 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
           : 'Make and confirm a prediction first.',
       render: () => {
         const ex = penaltyExplanation(data.penalty);
+        const experiment = penaltyExperimentState(data.penalty, data.foundFlip);
         const gf = penaltyGuess ? penaltyGuessFeedback(penaltyGuess) : null;
         return (
           <>
@@ -498,9 +502,7 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
                     tone="orange"
                     marker={data.foundFlip ? { value: BASE_CUT_ADVANTAGE, label: 'tie' } : undefined}
                     formatValue={(v) => v.toFixed(1)}
-                    onChange={(p) =>
-                      update((d) => ({ penalty: p, foundFlip: d.foundFlip || regimeFor({ cutPenalty: p, maintainReward: 0 }) === 'maintain-dominant' }))
-                    }
+                    onChange={(p) => update((d) => movePenalty(d, p))}
                   />
                   <PayoffMatrix
                     game={penaltyGame}
@@ -518,6 +520,11 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
                 <Panel tone={ex.regime === 'maintain-dominant' ? 'success' : ex.regime === 'tie' ? 'info' : 'caution'} title={ex.title}>
                   {ex.body}
                 </Panel>
+                {experiment.currentNote ? (
+                  <AppText variant="small" color={colors.textMuted}>
+                    {experiment.currentNote}
+                  </AppText>
+                ) : null}
               </>
             ) : null}
             <NarrateOn clip="l1.penalty.flip" trigger={data.foundFlip} />

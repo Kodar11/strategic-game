@@ -52,6 +52,7 @@ import {
   PROPOSAL_PREDICTIONS,
   detectionFeedback,
   incentiveRecap,
+  incentiveRecords,
   proposalExplanation,
   proposalFeedback,
   proposalLabel,
@@ -156,7 +157,7 @@ const TRANSFER_ANALOGY = {
 
 export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
   const TOTAL = 11;
-  const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL);
+  const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL, incentiveRecords);
   const enter = useEnter();
 
   const rules: IncentiveRules = { cutPenalty: data.penalty, maintainReward: data.reward };

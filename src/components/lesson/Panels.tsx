@@ -117,6 +117,7 @@ const VERDICT: Record<Verdict, { tone: PanelTone; title: string }> = {
   defensible: { tone: 'info', title: 'Defensible — with a gap' },
   misconception: { tone: 'caution', title: 'Worth a second look' },
   depends: { tone: 'insight', title: 'Depends on an assumption' },
+  reasonable: { tone: 'info', title: 'Reasonable call — the outcome went another way' },
 };
 
 /**

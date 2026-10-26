@@ -18,7 +18,10 @@ Not every stage gets its own screen, and no lesson is forced into an identical t
   - It never affects verdicts, gating or recaps.
   - Transfer questions are not predictions (they are answers checked immediately with feedback), so they don't ask for confidence. Neither do decisions such as prices, places, shots and the promise.
 - **Name a concept only after the evidence.** "Dominant strategy", "level-k", "Nash equilibrium", "focal point" and "mixed strategy" each appear on the screen *after* the learner has seen the pattern they describe.
-- **Feedback is graded, not green-by-default.** `FeedbackPanel` takes a `Verdict` (`match`, `defensible`, `misconception`, `depends`). Green is reserved for answers that match the model.
+- **Feedback is graded, not green-by-default.** `FeedbackPanel` takes a `Verdict` (`match`, `defensible`, `misconception`, `depends`, `reasonable`). Green is reserved for answers that match the model.
+  - `reasonable` is for a sensible prediction about something the learner couldn't know yet: the Lesson 2 crowd in round 1, or Nina's rule in Lesson 3 round 1. A miss there is never called a misconception.
+  - `misconception` is kept for answers that contradict information on screen (the round-2 shared clue, the "everyone plays 0" belief) or the learner's own prediction. In Lesson 3 this is judged from the payoff table, where going to the café while unsure is a defensible hedge.
+  - Every prediction's result also goes to the learning record (see [LEARNING_DATA.md](LEARNING_DATA.md)).
 - **Feedback comes from state.** All learner-dependent wording lives in each lesson's `copy.ts` as pure functions of lesson state and the game engine, and is covered by `src/features/lessons/__tests__/lesson-copy.test.ts`.
 - **Scripted opponents are described as scripted.** Rohan, Nina, Maya and the Lesson 2 crowd each follow a stated, fixed policy. The screens say so; nothing implies they adapted to the learner unless the model does (Maya reads past shots only).
 - **Transfer questions don't name the concept.** After the learner answers, `TransferQuestion` shows what carries over from the lesson's model and where the analogy stops. A test checks that transfer prompts don't contain the concept's name.

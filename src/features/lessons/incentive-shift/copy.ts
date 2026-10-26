@@ -1,4 +1,4 @@
-import { emptyPrediction } from '../../../components/lesson/prediction-state.ts';
+import { type PredictionAttempt, emptyPrediction, lockedAnswer } from '../../../components/lesson/prediction-state.ts';
 import type { Feedback } from '../../../components/lesson/verdict.ts';
 import {
   BASE_CUT_ADVANTAGE,
@@ -10,6 +10,7 @@ import {
   sanitizeRules,
   withDetection,
 } from '../../../game/incentives.ts';
+import { type LearningAttempt, recordAttempt } from '../../learning/records.ts';
 
 /** Lesson 5 wording that depends on the learner's predictions and rules. Pure, so tests can pin it to the model. */
 
@@ -186,4 +187,31 @@ export function incentiveRecap(d: {
     );
   }
   return lines;
+}
+
+// ── Learning record ──────────────────────────────────────────────────────────
+
+const DETECTION_OUTCOME: Record<DetectionPrediction, string> = {
+  yes: 'At 50% detection maintaining still wins',
+  no: 'At 50% detection cutting pays again',
+  depends: 'At 50% detection the choices are exactly balanced',
+};
+
+/** Lesson 5's evaluated predictions. The stress test is judged against the rules it was locked for. */
+export function incentiveRecords(d: {
+  proposal: PredictionAttempt<ProposalPrediction>;
+  penalty: number;
+  reward: number;
+  detectionPrediction: PredictionAttempt<DetectionPrediction>;
+  detectionTouched: boolean;
+}): (LearningAttempt | null)[] {
+  const proposal = lockedAnswer(d.proposal);
+  const detection = lockedAnswer(d.detectionPrediction);
+  const rules = { cutPenalty: d.penalty, maintainReward: d.reward };
+  return [
+    proposal ? recordAttempt('l5.proposal', d.proposal, proposalFeedback(proposal).verdict, 'Both companies still cut') : null,
+    detection && d.detectionTouched
+      ? recordAttempt('l5.detection', d.detectionPrediction, detectionFeedback(detection, rules).verdict, DETECTION_OUTCOME[detectionOutcome(rules)])
+      : null,
+  ];
 }

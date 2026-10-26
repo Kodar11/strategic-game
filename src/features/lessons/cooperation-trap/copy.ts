@@ -1,5 +1,7 @@
+import { type PredictionAttempt, lockedAnswer } from '../../../components/lesson/prediction-state.ts';
 import type { Feedback, Verdict } from '../../../components/lesson/verdict.ts';
-import { BASE_PRICING_GAME, type PriceAction, applyCutPenalty, cutAdvantage, regimeFor, type Regime } from '../../../game/incentives.ts';
+import { type LearningAttempt, recordAttempt } from '../../learning/records.ts';
+import { BASE_CUT_ADVANTAGE, BASE_PRICING_GAME, type PriceAction, applyCutPenalty, cutAdvantage, regimeFor, type Regime } from '../../../game/incentives.ts';
 import { payoffAt, rowBestResponses } from '../../../game/payoff-matrix.ts';
 
 /**
@@ -139,6 +141,41 @@ export function penaltyGuessFeedback(guess: PenaltyGuess): Feedback {
   }
 }
 
+/** Whether penalty p, right now, makes maintaining strictly better for QuickEats. */
+export function penaltyFlips(p: number): boolean {
+  return regimeFor({ cutPenalty: p, maintainReward: 0 }) === 'maintain-dominant';
+}
+
+/**
+ * Moving the penalty slider. `foundFlip` is *historical*: it records that the learner has found a penalty
+ * that flips the choice in this attempt, and is never cleared by moving the slider again. Whether the
+ * *current* penalty flips it is always derived (`penaltyFlips`), never stored.
+ */
+export function movePenalty(d: { foundFlip: boolean }, p: number): { penalty: number; foundFlip: boolean } {
+  return { penalty: p, foundFlip: d.foundFlip || penaltyFlips(p) };
+}
+
+export interface PenaltyExperimentState {
+  /** The current penalty makes maintaining strictly better. */
+  flipsNow: boolean;
+  /** The learner has found a flipping penalty at some point in this attempt. */
+  discovered: boolean;
+  /** Progression follows the discovery — the goal of the step — not wherever the slider was left. */
+  canContinue: boolean;
+  /** Shown after a discovery when the slider has since moved off a flipping value, so nothing implies it still flips. */
+  currentNote: string | null;
+}
+
+export function penaltyExperimentState(p: number, discovered: boolean): PenaltyExperimentState {
+  const flipsNow = penaltyFlips(p);
+  const regime = regimeFor({ cutPenalty: p, maintainReward: 0 });
+  const currentNote =
+    discovered && !flipsNow
+      ? `You found the line earlier. At the current p = ${p.toFixed(1)}, ${regime === 'tie' ? 'the two choices tie again' : 'cutting wins again'} — move the slider above ${BASE_CUT_ADVANTAGE} to see maintaining win.`
+      : null;
+  return { flipsNow, discovered, canContinue: discovered, currentNote };
+}
+
 export interface PenaltyExplanation {
   regime: Regime;
   title: string;
@@ -227,4 +264,23 @@ export function cooperationRecap(d: CooperationRecapInput): string[] {
     );
   }
   return lines;
+}
+
+// ── Learning record ──────────────────────────────────────────────────────────
+
+/** Lesson 1's evaluated predictions, each recorded once its feedback is shown, from the same functions as the screen. */
+export function cooperationRecords(d: {
+  prediction: PredictionAttempt<PriceAction>;
+  rival: PriceAction | null;
+  penaltyPrediction: PredictionAttempt<PenaltyGuess>;
+  foundFlip: boolean;
+}): (LearningAttempt | null)[] {
+  const predicted = lockedAnswer(d.prediction);
+  const guess = lockedAnswer(d.penaltyPrediction);
+  return [
+    predicted && d.rival ? recordAttempt('l1.rival', d.prediction, predictionCheck(predicted, d.rival).verdict, `Rohan chose to ${d.rival}`) : null,
+    guess && d.foundFlip
+      ? recordAttempt('l1.penalty', d.penaltyPrediction, penaltyGuessFeedback(guess).verdict, `Maintaining wins once p is above ${BASE_CUT_ADVANTAGE}`)
+      : null,
+  ];
 }

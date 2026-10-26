@@ -38,9 +38,7 @@ import {
   type StrikerStrategy,
   expectedPayoff,
   guaranteedPayoff,
-  playSeries,
   simulateMix,
-  strategySequence,
   takeShot,
 } from '@/src/game/mixed-strategy';
 import { createRng } from '@/src/game/rng';
@@ -49,18 +47,20 @@ import { colors, radius, space } from '@/src/theme/tokens';
 import {
   COMPARE_PREDICTIONS,
   LAB_PREDICTIONS,
+  COMPARE_SHOTS,
+  KEEPER_SEED,
   MIX_LAB_RESET,
+  compareResults,
   comparePredictionFeedback,
   mixLabFeedback,
   mixLabPhase,
   predictabilityRecap,
+  predictabilityRecords,
   runComparison,
   simulateMixRun,
 } from './copy';
 
 const SHOTS_TO_TAKE = 8;
-const KEEPER_SEED = 4242;
-const COMPARE_SHOTS = 40;
 const SIM_SHOTS = 40;
 
 /** The keeper's own coin for shot i is seeded, so a replayed sequence of shots gives the same saves. */
@@ -152,7 +152,7 @@ const TRANSFER_ANALOGY = {
 
 export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
   const TOTAL = 10;
-  const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL);
+  const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL, predictabilityRecords);
   const enter = useEnter();
 
   // The updater stays pure; the keeper only ever sees shots already in history.
@@ -287,7 +287,7 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
             : 'Run the comparison to continue.',
       render: () => {
         const seed = data.compareSeed;
-        const results = seed === null ? null : STRATEGIES.map((s) => ({ ...s, result: playSeries(strategySequence(s.id, COMPARE_SHOTS, seed + 1), KEEPER_SEED + seed) }));
+        const results = seed === null ? null : compareResults(seed).map((r, i) => ({ ...STRATEGIES[i], result: r.result }));
         const comparePick = lockedAnswer(data.comparePrediction);
         const compareFb = results && comparePick ? comparePredictionFeedback(comparePick, results.map((r) => ({ id: r.id, goals: r.result.goals }))) : null;
         return (

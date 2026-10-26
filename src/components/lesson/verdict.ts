@@ -6,8 +6,10 @@
  * - `defensible`    a reasonable line of thought that misses or adds something.
  * - `misconception` a common but mistaken reading of the situation.
  * - `depends`       the answer turns on an assumption outside (or at the edge of) the model.
+ * - `reasonable`    a sensible prediction about something the learner had no way to know yet (another player's
+ *                   hidden rule, a crowd's mix); the outcome went another way. Not evidence of a reasoning error.
  */
-export type Verdict = 'match' | 'defensible' | 'misconception' | 'depends';
+export type Verdict = 'match' | 'defensible' | 'misconception' | 'depends' | 'reasonable';
 
 export interface Feedback {
   verdict: Verdict;

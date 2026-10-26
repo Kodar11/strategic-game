@@ -56,6 +56,7 @@ import {
   averageGuessLabel,
   averagePredictionFeedback,
   detectiveRecap,
+  detectiveRecords,
   labPredictionFeedback,
   LAB_SEED,
   type LabPrediction,
@@ -151,7 +152,7 @@ const ordinal = (n: number) => {
 
 export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
   const TOTAL = 11;
-  const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL);
+  const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL, detectiveRecords);
   const enter = useEnter();
 
   const round1 = data.committed1 ? playRound(data.guess1, ROUND1_POP, ROUND1_SEED) : null;

@@ -33,11 +33,11 @@ import type { LessonMeta } from '@/src/content/lessons';
 import { getClip } from '@/src/features/audio/clips';
 import { meetupReactionClip } from '@/src/features/audio/reactions';
 import { NarrateOn } from '@/src/features/audio/useNarration';
-import { type FriendInfo, MEETUP_GAME, type MeetupResult, type Place, friendPolicy, resolveMeetup } from '@/src/game/coordination';
+import { MEETUP_GAME, type MeetupResult, type Place, friendPolicy, resolveMeetup } from '@/src/game/coordination';
 import { payoffAt, rowBestResponses } from '@/src/game/payoff-matrix';
 import { useMotionReduced } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
-import { PLACE_NAME as NAME, coordinationRecap, equilibriumSummary, meetupFeedback, messageExplanation } from './copy';
+import { PLACE_NAME as NAME, ROUND_INFO, coordinationRecap, coordinationRecords, equilibriumSummary, meetupFeedback, messageExplanation } from './copy';
 
 const place = z.enum(['cafe', 'park']);
 const schema = z.object({
@@ -71,7 +71,6 @@ const INITIAL: Data = {
 
 const ROW_LABELS = { cafe: 'You: café', park: 'You: park' } as const;
 const COL_LABELS = { cafe: 'Nina: café', park: 'Nina: park' } as const;
-const FOCAL: FriendInfo = { kind: 'focal', place: 'cafe' };
 const NINA_AT: Record<Place, string> = { cafe: 'At the café', park: 'At the park' };
 
 const TRANSFER: TransferOption[] = [
@@ -115,12 +114,12 @@ const TRANSFER_ANALOGY = {
 
 export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) {
   const TOTAL = 11;
-  const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL);
+  const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL, coordinationRecords);
   const enter = useEnter();
   const equilibria = equilibriumSummary();
 
-  const friend1 = friendPolicy({ kind: 'none' });
-  const friend2 = friendPolicy(FOCAL);
+  const friend1 = friendPolicy(ROUND_INFO[1]);
+  const friend2 = friendPolicy(ROUND_INFO[2]);
   const r1 = data.committed1 && data.pick1 ? resolveMeetup(data.pick1, friend1) : null;
   const r2 = data.committed2 && data.pick2 ? resolveMeetup(data.pick2, friend2) : null;
   const predict1 = lockedAnswer(data.predict1);

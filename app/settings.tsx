@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { X } from '@/src/components/ui/icons';
+import { Download, X } from '@/src/components/ui/icons';
 import { useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,10 @@ import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
+import { LESSONS } from '@/src/content/lessons';
+import { buildLearningExport, exportFileName } from '@/src/features/learning/records';
+import { shareJsonFile } from '@/src/features/learning/shareFile';
+import { type ShareOutcome, isShareFailure, shareOutcomeMessage } from '@/src/features/learning/shareOutcome';
 import { useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
@@ -55,10 +59,12 @@ export default function SettingsScreen() {
             ) : null}
           </Card>
 
+          <LearningDataCard />
+
           <Card style={{ gap: space.md }}>
             <AppText variant="bodyStrong">Progress</AppText>
             <AppText variant="small" color={colors.textMuted}>
-              Progress is saved on this device only. Resetting clears completed lessons and any lesson in progress.
+              Progress is saved on this device only. Resetting clears completed lessons, any lesson in progress and your recorded predictions. Your goal is kept.
             </AppText>
             {confirmReset ? (
               <View style={{ flexDirection: 'row', gap: space.sm }}>
@@ -81,6 +87,56 @@ export default function SettingsScreen() {
         </View>
       </ScrollView>
     </View>
+  );
+}
+
+/**
+ * Export the learning record as JSON. Only on request; the app never sends it anywhere by itself.
+ * Uses the same records as the profile (see docs/LEARNING_DATA.md for the format).
+ */
+function LearningDataCard() {
+  const learning = useProgress((s) => s.learning);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<{ text: string; failed: boolean } | null>(null);
+
+  const exportData = async () => {
+    if (busy) return;
+    setBusy(true);
+    setStatus(null);
+    const now = new Date();
+    const fileName = exportFileName(now);
+    let outcome: ShareOutcome;
+    try {
+      const { learning: attempts, completed, runtime, goal } = useProgress.getState();
+      const inProgress = LESSONS.filter((l) => (runtime[l.id]?.step ?? 0) > 0).map((l) => l.id);
+      const json = JSON.stringify(buildLearningExport({ attempts, completed, inProgress, goal, now }), null, 2);
+      outcome = await shareJsonFile(json, fileName);
+    } catch (error) {
+      // shareJsonFile reports its own failures; anything thrown here happened while preparing the data.
+      outcome = { kind: 'serialize-error', detail: String(error) };
+    }
+    setStatus({ text: shareOutcomeMessage(outcome, fileName), failed: isShareFailure(outcome) });
+    setBusy(false);
+  };
+
+  return (
+    <Card style={{ gap: space.md }}>
+      <AppText variant="bodyStrong">Learning data</AppText>
+      <AppText variant="small" color={colors.textMuted}>
+        Your predictions, confidence ratings and how each was evaluated are kept only on this device. They power your profile. Export a copy as a JSON file to keep, inspect or share — no names or account details are included.
+      </AppText>
+      <AppText variant="caption" color={colors.textMuted}>
+        {learning.length === 0
+          ? 'No predictions recorded yet — an export now would contain only your lesson progress.'
+          : `${learning.length} ${learning.length === 1 ? 'prediction' : 'predictions'} recorded.`}
+      </AppText>
+      <Button label={busy ? 'Preparing…' : 'Export learning data'} variant="secondary" compact icon={Download} iconPosition="left" disabled={busy} onPress={exportData} />
+      {status ? (
+        <AppText variant="small" color={status.failed ? colors.danger : colors.textBody} accessibilityLiveRegion="polite">
+          {status.text}
+        </AppText>
+      ) : null}
+    </Card>
   );
 }
 

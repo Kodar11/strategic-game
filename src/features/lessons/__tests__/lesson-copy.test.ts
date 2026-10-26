@@ -146,7 +146,8 @@ describe('Lesson 3 — reading Nina', () => {
     assert.equal(l3.meetupFeedback(1, 'park', r1('park')).verdict, 'match');
     assert.equal(l3.meetupFeedback(1, 'park', r1('cafe')).verdict, 'defensible');
     assert.match(l3.meetupFeedback(1, 'park', r1('cafe')).text, /best move is simply wherever you expect her/);
-    assert.equal(l3.meetupFeedback(1, 'cafe', r1('cafe')).verdict, 'defensible');
+    // Round 1: Nina's rule was hidden, so expecting the café and going there is a reasonable call, not a flaw.
+    assert.equal(l3.meetupFeedback(1, 'cafe', r1('cafe')).verdict, 'reasonable');
     assert.equal(l3.meetupFeedback(2, 'cafe', r2('cafe')).verdict, 'match');
     assert.equal(l3.meetupFeedback(2, 'park', r2('park')).verdict, 'misconception');
   });

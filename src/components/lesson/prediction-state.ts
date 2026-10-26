@@ -30,6 +30,11 @@ export interface PredictionAttempt<T extends string> {
   /** Optional only while the attempt is a draft. Never defaulted: null means "not rated yet". */
   confidence: Confidence | null;
   locked: boolean;
+  /**
+   * When the attempt was locked (ms since epoch). Together with the prediction it identifies this attempt in the
+   * learning record, so a retry or replay is a new attempt and re-renders never record one twice.
+   */
+  lockedAt?: number;
 }
 
 export type PredictionStatus = 'unanswered' | 'draft' | 'locked' | 'evaluated';
@@ -41,7 +46,13 @@ export function emptyPrediction<T extends string>(): PredictionAttempt<T> {
 /** Runtime validation for a saved attempt. A locked attempt must carry both an answer and a confidence. */
 export function predictionSchema<T extends string>(answer: z.ZodType<T>) {
   return z
-    .object({ answer: answer.nullable(), confidence: confidenceSchema.nullable(), locked: z.boolean() })
+    .object({
+      answer: answer.nullable(),
+      confidence: confidenceSchema.nullable(),
+      locked: z.boolean(),
+      // Optional so attempts saved before it existed still load.
+      lockedAt: z.number().int().nonnegative().optional(),
+    })
     .refine((a) => !a.locked || (a.answer !== null && a.confidence !== null), 'A locked prediction needs an answer and a confidence');
 }
 
@@ -65,8 +76,8 @@ export function canLock(a: PredictionAttempt<string>): boolean {
 }
 
 /** Lock a complete draft. Idempotent, and a no-op for an incomplete draft, so double taps can't misfire. */
-export function lockPrediction<T extends string>(a: PredictionAttempt<T>): PredictionAttempt<T> {
-  return canLock(a) ? { ...a, locked: true } : a;
+export function lockPrediction<T extends string>(a: PredictionAttempt<T>, now: number = Date.now()): PredictionAttempt<T> {
+  return canLock(a) ? { ...a, locked: true, lockedAt: now } : a;
 }
 
 /** The answer, only once it has been committed — what feedback, recaps and reveals may use. */

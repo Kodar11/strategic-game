@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ArrowRight, CircleCheck, Clock, Play, RotateCcw, Settings } from '@/src/components/ui/icons';
+import { ArrowRight, CircleCheck, Clock, Play, RotateCcw, Settings, UserRound } from '@/src/components/ui/icons';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -51,7 +51,10 @@ export default function Home() {
                 Strategic
               </AppText>
             </View>
-            <IconButton icon={Settings} label="Settings" onPress={() => router.push('/settings')} />
+            <View style={{ flexDirection: 'row', gap: space.xs }}>
+              <IconButton icon={UserRound} label="Your strategic thinking profile" onPress={() => router.push('/profile')} />
+              <IconButton icon={Settings} label="Settings" onPress={() => router.push('/settings')} />
+            </View>
           </View>
 
           {/* Hero */}

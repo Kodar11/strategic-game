@@ -1,5 +1,15 @@
+import { type PredictionAttempt, lockedAnswer } from '../../../components/lesson/prediction-state.ts';
 import type { Feedback } from '../../../components/lesson/verdict.ts';
-import { type Population, type RoundResult, bestGuess, bestGuessForPopulation, levelKGuess, shiftPopulation } from '../../../game/two-thirds-game.ts';
+import {
+  type Population,
+  type RoundResult,
+  bestGuess,
+  bestGuessForPopulation,
+  levelKGuess,
+  playRound,
+  shiftPopulation,
+} from '../../../game/two-thirds-game.ts';
+import { type LearningAttempt, recordAttempt } from '../../learning/records.ts';
 
 /** Lesson 2 wording that depends on the learner's predictions and picks. Pure, so tests can pin it to the model. */
 
@@ -68,15 +78,31 @@ export function averagePredictionFeedback(guess: AverageGuess, result: Pick<Roun
   if (nearest === guess) {
     return { verdict: 'match', text: `The other ten averaged ${avgText}, close to what you expected. You modelled this crowd, not just the rules.${followThrough}` };
   }
+  // Expecting the whole crowd to reason down to 0 is the misconception this lesson targets: it treats every
+  // player as a perfect theorist. Any other forecast was a judgement call about people whose rules were hidden.
+  if (guess === 'zero') {
+    return {
+      verdict: 'misconception',
+      text: `The other ten averaged ${avgText}. Expecting everyone to reason all the way down to 0 assumes every player is a perfect theorist — real crowds rarely are, and that gap is what this lesson is about.${followThrough}`,
+    };
+  }
   const centre = AVERAGE_GUESSES.find((g) => g.id === guess)!.centre;
   return {
-    verdict: 'misconception',
+    verdict: 'reasonable',
     text:
       (centre > avg
         ? `The other ten averaged ${avgText} — lower than you expected. More of them were thinking ahead than you assumed.`
-        : `The other ten averaged ${avgText} — higher than you expected. Fewer of them reasoned as deeply as you assumed.`) + followThrough,
+        : `The other ten averaged ${avgText} — higher than you expected. Fewer of them reasoned as deeply as you assumed.`) +
+      ` You couldn't see their rules yet, so this miss isn't a reasoning mistake — forecasting a crowd is uncertain.${followThrough}`,
   };
 }
+
+/** The recap's verdict on the crowd forecast, from the same evaluation as the feedback. */
+const CROWD_NOTE: Partial<Record<Feedback['verdict'], string>> = {
+  match: 'a close read',
+  reasonable: 'a reasonable forecast — their rules were hidden',
+  misconception: 'real crowds rarely reason all the way to 0',
+};
 
 // ── Crowd lab ────────────────────────────────────────────────────────────────
 
@@ -122,7 +148,10 @@ export function detectiveRecap(d: {
 }): string[] {
   const lines: string[] = [];
   if (d.averageGuess && d.round1) {
-    lines.push(`You expected the crowd to average ${averageGuessLabel(d.averageGuess).split(' — ')[0].toLowerCase()}; they averaged ${othersAverage(d.round1).toFixed(1)}.`);
+    const note = CROWD_NOTE[averagePredictionFeedback(d.averageGuess, d.round1).verdict];
+    lines.push(
+      `You expected the crowd to average ${averageGuessLabel(d.averageGuess).split(' — ')[0].toLowerCase()}; they averaged ${othersAverage(d.round1).toFixed(1)}${note ? ` (${note})` : ''}.`,
+    );
   }
   for (const [n, r] of [
     [1, d.round1],
@@ -135,4 +164,28 @@ export function detectiveRecap(d: {
     lines.push(moved ? 'You lowered your pick when the crowd thought deeper — adjusting to the players, not just the rules.' : 'You kept or raised your pick in round 2, while the crowd moved lower.');
   }
   return lines;
+}
+
+// ── Learning record ──────────────────────────────────────────────────────────
+
+/**
+ * Lesson 2's evaluated predictions. The crowd forecast is recorded as an *uncertain* prediction (the crowd's rules
+ * were hidden), so a reasonable miss never counts against the learner's calibration or skills.
+ */
+export function detectiveRecords(d: {
+  crowdPrediction: PredictionAttempt<AverageGuess>;
+  guess1: number;
+  committed1: boolean;
+  labPrediction: PredictionAttempt<LabPrediction>;
+  labTouched: boolean;
+}): (LearningAttempt | null)[] {
+  const crowd = lockedAnswer(d.crowdPrediction);
+  const lab = lockedAnswer(d.labPrediction);
+  const round1 = crowd && d.committed1 ? playRound(d.guess1, ROUND1_POP, ROUND1_SEED) : null;
+  return [
+    crowd && round1
+      ? recordAttempt('l2.crowd', d.crowdPrediction, averagePredictionFeedback(crowd, round1).verdict, `The other ten averaged ${othersAverage(round1).toFixed(1)}`)
+      : null,
+    lab && d.labTouched ? recordAttempt('l2.lab', d.labPrediction, labPredictionFeedback(lab).verdict, 'Your best pick goes down against deeper thinkers') : null,
+  ];
 }

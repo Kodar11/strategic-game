@@ -1,6 +1,17 @@
 import { type PredictionAttempt, emptyPrediction, lockPrediction, lockedAnswer } from '../../../components/lesson/prediction-state.ts';
 import type { Feedback } from '../../../components/lesson/verdict.ts';
-import { type ShotRecord, type StrikerStrategy, guaranteedPayoff, keeperBestResponse } from '../../../game/mixed-strategy.ts';
+import { type ShotRecord, type StrikerStrategy, guaranteedPayoff, keeperBestResponse, playSeries, strategySequence } from '../../../game/mixed-strategy.ts';
+import { type LearningAttempt, recordAttempt } from '../../learning/records.ts';
+
+/** The keeper's base seed and the length of each comparison run. Shared by the screen and the learning record. */
+export const KEEPER_SEED = 4242;
+export const COMPARE_SHOTS = 40;
+export const STRIKER_STRATEGIES: readonly StrikerStrategy[] = ['repeat', 'alternate', 'random'];
+
+/** One comparison run: every striker strategy against Maya's stated policy, for a given run seed. */
+export function compareResults(seed: number) {
+  return STRIKER_STRATEGIES.map((id) => ({ id, result: playSeries(strategySequence(id, COMPARE_SHOTS, seed + 1), KEEPER_SEED + seed) }));
+}
 
 /** Lesson 4 wording that depends on the learner's predictions and shots. Pure, so tests can pin it to the model. */
 
@@ -120,4 +131,25 @@ export function predictabilityRecap(d: { shots: readonly ShotRecord[]; comparePi
     );
   }
   return lines;
+}
+
+// ── Learning record ──────────────────────────────────────────────────────────
+
+/**
+ * Lesson 4's evaluated predictions. The comparison is recorded from the first run after locking (later reruns
+ * share the attempt id, so they never rewrite it); the lab once its first simulation reveals the answer.
+ */
+export function predictabilityRecords(d: MixLabState & { comparePrediction: PredictionAttempt<StrikerStrategy>; compareSeed: number | null }): (LearningAttempt | null)[] {
+  const pick = lockedAnswer(d.comparePrediction);
+  let compare: LearningAttempt | null = null;
+  if (pick && d.compareSeed !== null) {
+    const results = compareResults(d.compareSeed).map((r) => ({ id: r.id, goals: r.result.goals }));
+    const top = results.reduce((a, b) => (b.goals > a.goals ? b : a));
+    compare = recordAttempt('l4.compare', d.comparePrediction, comparePredictionFeedback(pick, results).verdict, `${STRATEGY_LABEL[top.id]} scored most (${top.goals}/${COMPARE_SHOTS})`);
+  }
+  const labFb = mixLabFeedback(d);
+  const lab = labFb
+    ? recordAttempt('l4.lab', d.labPrediction, labFb.verdict, `${guaranteedPayoff(LAB_START_Q).toFixed(2)} goals a shot at ${Math.round(LAB_START_Q * 100)}% left`)
+    : null;
+  return [compare, lab];
 }

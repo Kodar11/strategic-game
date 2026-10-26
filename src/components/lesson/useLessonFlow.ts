@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { z } from 'zod';
 
 import type { LessonId } from '@/src/content/lessons';
+import type { LearningAttempt } from '@/src/features/learning/records';
 import { narration } from '@/src/features/audio/narration';
 import { useProgress } from '@/src/store/progress';
 
@@ -10,7 +11,17 @@ import { useProgress } from '@/src/store/progress';
  * Saved after every change so leaving mid-lesson resumes where the learner was.
  * Persisted data is validated with the lesson's schema; anything invalid restarts the lesson cleanly.
  */
-export function useLessonFlow<S extends z.ZodType>(lessonId: LessonId, schema: S, initial: z.infer<S>, totalSteps: number) {
+export function useLessonFlow<S extends z.ZodType>(
+  lessonId: LessonId,
+  schema: S,
+  initial: z.infer<S>,
+  totalSteps: number,
+  /**
+   * The lesson's evaluated predictions for the current state (null for anything not evaluated yet). A module-level
+   * pure function; records are deduplicated by attempt id, so calling it on every change is safe.
+   */
+  records?: (data: z.infer<S>) => (LearningAttempt | null)[],
+) {
   type Data = z.infer<S>;
 
   const [state, setState] = useState<{ step: number; data: Data }>(() => {
@@ -28,6 +39,13 @@ export function useLessonFlow<S extends z.ZodType>(lessonId: LessonId, schema: S
   const completedRef = useRef(false);
   const saveRuntime = useProgress((s) => s.saveRuntime);
   const markComplete = useProgress((s) => s.markComplete);
+  const recordAttempts = useProgress((s) => s.recordAttempts);
+
+  // Add newly evaluated predictions to the learning record. Restored and re-rendered states produce the same ids,
+  // so nothing is recorded twice; a retry or replay locks a new attempt with a new id.
+  useEffect(() => {
+    if (records) recordAttempts(records(state.data));
+  }, [records, recordAttempts, state.data]);
 
   // Reaching the final step (only possible after every gated step) completes the lesson and clears its runtime.
   useEffect(() => {

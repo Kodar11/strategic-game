@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 
 import { LESSON_IDS, type LessonId, lessonIdSchema } from '@/src/content/lessons';
+import { type GoalId, type LearningAttempt, mergeAttempts, sanitizeAttempts, sanitizeGoal } from '@/src/features/learning/records';
 import { DEFAULT_SETTINGS, type Settings, sanitizeSettings } from './settings';
 
 export type { Settings } from './settings';
@@ -21,11 +22,17 @@ interface ProgressState {
   completed: LessonId[];
   runtime: Partial<Record<LessonId, LessonRuntime>>;
   settings: Settings;
+  /** Evaluated prediction attempts — the source of truth for the profile and the export. Survives completion. */
+  learning: LearningAttempt[];
+  /** Optional "what would you like to get better at?" answer. Null until the learner chooses. */
+  goal: GoalId | null;
   hydrated: boolean;
   saveRuntime: (id: LessonId, step: number, total: number, data: unknown) => void;
   clearRuntime: (id: LessonId) => void;
   markComplete: (id: LessonId) => void;
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
+  recordAttempts: (attempts: readonly (LearningAttempt | null)[]) => void;
+  setGoal: (goal: GoalId | null) => void;
   resetProgress: () => void;
 }
 
@@ -39,6 +46,8 @@ export const useProgress = create<ProgressState>()(
       completed: [],
       runtime: {},
       settings: DEFAULT_SETTINGS,
+      learning: [],
+      goal: null,
       hydrated: false,
       saveRuntime: (id, step, total, data) =>
         set((s) => ({ runtime: { ...s.runtime, [id]: { step, total, data, updatedAt: Date.now() } } })),
@@ -55,13 +64,21 @@ export const useProgress = create<ProgressState>()(
           return { completed: s.completed.includes(id) ? s.completed : [...s.completed, id], runtime };
         }),
       setSetting: (key, value) => set((s) => ({ settings: { ...s.settings, [key]: value } })),
-      resetProgress: () => set({ completed: [], runtime: {} }),
+      // Deduplicated by attempt id, so re-renders, resumes and repeated effects never add a record twice.
+      recordAttempts: (attempts) =>
+        set((s) => {
+          const learning = mergeAttempts(s.learning, attempts);
+          return learning === s.learning ? s : { learning };
+        }),
+      setGoal: (goal) => set({ goal }),
+      // Resetting progress also clears the learning history built from it; the goal is a preference and stays.
+      resetProgress: () => set({ completed: [], runtime: {}, learning: [] }),
     }),
     {
       name: 'strategic-game/progress',
       version: 1,
       storage: createJSONStorage(() => storage),
-      partialize: ({ completed, runtime, settings }) => ({ completed, runtime, settings }),
+      partialize: ({ completed, runtime, settings, learning, goal }) => ({ completed, runtime, settings, learning, goal }),
       // Drop anything unrecognised so a corrupted or older save can never break the app.
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<ProgressState>;
@@ -76,7 +93,10 @@ export const useProgress = create<ProgressState>()(
           }
         }
         const settings = sanitizeSettings(p.settings);
-        return { ...current, completed, runtime, settings };
+        // Saves from before the learning record existed simply start with an empty history.
+        const learning = sanitizeAttempts(p.learning);
+        const goal = sanitizeGoal(p.goal);
+        return { ...current, completed, runtime, settings, learning, goal };
       },
       onRehydrateStorage: () => () => {
         useProgress.setState({ hydrated: true });
