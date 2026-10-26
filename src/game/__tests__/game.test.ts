@@ -9,6 +9,7 @@ import {
   evaluatePolicy,
   regimeFor,
   rivalPolicy,
+  withDetection,
 } from '../incentives.ts';
 import {
   colBestResponses,
@@ -108,6 +109,15 @@ describe('Lesson 5 — incentive design', () => {
     assert.deepEqual(payoffAt(g, 'cut', 'cut'), [5, 5]);
     assert.deepEqual(payoffAt(g, 'maintain', 'cut'), [6, 10]);
     assert.deepEqual(payoffAt(g, 'maintain', 'maintain'), [11, 11]);
+  });
+
+  it('imperfect detection makes a penalty act like a smaller one', () => {
+    // p = 3 caught half the time behaves like p = 1.5: cutting stays dominant.
+    assert.equal(regimeFor(withDetection({ cutPenalty: 3, maintainReward: 0 }, 0.5)), 'cut-dominant');
+    assert.equal(regimeFor(withDetection({ cutPenalty: 4, maintainReward: 0 }, 0.5)), 'tie');
+    assert.equal(regimeFor(withDetection({ cutPenalty: 5, maintainReward: 0 }, 0.5)), 'maintain-dominant');
+    assert.equal(regimeFor(withDetection({ cutPenalty: 0, maintainReward: 2.5 }, 0)), 'maintain-dominant');
+    assert.deepEqual(withDetection({ cutPenalty: 3, maintainReward: 0 }, 1), { cutPenalty: 3, maintainReward: 0 });
   });
 
   it('accounts for money collected and paid at the predicted outcome', () => {

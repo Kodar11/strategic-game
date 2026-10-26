@@ -6,6 +6,8 @@
     "@expo-google-fonts/inter": "^0.4.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.30",
+    "expo-asset": "~57.0.20",
+    "expo-audio": "~57.0.5",
     "expo-constants": "~57.0.22",
     "expo-font": "~57.0.4",
     "expo-haptics": "~57.0.3",
@@ -45,9 +47,11 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "node --test \"src/game/__tests__/*.test.ts\"",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"src/**/__tests__/*.test.ts\" \"scripts/__tests__/*.test.mjs\"",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "tts": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-tts.mjs",
+    "tts:audition": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-tts.mjs --audition"
   },
   "private": true
 }

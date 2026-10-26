@@ -83,6 +83,16 @@ export function regimeFor(rules: IncentiveRules): Regime {
   return margin > 0 ? 'cut-dominant' : 'maintain-dominant';
 }
 
+/**
+ * Lesson 5 stress test: only a share `detection` (0–1) of price cuts is caught. Assuming companies weigh a
+ * fine by the chance of paying it, a penalty p acts like a certain penalty of detection × p. Rewards for
+ * maintaining are paid without catching anyone, so they are unchanged. Everything else uses the same formulas.
+ */
+export function withDetection(rules: IncentiveRules, detection: number): IncentiveRules {
+  const safe = sanitizeRules(rules);
+  return { cutPenalty: safe.cutPenalty * clamp(detection, 0, 1), maintainReward: safe.maintainReward };
+}
+
 export function cutAdvantage(rules: IncentiveRules): number {
   const { cutPenalty, maintainReward } = sanitizeRules(rules);
   return BASE_CUT_ADVANTAGE - cutPenalty - maintainReward;

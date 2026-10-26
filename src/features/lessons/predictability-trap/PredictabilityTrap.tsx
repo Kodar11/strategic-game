@@ -6,7 +6,8 @@ import { z } from 'zod';
 import { SceneArt } from '@/src/components/art/SceneArt';
 import { Completion } from '@/src/components/lesson/Completion';
 import { LessonShell, type StepDef } from '@/src/components/lesson/LessonShell';
-import { Dialogue, Panel, Stat, StepHeading } from '@/src/components/lesson/Panels';
+import { Dialogue, FeedbackPanel, Panel, Stat, StepHeading } from '@/src/components/lesson/Panels';
+import { PredictionPrompt } from '@/src/components/lesson/Prediction';
 import { TransferQuestion, type TransferOption } from '@/src/components/lesson/TransferQuestion';
 import { useEnter } from '@/src/components/lesson/motion';
 import { useLessonFlow } from '@/src/components/lesson/useLessonFlow';
@@ -16,6 +17,8 @@ import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
 import { Slider } from '@/src/components/ui/Slider';
 import type { LessonMeta } from '@/src/content/lessons';
+import { keeperReviewClip, shotReactionClip } from '@/src/features/audio/reactions';
+import { NarrateOn, NarrateOnMount } from '@/src/features/audio/useNarration';
 import {
   HABIT_MARGIN,
   KEEPER_WINDOW,
@@ -33,6 +36,7 @@ import {
 import { createRng } from '@/src/game/rng';
 import { haptic } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
+import { COMPARE_PREDICTIONS, LAB_PREDICTIONS, comparePredictionFeedback, labPredictionFeedback, predictabilityRecap } from './copy';
 
 const SHOTS_TO_TAKE = 8;
 const KEEPER_SEED = 4242;
@@ -52,7 +56,9 @@ const shotSchema = z.object({
 const schema = z.object({
   firstPick: side.nullable(),
   shots: z.array(shotSchema).max(SHOTS_TO_TAKE),
+  comparePick: z.enum(['repeat', 'alternate', 'random']).nullable(),
   compareSeed: z.number().int().min(0).nullable(),
+  labPick: z.enum(['high', 'half', 'low']).nullable(),
   q: z.number().min(0).max(1),
   simSeed: z.number().int().min(0).nullable(),
   transferPick: z.string().nullable(),
@@ -63,7 +69,9 @@ type Data = z.infer<typeof schema>;
 const INITIAL: Data = {
   firstPick: null,
   shots: [],
+  comparePick: null,
   compareSeed: null,
+  labPick: null,
   q: 0.8,
   simSeed: null,
   transferPick: null,
@@ -87,25 +95,42 @@ const STRATEGIES: { id: StrikerStrategy; label: string; rule: string; Icon: type
 
 const TRANSFER: TransferOption[] = [
   {
-    id: 'random',
-    label: 'Check on unpredictable days and routes',
-    strong: true,
+    id: 'weighted',
+    label: 'Unpredictable days and times, with more checks where fare-dodging is most common',
+    verdict: 'strong',
+    clip: 'l4.transfer.weighted',
     feedback:
-      'If riders can’t predict when checks happen, skipping a ticket is risky on every trip. The same number of inspectors deters more fare-dodging.',
+      'Riders can’t time their dodging, so skipping a ticket is risky on every trip — and the checks lean towards the routes where they matter most. Unpredictable doesn’t have to mean evenly spread.',
+  },
+  {
+    id: 'uniform',
+    label: 'Pick days and routes completely at random, each equally often',
+    verdict: 'defensible',
+    clip: 'l4.transfer.uniform',
+    feedback:
+      'Nothing for riders to learn, which is the key idea. But routes differ: an even spread wastes checks on routes where hardly anyone dodges. The right mix depends on the payoffs, like a striker with a stronger side.',
   },
   {
     id: 'fixed',
     label: 'Check the busiest route every Monday morning',
-    strong: false,
+    verdict: 'misconception',
+    clip: 'l4.transfer.fixed',
     feedback: 'A fixed schedule is easy to learn. Fare-dodgers simply avoid Monday mornings on that route.',
   },
   {
     id: 'rotate',
     label: 'Rotate through routes in a fixed order',
-    strong: false,
+    verdict: 'misconception',
+    clip: 'l4.transfer.rotate',
     feedback: 'Rotation feels varied, but a fixed cycle is still a pattern — once noticed, it is as exploitable as alternating shots.',
   },
 ];
+
+const TRANSFER_ANALOGY = {
+  holds: 'Inspectors and riders are like keeper and striker: whoever can read the other’s pattern wins, so a learnable schedule gets exploited.',
+  differs:
+    'There are many routes rather than two sides, the stakes differ by route, and riders only see part of the schedule — so the best mix isn’t 50/50 and depends on what each check is worth.',
+};
 
 export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
   const TOTAL = 10;
@@ -133,12 +158,12 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
           <Animated.View entering={enter(0, 'fade')} style={{ borderRadius: 20, overflow: 'hidden' }}>
             <SceneArt scene="shootout" height={180} />
           </Animated.View>
-          <StepHeading kicker="Lesson 4" title="The penalty shootout" body="You shoot left or right. Maya, in goal, dives left or right at the same moment." />
+          <StepHeading kicker="Lesson 4" title="The penalty shootout" body="You shoot left or right. Maya, in goal, dives left or right at the same moment." clip="l4.intro.heading" />
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             <Stat label="She dives the other way" value="Goal" tone="blue" caption="you score 1" />
             <Stat label="She guesses your side" value="Save" tone="orange" caption="you score 0" />
           </View>
-          <Dialogue character="maya" expression="thinking" align="right" delay={120}>
+          <Dialogue character="maya" expression="thinking" align="right" delay={120} clip="l4.intro.maya">
             I don&apos;t know where you&apos;ll shoot. But I&apos;ll be watching every shot you take.
           </Dialogue>
         </>
@@ -185,6 +210,9 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
               </Card>
             </Animated.View>
           ) : null}
+          {/* Maya reacts to each shot as it resolves; a newer shot cuts off the previous reaction. */}
+          {data.shots.length === 1 && last ? <NarrateOnMount clip={shotReactionClip(last)} narrationKey="l4.shot@1" /> : null}
+          <NarrateOn clip={last ? shotReactionClip(last) : null} trigger={data.shots.length} narrationKey={`l4.shot@${data.shots.length}`} />
           <History shots={data.shots} />
           {data.shots.length < SHOTS_TO_TAKE ? (
             <View style={{ flexDirection: 'row', gap: space.sm }}>
@@ -223,7 +251,7 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
               <Stat label="Saves from those reads" value={String(readSaves)} tone="orange" />
               <Stat label="Your goals" value={`${goals}/${SHOTS_TO_TAKE}`} tone="blue" />
             </View>
-            <Dialogue character="maya" expression={readSaves >= 3 ? 'confident' : 'frustrated'} align="right">
+            <Dialogue character="maya" expression={readSaves >= 3 ? 'confident' : 'frustrated'} align="right" clip={keeperReviewClip(readSaves)}>
               {readSaves >= 3 ? 'People think they’re being random. Most of them have a rhythm.' : 'You didn’t give me much to work with. Annoying.'}
             </Dialogue>
           </>
@@ -233,13 +261,21 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
     {
       key: 'compare',
       canContinue: data.compareSeed !== null,
-      blockedHint: 'Run the comparison to continue.',
+      blockedHint: data.comparePick ? 'Run the comparison to continue.' : 'Predict the winner, then run the comparison.',
       render: () => {
         const seed = data.compareSeed;
         const results = seed === null ? null : STRATEGIES.map((s) => ({ ...s, result: playSeries(strategySequence(s.id, COMPARE_SHOTS, seed + 1), KEEPER_SEED + seed) }));
+        const compareFb = results && data.comparePick ? comparePredictionFeedback(data.comparePick, results.map((r) => ({ id: r.id, goals: r.result.goals }))) : null;
         return (
           <>
-            <StepHeading kicker="Experiment" title="Three strikers, same keeper" body={`Each strategy takes ${COMPARE_SHOTS} shots against Maya's policy.`} />
+            <StepHeading kicker="Experiment" title="Three strikers, same keeper" body={`Each strategy takes ${COMPARE_SHOTS} shots against Maya's stated policy. Her policy never changes — only the striker does.`} />
+            <PredictionPrompt
+              question="Which striker will score the most?"
+              options={COMPARE_PREDICTIONS}
+              value={data.comparePick}
+              onChange={(comparePick) => update({ comparePick })}
+              locked={seed !== null}
+            />
             <Card style={{ gap: space.lg }}>
               {STRATEGIES.map((s, i) => {
                 const r = results?.[i].result;
@@ -267,8 +303,15 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
             <Button
               label={seed === null ? 'Run the comparison' : 'Run again with new coin flips'}
               variant="secondary"
+              disabled={!data.comparePick}
               onPress={() => update((d) => ({ compareSeed: d.compareSeed === null ? 1 : d.compareSeed + 1 }))}
             />
+            <NarrateOn clip="l4.compare.patterns" trigger={seed !== null} />
+            {results && compareFb ? (
+              <FeedbackPanel verdict={compareFb.verdict} title="Your prediction">
+                {compareFb.text}
+              </FeedbackPanel>
+            ) : null}
             {results ? (
               <Panel tone="insight" title="Patterns get punished">
                 Always-left and alternating are both perfectly predictable once Maya has a few shots of history. The random striker gives her nothing reliable to read: her reads are no better than guesses, so it scores around half — more or less, depending on the run.
@@ -283,7 +326,7 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
       render: () => (
         <>
           <StepHeading kicker="The idea" title="Mixed strategies" />
-          <Dialogue character="meera" expression="explaining">
+          <Dialogue character="meera" expression="explaining" clip="l4.mixed.meera">
             Choosing each side with a fixed probability is called a mixed strategy. Mixing 50/50 here means your chance of scoring doesn&apos;t depend on what she does.
           </Dialogue>
           <Card style={{ gap: space.sm }}>
@@ -299,19 +342,37 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
           <Panel tone="info" title="Equilibrium">
             If you mix 50/50, she can&apos;t do better than 50/50 either, and vice versa. Neither can gain by changing alone — this is the game&apos;s mixed-strategy equilibrium.
           </Panel>
+          <AppText variant="small" color={colors.textMuted}>
+            A mix describes how often you pick each side — not a rule for which side comes next. Switching every time is the &ldquo;Alternate&rdquo; striker Maya just punished.
+          </AppText>
         </>
       ),
     },
     {
       key: 'lab',
       canContinue: data.simSeed !== null,
-      blockedHint: 'Run at least one simulation.',
+      blockedHint: data.labPick ? 'Run at least one simulation.' : 'Make a prediction first.',
       render: () => {
         const q = data.q;
         const sim = data.simSeed === null ? null : simulateMix(q, SIM_SHOTS, data.simSeed);
+        const labFb = data.labPick ? labPredictionFeedback(data.labPick) : null;
         return (
           <>
             <StepHeading kicker="Simulation lab" title="Tune your mix" body="Set how often you shoot left. Assume Maya has studied you long enough to know this number, and always dives to the side that hurts you most." />
+            <PredictionPrompt
+              question="You shoot left 80% of the time, and Maya knows it. How many goals a shot can you count on?"
+              options={LAB_PREDICTIONS}
+              value={data.labPick}
+              onChange={(labPick) => update({ labPick })}
+              locked={!!data.labPick}
+            />
+            {labFb ? (
+              <FeedbackPanel verdict={labFb.verdict} title="Your prediction">
+                {labFb.text}
+              </FeedbackPanel>
+            ) : null}
+            {data.labPick ? (
+              <>
             <Card style={{ gap: space.lg }}>
               <Slider
                 label="Chance you shoot left"
@@ -348,6 +409,8 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
                 </AppText>
               </Card>
             ) : null}
+              </>
+            ) : null}
           </>
         );
       },
@@ -356,13 +419,19 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
       key: 'caveat',
       render: () => (
         <>
-          <StepHeading title="Is 50/50 always right?" body="Only in this model, where both sides are equally good for you and equally easy for her." />
-          <Dialogue character="sen" expression="thinking">
+          <StepHeading title="When does unpredictability help?" body="50/50 is right only in this model, where both sides are equally good for you and equally easy for her to reach." />
+          <Dialogue character="sen" expression="thinking" clip="l4.caveat.sen">
             Real strikers have a stronger side, and keepers reach some corners better. Then the equilibrium mix shifts away from 50/50 — the principle stays the same: leave no exploitable pattern.
           </Dialogue>
           <Panel tone="caution" title="Random isn't careless">
             Mixing is a deliberate choice of probabilities. Being unpredictable only matters when someone is watching and can react to your pattern.
           </Panel>
+          <Card style={{ gap: space.xs }}>
+            <SectionLabel>When consistency wins</SectionLabel>
+            <AppText variant="small">
+              If the other person is on your side — like Nina trying to find you in Lesson 3 — being predictable is exactly what helps. Unpredictability pays only against someone who gains by reading you.
+            </AppText>
+          </Card>
         </>
       ),
     },
@@ -372,7 +441,11 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
       blockedHint: 'Pick an answer and check your reasoning.',
       render: () => (
         <>
-          <StepHeading kicker="New situation" title="Ticket inspections" body="A tram network can afford inspectors on only a few trams each day. Riders notice when and where checks happen." />
+          <StepHeading
+            kicker="New situation"
+            title="Ticket inspections"
+            body="A tram network can afford inspectors on only a few trams each day. Riders notice when and where checks happen. Fare-dodging is common on a few routes and rare on most."
+          />
           <TransferQuestion
             question="Which schedule discourages fare-dodging most?"
             options={TRANSFER}
@@ -380,6 +453,7 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
             checked={data.transferChecked}
             onPick={(id) => update({ transferPick: id })}
             onCheck={() => update({ transferChecked: true })}
+            analogy={TRANSFER_ANALOGY}
           />
         </>
       ),
@@ -390,11 +464,15 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
         <Completion
           lesson={lesson}
           takeaway="If an opponent can learn your pattern, your pattern becomes their advantage."
+          takeawayClip="l4.done.takeaway"
           remember={[
             'Repeating and alternating are both patterns.',
             'A mixed strategy can make your result independent of the opponent’s choice.',
             'Short-run results are noisy; judge a strategy by its expected value.',
           ]}
+          recap={predictabilityRecap({ shots: data.shots, comparePick: data.comparePick, labPick: data.labPick })}
+          reflection="Where could someone exploit a routine of yours — and where does the same routine help the people on your side?"
+          nextHook="So far you have played inside the rules. Next, you get to rewrite them."
           onReplay={restart}
         />
       ),

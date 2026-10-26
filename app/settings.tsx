@@ -34,6 +34,12 @@ export default function SettingsScreen() {
 
           <Card style={{ gap: space.lg }}>
             <Row
+              title="Narration"
+              body="Prof. Sen and the cast read their lines aloud. All text stays on screen either way."
+              value={settings.narration}
+              onChange={(v) => setSetting('narration', v)}
+            />
+            <Row
               title="Reduce motion"
               body="Turns off entrance and reveal animations. Your system setting is respected either way."
               value={settings.reduceMotion}

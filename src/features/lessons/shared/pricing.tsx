@@ -4,7 +4,8 @@ import Animated from 'react-native-reanimated';
 import { AnimatedNumber } from '@/src/components/lesson/AnimatedNumber';
 import { useEnter } from '@/src/components/lesson/motion';
 import { AppText } from '@/src/components/ui/AppText';
-import type { PriceAction } from '@/src/game/incentives';
+import { BASE_PRICING_GAME, PRICE_ACTIONS, type PriceAction } from '@/src/game/incentives';
+import { type MatrixGame, payoffAt } from '@/src/game/payoff-matrix';
 import { colors, radius, space } from '@/src/theme/tokens';
 
 export const PRICE_LABEL: Record<PriceAction, string> = { maintain: 'Maintain prices', cut: 'Cut prices' };
@@ -79,7 +80,57 @@ export function OutcomeBoard({
   );
 }
 
+/**
+ * The four possible weeks as plain sentences — the rules of the game, before any analysis is layered on.
+ * Values come straight from the payoff table.
+ */
+export function OutcomeList({ game = BASE_PRICING_GAME }: { game?: MatrixGame<PriceAction, PriceAction> }) {
+  return (
+    <View style={{ gap: space.xs }} accessibilityLabel="Profit for each combination of choices">
+      <View style={styles.listRow}>
+        <AppText variant="caption" color={colors.textMuted} style={{ flex: 1 }}>
+          If…
+        </AppText>
+        <AppText variant="caption" color={colors.primaryText} style={styles.listNum}>
+          QuickEats
+        </AppText>
+        <AppText variant="caption" color={colors.rivalText} style={styles.listNum}>
+          FoodKart
+        </AppText>
+      </View>
+      {PRICE_ACTIONS.flatMap((you) =>
+        PRICE_ACTIONS.map((rival) => {
+          const [a, b] = payoffAt(game, you, rival);
+          return (
+            <View
+              key={`${you}-${rival}`}
+              style={[styles.listRow, styles.listItem]}
+              accessible
+              accessibilityLabel={`You ${PRICE_VERB[you]}, FoodKart ${PRICE_VERB_3P[rival]}: QuickEats ${a}, FoodKart ${b}`}>
+              <AppText variant="small" style={{ flex: 1 }}>
+                You {PRICE_VERB[you]}, FoodKart {PRICE_VERB_3P[rival]}
+              </AppText>
+              <AppText variant="bodyStrong" color={colors.primaryText} tabular style={styles.listNum}>
+                {a}
+              </AppText>
+              <AppText variant="bodyStrong" color={colors.rivalText} tabular style={styles.listNum}>
+                {b}
+              </AppText>
+            </View>
+          );
+        }),
+      )}
+    </View>
+  );
+}
+
+const PRICE_VERB: Record<PriceAction, string> = { maintain: 'maintain', cut: 'cut' };
+const PRICE_VERB_3P: Record<PriceAction, string> = { maintain: 'maintains', cut: 'cuts' };
+
 const styles = StyleSheet.create({
+  listRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  listItem: { minHeight: 36, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space.xs },
+  listNum: { width: 72, textAlign: 'right' },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',

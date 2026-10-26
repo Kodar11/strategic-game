@@ -6,7 +6,8 @@ import { z } from 'zod';
 import { SceneArt } from '@/src/components/art/SceneArt';
 import { Completion } from '@/src/components/lesson/Completion';
 import { LessonShell, type StepDef } from '@/src/components/lesson/LessonShell';
-import { Dialogue, Panel, Stat, StepHeading } from '@/src/components/lesson/Panels';
+import { Dialogue, FeedbackPanel, Panel, Stat, StepHeading } from '@/src/components/lesson/Panels';
+import { PredictionPrompt, PredictionResult } from '@/src/components/lesson/Prediction';
 import { TransferQuestion, type TransferOption } from '@/src/components/lesson/TransferQuestion';
 import { useEnter } from '@/src/components/lesson/motion';
 import { useLessonFlow } from '@/src/components/lesson/useLessonFlow';
@@ -15,6 +16,8 @@ import { Button } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { Slider } from '@/src/components/ui/Slider';
 import type { LessonMeta } from '@/src/content/lessons';
+import { roundResultClip } from '@/src/features/audio/reactions';
+import { NarrateOn } from '@/src/features/audio/useNarration';
 import {
   MAX_GUESS,
   MAX_PER_TYPE,
@@ -35,6 +38,17 @@ import {
 import { haptic } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
 import { NumberLine } from './NumberLine';
+import {
+  ALL_INSTINCTIVE,
+  ALL_THEORISTS,
+  AVERAGE_GUESSES,
+  LAB_PREDICTIONS,
+  averageGuessLabel,
+  averagePredictionFeedback,
+  detectiveRecap,
+  labPredictionFeedback,
+  othersAverage,
+} from './copy';
 
 /** Round 1 crowd: a mix of reasoning depths. Round 2: the same people, each one level deeper. */
 const ROUND1_POP: Population = { level0: 4, level1: 3, level2: 2, level3: 1, equilibrium: 0 };
@@ -53,10 +67,12 @@ const populationSchema = z.object({
 });
 const guess = z.number().int().min(MIN_GUESS).max(MAX_GUESS);
 const schema = z.object({
+  averageGuess: z.enum(['random', 'one-step', 'two-step', 'zero']).nullable(),
   guess1: guess,
   committed1: z.boolean(),
   guess2: guess,
   committed2: z.boolean(),
+  labPrediction: z.enum(['up', 'down', 'same']).nullable(),
   lab: populationSchema,
   labTouched: z.boolean(),
   elim: z.number().int().min(0).max(MAX_ELIM),
@@ -66,10 +82,12 @@ const schema = z.object({
 type Data = z.infer<typeof schema>;
 
 const INITIAL: Data = {
+  averageGuess: null,
   guess1: 50,
   committed1: false,
   guess2: 50,
   committed2: false,
+  labPrediction: null,
   lab: ROUND1_POP,
   labTouched: false,
   elim: 0,
@@ -79,25 +97,40 @@ const INITIAL: Data = {
 
 const TRANSFER: TransferOption[] = [
   {
-    id: 'others',
-    label: 'Estimating how far ahead the other bidders are thinking',
-    strong: true,
+    id: 'model',
+    label: 'First estimate how many people will follow that advice',
+    verdict: 'strong',
+    clip: 'l2.transfer.model',
     feedback:
-      'Your best bid depends on what others will bid, which depends on what they expect from you. Modelling their depth of reasoning — not just your own valuation — is the core skill.',
+      'The advice only works if few people follow it. If most do, 9:30 becomes the new jam. The best time depends on how many steps ahead the rest of the crowd is thinking.',
   },
   {
-    id: 'value-only',
-    label: 'Only the item’s true value — the other bidders don’t matter',
-    strong: false,
-    feedback: 'Value sets your limit, but whether you win, and at what price, depends on how the others reason.',
+    id: 'advice',
+    label: 'Leave at 9:30, as the advice says',
+    verdict: 'misconception',
+    clip: 'l2.transfer.advice',
+    feedback: 'That is one step of reasoning — beating last year’s crowd. But everyone read the same advice, so you may be joining this year’s crowd instead.',
   },
   {
-    id: 'deepest',
-    label: 'Thinking more steps ahead than anyone else, always',
-    strong: false,
-    feedback: 'Out-thinking a crowd that reasons less deeply can make you overshoot — just as guessing 0 rarely wins the number game.',
+    id: 'ten',
+    label: 'Stay until 10 — everyone else will have left at 9:30',
+    verdict: 'defensible',
+    clip: 'l2.transfer.ten',
+    feedback: 'One step further, and it can work — but only if most people really do leave early. If the advice didn’t spread widely, 10 pm is the old jam again.',
+  },
+  {
+    id: 'earliest',
+    label: 'Leave as early as possible to out-think everyone',
+    verdict: 'misconception',
+    clip: 'l2.transfer.earliest',
+    feedback: 'You would beat the traffic and miss the festival. Reasoning further than the crowd costs you something — like picking 0 in the number game.',
   },
 ];
+
+const TRANSFER_ANALOGY = {
+  holds: 'Like the number game, your best choice depends on what others choose — and they are guessing what everyone else will do, including you.',
+  differs: 'There is no single target and no fixed number of players, people care about more than the traffic, and some will leave early for reasons that have nothing to do with reasoning about others.',
+};
 
 const ordinal = (n: number) => {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -115,6 +148,7 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
 
   const steps: StepDef[] = [
     {
+      // Situation: the game, and who you're playing against (honestly: simulated players).
       key: 'intro',
       cta: 'Join the game',
       render: () => (
@@ -122,17 +156,21 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
           <Animated.View entering={enter(0, 'fade')} style={{ borderRadius: 20, overflow: 'hidden' }}>
             <SceneArt scene="crowd" height={170} />
           </Animated.View>
-          <StepHeading kicker="Lesson 2" title="Guess two-thirds of the average" body="You and ten other players each secretly pick a whole number from 0 to 100." />
-          <Dialogue character="sen" expression="explaining">
+          <StepHeading kicker="Lesson 2" title="Guess two-thirds of the average" body="You and ten other players each secretly pick a whole number from 0 to 100." clip="l2.intro.heading" />
+          <Dialogue character="sen" expression="explaining" clip="l2.intro.sen">
             The target is two-thirds of everyone&apos;s average pick — yours included. Closest to the target wins.
           </Dialogue>
-          <Dialogue character="maya" expression="confident" align="right" delay={120}>
+          <Dialogue character="maya" expression="confident" align="right" delay={120} clip="l2.intro.maya">
             I&apos;m in. The question is what the rest of you will do.
           </Dialogue>
+          <AppText variant="caption" color={colors.textMuted}>
+            The ten others are simulated players. Each follows a fixed rule of thumb — you&apos;ll see their rules after two rounds.
+          </AppText>
         </>
       ),
     },
     {
+      // Rules: one worked example of the scoring, no strategy.
       key: 'example',
       render: () => (
         <>
@@ -146,30 +184,56 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
               Whoever picked closest to 40 wins. If several are equally close, they share the win.
             </AppText>
           </Card>
-          <Dialogue character="aarav" expression="curious">
+          <Dialogue character="aarav" expression="curious" clip="l2.example.aarav">
             So I&apos;m not guessing a number — I&apos;m guessing what everyone else will guess.
           </Dialogue>
         </>
       ),
     },
     {
+      // Prediction + decision: model the crowd first, then pick.
       key: 'guess1',
       cta: data.committed1 ? 'See the results' : 'Submit my number',
+      canContinue: !!data.averageGuess,
+      blockedHint: 'Predict how the crowd will pick first.',
       onContinue: () => {
         if (!data.committed1) update({ committed1: true });
       },
       render: () => (
         <>
-          <StepHeading kicker="Round 1" title="Pick your number" body="Ten others are choosing right now. Think about how they might think." />
-          <NumberPicker value={data.guess1} onChange={(v) => update({ guess1: v })} locked={data.committed1} />
+          <StepHeading kicker="Round 1" title="Read the crowd, then pick" body="Ten others are choosing right now. Start with them, not with your number." />
+          <PredictionPrompt
+            question="What do you think the other ten will average?"
+            options={AVERAGE_GUESSES}
+            value={data.averageGuess}
+            onChange={(averageGuess) => update({ averageGuess })}
+            locked={data.committed1}
+          />
+          {data.averageGuess ? <NumberPicker value={data.guess1} onChange={(v) => update({ guess1: v })} locked={data.committed1} /> : null}
         </>
       ),
     },
     {
+      // Consequence: the target, your distance, and how your crowd model held up.
       key: 'result1',
-      render: () => (round1 ? <RoundResultView result={round1} round={1} /> : null),
+      render: () =>
+        round1 ? (
+          <>
+            <RoundResultView result={round1} round={1} />
+            {data.averageGuess ? (
+              <PredictionResult
+                predicted={averageGuessLabel(data.averageGuess).split(' — ')[0]}
+                actual={`Average ${othersAverage(round1).toFixed(1)}`}
+                verdict={averagePredictionFeedback(data.averageGuess, round1).verdict}
+                title="Your read of the crowd">
+                {averagePredictionFeedback(data.averageGuess, round1).text}
+              </PredictionResult>
+            ) : null}
+          </>
+        ) : null,
     },
     {
+      // Decision under a changed crowd: the same players, one level deeper.
       key: 'guess2',
       cta: data.committed2 ? 'See the results' : 'Submit my number',
       onContinue: () => {
@@ -180,9 +244,9 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
           <StepHeading
             kicker="Round 2"
             title="Same crowd, one step wiser"
-            body={`Everyone saw that last target of ${round1 ? round1.target.toFixed(1) : '—'}. This time, each player reasons one step deeper than before.`}
+            body={`Everyone saw that last target of ${round1 ? round1.target.toFixed(1) : '—'}. In this simulation, each player now reasons exactly one step deeper than before.`}
           />
-          <Dialogue character="maya" expression="thinking" align="right">
+          <Dialogue character="maya" expression="thinking" align="right" clip="l2.guess2.maya">
             If they all expect a lower target, the target itself moves lower. Where does it stop?
           </Dialogue>
           <NumberPicker value={data.guess2} onChange={(v) => update({ guess2: v })} locked={data.committed2} />
@@ -190,6 +254,7 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
       ),
     },
     {
+      // Discovery: the rules didn't change; only the players' depth did.
       key: 'result2',
       render: () =>
         round1 && round2 ? (
@@ -204,10 +269,11 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
         ) : null,
     },
     {
+      // Concept: name level-k reasoning once both rounds have shown it.
       key: 'types',
       render: () => (
         <>
-          <StepHeading kicker="Meet the players" title="Five ways to reason" body="The simulated players aren't random personalities. Each follows one of these stated rules." />
+          <StepHeading kicker="Meet the players" title="Five ways to reason" body="Here are the stated rules the simulated players were following." />
           <View style={{ gap: space.sm }}>
             {PLAYER_TYPES.map((t, i) => (
               <Animated.View key={t} entering={enter(i * 50)}>
@@ -227,19 +293,29 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
               </Animated.View>
             ))}
           </View>
-          <Dialogue character="meera" expression="explaining">
+          <Dialogue character="meera" expression="explaining" clip="l2.types.meera">
             Each extra step multiplies the previous guess by ⅔: 50 → {levelKGuess(1)} → {levelKGuess(2)} → {levelKGuess(3)}. This is called level-k reasoning.
           </Dialogue>
         </>
       ),
     },
     {
+      // Experiment: predict, then change who you're playing against.
       key: 'lab',
       canContinue: data.labTouched,
-      blockedHint: 'Change the crowd at least once to see the effect.',
-      render: () => <CrowdLab pop={data.lab} onChange={(lab) => update({ lab, labTouched: true })} />,
+      blockedHint: data.labPrediction ? 'Change the crowd at least once to see the effect.' : 'Make a prediction first.',
+      render: () => (
+        <CrowdLab
+          pop={data.lab}
+          prediction={data.labPrediction}
+          touched={data.labTouched}
+          onPredict={(labPrediction) => update({ labPrediction })}
+          onChange={(lab) => update({ lab, labTouched: true })}
+        />
+      ),
     },
     {
+      // Theory vs practice: where perfect reasoning leads, and where real people stop.
       key: 'theory',
       canContinue: data.elim >= 3,
       blockedHint: 'Run at least three rounds of elimination.',
@@ -281,28 +357,43 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
               The target can be at most ⅔ × 100 ≈ 66.7, so no rational player picks above it. If everyone knows that, the target is at most ⅔ × 66.7 ≈ 44.4 — and so on.
             </AppText>
           ) : null}
+          <NarrateOn clip="l2.theory.zero" trigger={data.elim >= 3} />
           {data.elim >= 3 ? (
-            <Panel tone="insight" title="Theory predicts 0. Real crowds don't play 0.">
-              Repeating the elimination forever leaves only 0. But that requires everyone to reason all the way down and to trust that everyone else does too. In the rounds you played, the winning number came from modelling the actual crowd.
-            </Panel>
+            <>
+              <Panel tone="insight" title="Theory predicts 0. Real crowds don't play 0.">
+                Repeating the elimination forever leaves only 0. But that requires everyone to reason all the way down and to trust that everyone else does too. In the rounds you played, the winning number came from modelling the actual crowd.
+              </Panel>
+              <Card style={{ gap: space.xs }}>
+                <SectionLabel>With real people</SectionLabel>
+                <AppText variant="small">
+                  When groups play this for the first time, the average usually lands well above 0 — often somewhere in the 20s or 30s — and 0 rarely wins. Played again and again, groups tend to drift lower.
+                </AppText>
+              </Card>
+            </>
           ) : null}
         </>
       ),
     },
     {
+      // Transfer: iterative reasoning in a situation with no numbers to guess.
       key: 'transfer',
       canContinue: data.transferChecked,
       blockedHint: 'Pick an answer and check your reasoning.',
       render: () => (
         <>
-          <StepHeading kicker="New situation" title="The sealed-bid auction" body="You're bidding on a vintage camera in a sealed-bid auction. Highest bid wins and pays what they bid." />
+          <StepHeading
+            kicker="New situation"
+            title="Leaving the festival"
+            body="A festival ends at 10 pm. Last year everyone left at 10 and the car park was jammed for an hour. This year a popular post says: “Leave at 9:30 to beat the rush.” Lots of people have read it."
+          />
           <TransferQuestion
-            question="Beyond knowing what the camera is worth to you, what matters most for your bid?"
+            question="How should you decide when to leave?"
             options={TRANSFER}
             picked={data.transferPick}
             checked={data.transferChecked}
             onPick={(id) => update({ transferPick: id })}
             onCheck={() => update({ transferChecked: true })}
+            analogy={TRANSFER_ANALOGY}
           />
         </>
       ),
@@ -313,11 +404,15 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
         <Completion
           lesson={lesson}
           takeaway="Your best move depends on how deeply others think — not on how deeply you can think."
+          takeawayClip="l2.done.takeaway"
           remember={[
             'Model the people you are actually playing with.',
             'Theory tells you where perfect reasoning leads; real players often stop earlier.',
             'Thinking one step beyond the crowd usually beats thinking ten steps beyond it.',
           ]}
+          recap={detectiveRecap({ averageGuess: data.averageGuess, round1, round2 })}
+          reflection="Think of a recent choice that depended on what other people would do — a queue, a sale, a deadline. Did you assume they'd think one step ahead, or several? What would have told you which?"
+          nextHook="Here, everyone wanted to out-think each other. Next, two people want the same thing — to find each other — and still might fail."
           onReplay={restart}
         />
       ),
@@ -388,55 +483,92 @@ function RoundResultView({ result, round }: { result: RoundResult; round: 1 | 2 
           Sum of all {playerCount} picks = {sumText}. Average = {sumText} ÷ {playerCount} = {average.toFixed(1)}. Target = ⅔ × {average.toFixed(1)} = {target.toFixed(1)}.
         </AppText>
       </Card>
-      <Dialogue character="meera" expression={won ? 'satisfied' : 'explaining'}>
+      <Dialogue character="meera" expression={won ? 'satisfied' : 'explaining'} clip={roundResultClip(result)} clipKey={`l2.result${round}`}>
         {won
           ? `Your ${learner.guess} landed ${learner.distance.toFixed(1)} from the target. You read this crowd well.`
           : `You picked ${learner.guess}. The closest pick was ${winning.guess}, just ${winning.distance.toFixed(1)} away. ${
-              learner.guess > target ? 'You expected the crowd to aim higher than it did.' : 'This crowd aimed higher than you expected.'
+              learner.guess > target ? 'Your number was above the target this crowd produced.' : 'Your number was below the target this crowd produced.'
             }`}
       </Dialogue>
     </>
   );
 }
 
-function CrowdLab({ pop, onChange }: { pop: Population; onChange: (p: Population) => void }) {
+const PRESETS: { label: string; pop: Population }[] = [
+  { label: 'All Instinctive', pop: ALL_INSTINCTIVE },
+  { label: 'Round 1 mix', pop: ROUND1_POP },
+  { label: 'All Theorists', pop: ALL_THEORISTS },
+];
+
+function CrowdLab({
+  pop,
+  prediction,
+  touched,
+  onPredict,
+  onChange,
+}: {
+  pop: Population;
+  prediction: Data['labPrediction'];
+  touched: boolean;
+  onPredict: (p: NonNullable<Data['labPrediction']>) => void;
+  onChange: (p: Population) => void;
+}) {
   const others = opponentPicks(pop, LAB_SEED);
   const best = bestGuessForPopulation(pop, LAB_SEED);
   const n = populationSize(pop);
   const { average, target } = targetFor([...others.map((o) => o.guess), best]);
+  const fb = prediction ? labPredictionFeedback(prediction, ROUND1_POP, LAB_SEED) : null;
   return (
     <>
-      <StepHeading kicker="Crowd lab" title="Design the crowd" body="Change who you're playing against. The best number to pick updates as you go." />
-      <Card style={{ gap: space.sm }}>
-        <SectionLabel>Players by reasoning type</SectionLabel>
-        {PLAYER_TYPES.map((t) => (
-          <View key={t} style={styles.labRow}>
-            <AppText variant="small" style={{ flex: 1 }}>
-              {PLAYER_TYPE_INFO[t].label}
+      <StepHeading kicker="Crowd lab" title="Change the crowd, not the rules" body="Your best number is the one that lands exactly on the target, given what everyone else picks." />
+      <PredictionPrompt
+        question="Swap the round-1 mix for ten Theorists. What happens to your best pick?"
+        options={LAB_PREDICTIONS}
+        value={prediction}
+        onChange={onPredict}
+        locked={!!prediction}
+      />
+      {prediction ? (
+        <>
+          <Card style={{ gap: space.sm }}>
+            <SectionLabel>Players by reasoning type</SectionLabel>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.sm }}>
+              {PRESETS.map((p) => (
+                <Button key={p.label} label={p.label} variant="secondary" compact onPress={() => onChange(p.pop)} />
+              ))}
+            </View>
+            {PLAYER_TYPES.map((t) => (
+              <View key={t} style={styles.labRow}>
+                <AppText variant="small" style={{ flex: 1 }}>
+                  {PLAYER_TYPE_INFO[t].label}
+                </AppText>
+                <Counter
+                  label={PLAYER_TYPE_INFO[t].label}
+                  value={pop[t]}
+                  onChange={(v) => onChange({ ...pop, [t]: v })}
+                  min={0}
+                  max={MAX_PER_TYPE}
+                  disableDecrement={n <= 1 && pop[t] > 0}
+                />
+              </View>
+            ))}
+          </Card>
+          <Card style={{ gap: space.md }}>
+            <View style={{ flexDirection: 'row', gap: space.sm }}>
+              <Stat label="Other players" value={String(n)} />
+              <Stat label="Best pick for you" value={best.toFixed(1)} tone="blue" caption={`lands on target ${target.toFixed(1)}`} />
+            </View>
+            <AppText variant="caption" color={colors.textMuted}>
+              Average with your best pick = {average.toFixed(1)}. Best pick solves: your number = ⅔ × average including your number.
             </AppText>
-            <Counter
-              label={PLAYER_TYPE_INFO[t].label}
-              value={pop[t]}
-              onChange={(v) => onChange({ ...pop, [t]: v })}
-              min={0}
-              max={MAX_PER_TYPE}
-              disableDecrement={n <= 1 && pop[t] > 0}
-            />
-          </View>
-        ))}
-      </Card>
-      <Card style={{ gap: space.md }}>
-        <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <Stat label="Other players" value={String(n)} />
-          <Stat label="Best pick for you" value={best.toFixed(1)} tone="blue" caption={`lands on target ${target.toFixed(1)}`} />
-        </View>
-        <AppText variant="caption" color={colors.textMuted}>
-          Average with your best pick = {average.toFixed(1)}. Best pick solves: your number = ⅔ × average including your number.
-        </AppText>
-      </Card>
-      <Panel tone="insight" title="Try this">
-        Fill the crowd with Instinctive players, then with Theorists. The &ldquo;right&rdquo; answer swings from the 30s to 0 — the rules never change.
-      </Panel>
+          </Card>
+        </>
+      ) : null}
+      {touched && fb ? (
+        <FeedbackPanel verdict={fb.verdict} title="Your prediction">
+          {fb.text} The rules never changed; only the crowd did.
+        </FeedbackPanel>
+      ) : null}
     </>
   );
 }
@@ -489,7 +621,7 @@ const styles = StyleSheet.create({
   },
   chip: {
     minWidth: 52,
-    minHeight: 40,
+    minHeight: 44,
     paddingHorizontal: space.md,
     borderRadius: radius.pill,
     borderWidth: 1,
@@ -501,8 +633,8 @@ const styles = StyleSheet.create({
   elimFill: { height: '100%', backgroundColor: colors.accent, borderRadius: 4 },
   labRow: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
   counterBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: radius.md,
     backgroundColor: colors.bgRaised,
     borderWidth: 1,

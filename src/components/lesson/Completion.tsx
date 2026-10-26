@@ -9,23 +9,41 @@ import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Badge, Card } from '@/src/components/ui/Card';
 import { type LessonMeta, nextLesson } from '@/src/content/lessons';
+import type { ClipId } from '@/src/features/audio/clips';
+import { useNarrateOnMount } from '@/src/features/audio/useNarration';
 import { haptic, useMotionReduced } from '@/src/utils/feedback';
-import { colors, space } from '@/src/theme/tokens';
+import { colors, radius, space } from '@/src/theme/tokens';
 import { useEnter } from './motion';
 
-/** Final step of every lesson: takeaway, then next / replay / home. */
+/**
+ * Final step of every lesson: takeaway, the learner's own path through it, a reflection question,
+ * then next / replay / home.
+ */
 export function Completion({
   lesson,
   takeaway,
   remember,
   onReplay,
+  takeawayClip,
+  recap,
+  reflection,
+  nextHook,
 }: {
   lesson: LessonMeta;
   takeaway: string;
   remember: string[];
   onReplay: () => void;
+  /** Prof. Sen reads the takeaway when the lesson completes. */
+  takeawayClip?: ClipId;
+  /** What this learner actually predicted and decided, built from lesson state. Never a judgement of the person. */
+  recap?: string[];
+  /** One question or small challenge to carry the idea into a new situation. */
+  reflection?: string;
+  /** Why the next lesson is a different problem worth opening. */
+  nextHook?: string;
 }) {
   const enter = useEnter();
+  useNarrateOnMount(takeawayClip);
   const reduced = useMotionReduced();
   const next = nextLesson(lesson.id);
 
@@ -67,7 +85,39 @@ export function Completion({
         </Card>
       </Animated.View>
 
+      {recap && recap.length ? (
+        <Animated.View entering={enter(170)}>
+          <Card style={{ gap: space.sm }}>
+            <AppText variant="overline" color={colors.primaryText}>
+              Your path through it
+            </AppText>
+            {recap.map((r) => (
+              <View key={r} style={{ flexDirection: 'row', gap: space.sm }}>
+                <AppText color={colors.primaryText}>•</AppText>
+                <AppText variant="small" style={{ flex: 1 }}>
+                  {r}
+                </AppText>
+              </View>
+            ))}
+          </Card>
+        </Animated.View>
+      ) : null}
+
+      {reflection ? (
+        <Animated.View entering={enter(200)} style={styles.reflection}>
+          <AppText variant="overline" color={colors.accent}>
+            Take it further
+          </AppText>
+          <AppText variant="body">{reflection}</AppText>
+        </Animated.View>
+      ) : null}
+
       <Animated.View entering={enter(220)} style={{ gap: space.sm }}>
+        {next && nextHook ? (
+          <AppText variant="small" color={colors.textMuted} align="center">
+            {nextHook}
+          </AppText>
+        ) : null}
         {next ? (
           <Button
             label={`Next: ${next.title}`}
@@ -89,6 +139,14 @@ export function Completion({
 }
 
 const styles = StyleSheet.create({
+  reflection: {
+    gap: space.sm,
+    padding: space.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(34,211,238,0.3)',
+    backgroundColor: colors.bgRaised,
+  },
   trophy: {
     width: 76,
     height: 76,

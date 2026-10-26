@@ -4,6 +4,9 @@ import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 
 import { LESSON_IDS, type LessonId, lessonIdSchema } from '@/src/content/lessons';
+import { DEFAULT_SETTINGS, type Settings, sanitizeSettings } from './settings';
+
+export type { Settings } from './settings';
 
 export interface LessonRuntime {
   /** Total steps in the lesson when saved, for progress display. */
@@ -12,11 +15,6 @@ export interface LessonRuntime {
   /** Lesson-specific state; each lesson validates it with its own schema on resume. */
   data: unknown;
   updatedAt: number;
-}
-
-export interface Settings {
-  reduceMotion: boolean;
-  haptics: boolean;
 }
 
 interface ProgressState {
@@ -30,8 +28,6 @@ interface ProgressState {
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   resetProgress: () => void;
 }
-
-const DEFAULT_SETTINGS: Settings = { reduceMotion: false, haptics: true };
 
 /** Static web rendering runs in Node where there is no localStorage; fall back to a no-op store there. */
 const noopStorage: StateStorage = { getItem: () => null, setItem: () => undefined, removeItem: () => undefined };
@@ -79,7 +75,7 @@ export const useProgress = create<ProgressState>()(
             if (r && Number.isFinite(r.step) && Number.isFinite(r.total)) runtime[id] = r;
           }
         }
-        const settings = { ...DEFAULT_SETTINGS, ...(p.settings ?? {}) };
+        const settings = sanitizeSettings(p.settings);
         return { ...current, completed, runtime, settings };
       },
       onRehydrateStorage: () => () => {

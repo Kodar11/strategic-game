@@ -1,5 +1,5 @@
 import { Coffee, MessageCircle, Trees } from '@/src/components/ui/icons';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { z } from 'zod';
@@ -10,6 +10,7 @@ import { Completion } from '@/src/components/lesson/Completion';
 import { LessonShell, type StepDef } from '@/src/components/lesson/LessonShell';
 import { Dialogue, Panel, StepHeading } from '@/src/components/lesson/Panels';
 import { PayoffMatrix } from '@/src/components/lesson/PayoffMatrix';
+import { PredictionPrompt, PredictionResult } from '@/src/components/lesson/Prediction';
 import { TransferQuestion, type TransferOption } from '@/src/components/lesson/TransferQuestion';
 import { useEnter } from '@/src/components/lesson/motion';
 import { useLessonFlow } from '@/src/components/lesson/useLessonFlow';
@@ -18,17 +19,23 @@ import { Button } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
 import type { LessonMeta } from '@/src/content/lessons';
-import { type FriendInfo, MEETUP_GAME, type Place, friendPolicy, meetupAnalysis, resolveMeetup } from '@/src/game/coordination';
-import { payoffAt } from '@/src/game/payoff-matrix';
+import { getClip } from '@/src/features/audio/clips';
+import { meetupReactionClip } from '@/src/features/audio/reactions';
+import { NarrateOn } from '@/src/features/audio/useNarration';
+import { type FriendInfo, MEETUP_GAME, type MeetupResult, type Place, friendPolicy, meetupAnalysis, resolveMeetup } from '@/src/game/coordination';
+import { payoffAt, rowBestResponses } from '@/src/game/payoff-matrix';
 import { useMotionReduced } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
+import { PLACE_NAME as NAME, coordinationRecap, meetupFeedback, messageExplanation } from './copy';
 
 const place = z.enum(['cafe', 'park']);
 const schema = z.object({
+  predict1: place.nullable(),
   pick1: place.nullable(),
   committed1: z.boolean(),
   inspected: z.object({ row: place, col: place }).nullable(),
   showBR: z.boolean(),
+  predict2: place.nullable(),
   pick2: place.nullable(),
   committed2: z.boolean(),
   message: place.nullable(),
@@ -38,10 +45,12 @@ const schema = z.object({
 type Data = z.infer<typeof schema>;
 
 const INITIAL: Data = {
+  predict1: null,
   pick1: null,
   committed1: false,
   inspected: null,
   showBR: false,
+  predict2: null,
   pick2: null,
   committed2: false,
   message: null,
@@ -49,32 +58,49 @@ const INITIAL: Data = {
   transferChecked: false,
 };
 
-const NAME: Record<Place, string> = { cafe: 'Clocktower Café', park: 'Riverside Park' };
 const ROW_LABELS = { cafe: 'You: café', park: 'You: park' } as const;
 const COL_LABELS = { cafe: 'Nina: café', park: 'Nina: park' } as const;
 const FOCAL: FriendInfo = { kind: 'focal', place: 'cafe' };
+const NINA_AT: Record<Place, string> = { cafe: 'At the café', park: 'At the park' };
 
 const TRANSFER: TransferOption[] = [
   {
-    id: 'clock',
-    label: 'Under the big clock in the main hall',
-    strong: true,
+    id: 'announce',
+    label: 'The group admin posts: “From Monday, we’re all on Ping.”',
+    verdict: 'strong',
+    clip: 'l3.transfer.announce',
     feedback:
-      'It is central, visible from every entrance, and widely known as the place people meet. You can expect your friend to expect you there — that shared expectation is what makes it a focal point.',
+      'A public announcement gives everyone the same expectation at once — and everyone knows everyone saw it. Chatter fans lose their favourite, but being on one app beats being split.',
   },
   {
-    id: 'platform',
-    label: 'Platform 3, where your train leaves',
-    strong: false,
-    feedback: 'Sensible if you both know the platform — but if your friend doesn’t, nothing makes it stand out to them.',
+    id: 'majority',
+    label: 'Everyone moves to whichever app more people already use',
+    verdict: 'defensible',
+    clip: 'l3.transfer.majority',
+    feedback: 'That can work as a shared rule — if everyone knows the numbers and expects the others to follow the same rule. If it is close, or people disagree about the count, the group can stay split.',
   },
   {
-    id: 'kiosk',
-    label: 'The quiet coffee kiosk by the side exit',
-    strong: false,
-    feedback: 'It may be the nicest spot, but "best for me" isn’t the same as "obvious to both of us."',
+    id: 'better-app',
+    label: 'Wait until everyone agrees which app is better',
+    verdict: 'misconception',
+    clip: 'l3.transfer.better-app',
+    feedback: 'People prefer different apps, so there may never be agreement on “better”. Like the café and the park, neither option is best for everyone — what matters is that you all pick the same one.',
+  },
+  {
+    id: 'both',
+    label: 'Stay on both apps — that keeps everyone happy',
+    verdict: 'misconception',
+    clip: 'l3.transfer.both',
+    feedback: 'Staying split is the outcome everyone wanted to avoid: messages get missed, like waiting at different meeting places.',
   },
 ];
+
+const TRANSFER_ANALOGY = {
+  holds:
+    'Two outcomes both work — everyone on Ping, or everyone on Chatter — and each person’s best choice is wherever the others go. Being split is the bad outcome, just like missing each other.',
+  differs:
+    'There are many people instead of two, switching apps has a cost, and an announcement needs someone everyone listens to. Some members also prefer staying split if their friends are on their app.',
+};
 
 export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) {
   const TOTAL = 11;
@@ -89,6 +115,7 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
 
   const steps: StepDef[] = [
     {
+      // Situation: a shared goal with no way to communicate.
       key: 'intro',
       cta: 'Head into town',
       render: () => (
@@ -96,14 +123,15 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
           <Animated.View entering={enter(0, 'fade')} style={{ borderRadius: 20, overflow: 'hidden' }}>
             <SceneArt scene="meetup" height={180} />
           </Animated.View>
-          <StepHeading kicker="Lesson 3" title="Two dead phones" body="You and Nina agreed to meet in the old town at six. Then both your phones died. You never said where." />
-          <Dialogue character="aarav" expression="concerned">
+          <StepHeading kicker="Lesson 3" title="Two dead phones" body="You and Nina agreed to meet in the old town at six. Then both your phones died. You never said where." clip="l3.intro.heading" />
+          <Dialogue character="aarav" expression="concerned" clip="l3.intro.aarav">
             There are only two places we&apos;d ever go: the Clocktower Café or Riverside Park.
           </Dialogue>
         </>
       ),
     },
     {
+      // Rules: the payoffs — a shared goal and slightly different tastes.
       key: 'stakes',
       render: () => (
         <>
@@ -119,38 +147,52 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
       ),
     },
     {
+      // Prediction, then decision.
       key: 'pick1',
       cta: data.committed1 ? 'See what happened' : 'Go there',
-      canContinue: !!data.pick1,
-      blockedHint: 'Choose where to go.',
+      canContinue: !!data.predict1 && !!data.pick1,
+      blockedHint: data.predict1 ? 'Choose where to go.' : 'First, predict where Nina will go.',
       onContinue: () => {
         if (!data.committed1) update({ committed1: true });
       },
       render: () => (
         <>
           <StepHeading kicker="Your move" title="Where do you go?" body="Nina is deciding at the same moment, with the same information you have." />
-          <PlacePicker value={data.pick1} onChange={(p) => update({ pick1: p })} locked={data.committed1} />
+          <PredictionPrompt
+            question="Where do you think Nina will go?"
+            layout="row"
+            options={(['cafe', 'park'] as const).map((p) => ({ id: p, label: NINA_AT[p] }))}
+            value={data.predict1}
+            onChange={(predict1) => update({ predict1 })}
+            locked={data.committed1}
+          />
+          {data.predict1 ? <PlacePicker value={data.pick1} onChange={(p) => update({ pick1: p })} locked={data.committed1} /> : null}
         </>
       ),
     },
     {
+      // Consequence: both choices, the payoff, and how the prediction held up.
       key: 'reveal1',
       render: () =>
         r1 ? (
           <>
-            <MeetReveal you={r1.you} friend={r1.friend} met={r1.met} payoffs={r1.payoffs} />
-            <Panel tone="info" title="Nina's reasoning (now revealed)" delay={300}>
-              With nothing else to go on, Nina went where she would most like to meet: {NAME[friend1]}.
-            </Panel>
+            <MeetReveal round={1} result={r1}>
+              {data.predict1 ? <MeetPrediction round={1} predicted={data.predict1} result={r1} /> : null}
+              <Panel tone="info" title="Nina's reasoning (now revealed)" delay={300}>
+                With nothing else to go on, Nina went where she would most like to meet: {NAME[friend1]}. She follows this rule whatever you do.
+              </Panel>
+            </MeetReveal>
           </>
         ) : null,
     },
     {
+      // Concept: two equilibria, no dominant strategy.
       key: 'matrix',
       canContinue: data.showBR,
       blockedHint: 'Reveal the best replies to continue.',
       render: () => (
         <>
+          <NarrateOn clip="l3.matrix.equilibria" trigger={data.showBR} />
           <StepHeading kicker="The table" title="Two ways to get it right" body="Tap any cell. Your enjoyment first, Nina's second." />
           <Card>
             <PayoffMatrix
@@ -175,31 +217,45 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
           {!data.showBR ? (
             <Button label="Show best replies" variant="secondary" onPress={() => update({ showBR: true })} />
           ) : (
-            <Panel tone="insight" title={`${analysis.equilibria.length} equilibria, no dominant strategy`}>
-              Your best move is simply &ldquo;go where Nina goes&rdquo; — and the same for her. Each meeting outcome is a Nash equilibrium: once you&apos;re there, nobody gains by leaving alone. The hard part is knowing which one you&apos;re aiming for.
-            </Panel>
+            <>
+              <Panel tone="insight" title={`${analysis.equilibria.length} equilibria, no dominant strategy`}>
+                Your best move is simply &ldquo;go where Nina goes&rdquo; — and the same for her. Each meeting outcome is a Nash equilibrium: once you&apos;re there, nobody gains by leaving alone. The hard part is knowing which one you&apos;re aiming for.
+              </Panel>
+              <AppText variant="small" color={colors.textMuted}>
+                {`If Nina picks the café, your best reply is the ${rowBestResponses(MEETUP_GAME, 'cafe')[0] === 'cafe' ? 'café' : 'park'}; if she picks the park, it's the ${rowBestResponses(MEETUP_GAME, 'park')[0] === 'park' ? 'park' : 'café'}. Your best move flips with hers, so no single choice is best whatever she does — unlike cutting prices in Lesson 1.`}
+              </AppText>
+            </>
           )}
         </>
       ),
     },
     {
+      // A shared expectation appears: predict again, then choose.
       key: 'pick2',
       cta: data.committed2 ? 'See what happened' : 'Go there',
-      canContinue: !!data.pick2,
-      blockedHint: 'Choose where to go.',
+      canContinue: !!data.predict2 && !!data.pick2,
+      blockedHint: data.predict2 ? 'Choose where to go.' : 'First, predict where Nina will go.',
       onContinue: () => {
         if (!data.committed2) update({ committed2: true });
       },
       render: () => (
         <>
-          <StepHeading kicker="A week later" title="Same problem, one clue" body="Phones dead again. But you remember something you both know." />
-          <Dialogue character="nina" expression="happy" align="right">
+          <StepHeading kicker="A week later" title="Same problem, one clue" body="Phones dead again. Same places, same preferences. But you remember something you both know." />
+          <Dialogue character="nina" expression="happy" align="right" clip="l3.pick2.nina">
             (Last month) &ldquo;Let&apos;s make the clocktower our usual spot — easy to remember.&rdquo;
           </Dialogue>
-          <Dialogue character="aarav" expression="thinking" delay={120}>
+          <Dialogue character="aarav" expression="thinking" delay={120} clip="l3.pick2.aarav">
             She&apos;ll remember that. And she knows I remember it too.
           </Dialogue>
-          <PlacePicker value={data.pick2} onChange={(p) => update({ pick2: p })} locked={data.committed2} />
+          <PredictionPrompt
+            question="Where do you think Nina will go this time?"
+            layout="row"
+            options={(['cafe', 'park'] as const).map((p) => ({ id: p, label: NINA_AT[p] }))}
+            value={data.predict2}
+            onChange={(predict2) => update({ predict2 })}
+            locked={data.committed2}
+          />
+          {data.predict2 ? <PlacePicker value={data.pick2} onChange={(p) => update({ pick2: p })} locked={data.committed2} /> : null}
         </>
       ),
     },
@@ -208,19 +264,22 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
       render: () =>
         r2 ? (
           <>
-            <MeetReveal you={r2.you} friend={r2.friend} met={r2.met} payoffs={r2.payoffs} />
-            <Panel tone="info" title="Nina's reasoning" delay={300}>
-              With a reference point you both share, Nina went to it: {NAME[friend2]} — even though she enjoys the park a little more.
-            </Panel>
+            <MeetReveal round={2} result={r2}>
+              {data.predict2 ? <MeetPrediction round={2} predicted={data.predict2} result={r2} /> : null}
+              <Panel tone="info" title="Nina's reasoning" delay={300}>
+                With a reference point you both share, Nina went to it: {NAME[friend2]} — even though she enjoys the park a little more.
+              </Panel>
+            </MeetReveal>
           </>
         ) : null,
     },
     {
+      // Concept: focal points, named after the learner has seen one work.
       key: 'focal',
       render: () => (
         <>
           <StepHeading kicker="The idea" title="Focal points" />
-          <Dialogue character="sen" expression="explaining">
+          <Dialogue character="sen" expression="explaining" clip="l3.focal.sen">
             When several outcomes would work, people coordinate on the one that stands out to everyone — and that everyone knows stands out. That&apos;s a focal point.
           </Dialogue>
           <Panel tone="insight" title="Shared, not best" delay={120}>
@@ -234,6 +293,7 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
       ),
     },
     {
+      // Experiment (a hypothetical extension): add communication, keep the payoffs.
       key: 'message',
       canContinue: !!data.message,
       blockedHint: 'Choose which message to send.',
@@ -241,16 +301,21 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
         const msg = data.message ? resolveMeetup(data.message, friendPolicy({ kind: 'message', proposed: data.message })) : null;
         return (
           <>
-            <StepHeading kicker="Experiment" title="One text gets through" body="Suppose your phone survives just long enough to send one message. Nina will see it." />
+            <StepHeading
+              kicker="What if?"
+              title="One text gets through"
+              body="An extension of the original game: suppose your phone survives just long enough to send Nina one message. The payoffs stay exactly the same."
+            />
+            <AppText variant="bodyStrong">Which message do you send?</AppText>
             <View style={{ flexDirection: 'row', gap: space.sm }} accessibilityRole="radiogroup">
               {(['cafe', 'park'] as const).map((p) => (
                 <ChoiceCard key={p} compact icon={MessageCircle} title={`"Meet at the ${p === 'cafe' ? 'café' : 'park'}"`} selected={data.message === p} onSelect={() => update({ message: p })} />
               ))}
             </View>
-            {msg ? (
+            {msg && data.message ? (
               <>
-                <Panel tone="success" title={`You meet at ${NAME[msg.you]}`}>
-                  {`Nina's stated rule: follow the message. Going elsewhere would leave her with 0, while meeting gives her ${msg.payoffs[1]}. You get ${msg.payoffs[0]}.`}
+                <Panel tone="info" title={`You meet at ${NAME[msg.you]}: you ${msg.payoffs[0]}, Nina ${msg.payoffs[1]}`}>
+                  {messageExplanation(data.message)}
                 </Panel>
                 <Panel tone="caution" title="Communication helps here — it isn't magic">
                   It works because missing each other is bad for both. If messages could be lost, if Nina doubted you&apos;d stick to it, or if one of you strongly preferred missing over the &ldquo;wrong&rdquo; place, a message might not settle it.
@@ -262,19 +327,25 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
       },
     },
     {
+      // Transfer: coordination among many people with different preferences.
       key: 'transfer',
       canContinue: data.transferChecked,
       blockedHint: 'Pick an answer and check your reasoning.',
       render: () => (
         <>
-          <StepHeading kicker="New situation" title="The busy train station" body="You're meeting a friend at a huge station you've both visited. No signal, no plan beyond 'the station, 5 pm'." />
+          <StepHeading
+            kicker="New situation"
+            title="The split study group"
+            body="Your study group of twenty is split across two chat apps, Ping and Chatter. Everyone would rather the whole group used one app. People who use Ping prefer Ping; people who use Chatter prefer Chatter."
+          />
           <TransferQuestion
-            question="Where do you wait?"
+            question="What is most likely to get everyone onto one app?"
             options={TRANSFER}
             picked={data.transferPick}
             checked={data.transferChecked}
             onPick={(id) => update({ transferPick: id })}
             onCheck={() => update({ transferChecked: true })}
+            analogy={TRANSFER_ANALOGY}
           />
         </>
       ),
@@ -285,11 +356,15 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
         <Completion
           lesson={lesson}
           takeaway="When many outcomes could work, success depends on shared expectations — not on finding the single best option."
+          takeawayClip="l3.done.takeaway"
           remember={[
             'Ask what the other person expects you to expect.',
             'Look for what stands out to both of you: history, convention, prominence.',
             'A clear signal in advance is often worth more than a clever guess later.',
           ]}
+          recap={coordinationRecap({ predict1: data.predict1, r1, predict2: data.predict2, r2, message: data.message })}
+          reflection="Think of a group you belong to — friends, a team, a household. Which unwritten conventions let you coordinate without discussing it? Where did one come from?"
+          nextHook="Here, being easy to predict helped you find Nina. Next, being predictable is exactly what your opponent wants."
           onReplay={restart}
         />
       ),
@@ -297,6 +372,15 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
   ];
 
   return <LessonShell lesson={lesson} steps={steps} step={step} goTo={goTo} />;
+}
+
+function MeetPrediction({ round, predicted, result }: { round: 1 | 2; predicted: Place; result: MeetupResult }) {
+  const fb = meetupFeedback(round, predicted, result);
+  return (
+    <PredictionResult predicted={NINA_AT[predicted]} actual={NINA_AT[result.friend]} verdict={fb.verdict} title="Your read of Nina" delay={250}>
+      {fb.text}
+    </PredictionResult>
+  );
 }
 
 function PrefCard({ who, title, cafe, park }: { who: 'aarav' | 'nina'; title: string; cafe: number; park: number }) {
@@ -335,9 +419,25 @@ function PrefRow({ icon, value }: { icon: Place; value: number }) {
 function PlacePicker({ value, onChange, locked }: { value: Place | null; onChange: (p: Place) => void; locked: boolean }) {
   return (
     <>
+      <AppText variant="bodyStrong">Where do you go?</AppText>
       <View style={{ flexDirection: 'row', gap: space.sm }} accessibilityRole="radiogroup">
-        <ChoiceCard title={NAME.cafe} description="Under the old clocktower, in the main square." icon={Coffee} selected={value === 'cafe'} disabled={locked} onSelect={() => onChange('cafe')} />
-        <ChoiceCard title={NAME.park} description="Benches by the water, a short walk away." icon={Trees} tone="orange" selected={value === 'park'} disabled={locked} onSelect={() => onChange('park')} />
+        <ChoiceCard
+          title={NAME.cafe}
+          description="Under the old clocktower, in the main square."
+          icon={Coffee}
+          selected={value === 'cafe'}
+          disabled={locked && value !== 'cafe'}
+          onSelect={() => !locked && onChange('cafe')}
+        />
+        <ChoiceCard
+          title={NAME.park}
+          description="Benches by the water, a short walk away."
+          icon={Trees}
+          tone="orange"
+          selected={value === 'park'}
+          disabled={locked && value !== 'park'}
+          onSelect={() => !locked && onChange('park')}
+        />
       </View>
       {locked ? (
         <AppText variant="caption" color={colors.textMuted}>
@@ -348,8 +448,12 @@ function PlacePicker({ value, onChange, locked }: { value: Place | null; onChang
   );
 }
 
-function MeetReveal({ you, friend, met, payoffs }: { you: Place; friend: Place; met: boolean; payoffs: readonly [number, number] }) {
+/** The meetup reveal. `children` (prediction check, Nina's reasoning) appear only once both places are shown. */
+function MeetReveal({ round, result, children }: { round: 1 | 2; result: MeetupResult; children?: ReactNode }) {
+  const { you, friend, met, payoffs } = result;
   const reduced = useMotionReduced();
+  const ninaClip = meetupReactionClip(round, { you, friend, met });
+  const ninaLine = ninaClip ? getClip(ninaClip)?.text : undefined;
   const enter = useEnter();
   const [shown, setShown] = useState(reduced);
   useEffect(() => {
@@ -385,6 +489,12 @@ function MeetReveal({ you, friend, met, payoffs }: { you: Place; friend: Place; 
             : `You waited at ${NAME[you]}. Nina waited at ${NAME[friend]}. Both choices were reasonable — they just didn't match.`}
         </Panel>
       ) : null}
+      {shown && ninaLine ? (
+        <Dialogue character="nina" expression={met ? 'happy' : 'concerned'} align="right" delay={250} clip={ninaClip} clipKey={`l3.reveal${round}`}>
+          {ninaLine}
+        </Dialogue>
+      ) : null}
+      {shown ? children : null}
     </>
   );
 }
