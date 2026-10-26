@@ -1,5 +1,15 @@
+import { emptyPrediction } from '../../../components/lesson/prediction-state.ts';
 import type { Feedback } from '../../../components/lesson/verdict.ts';
-import { BASE_CUT_ADVANTAGE, type IncentiveRules, cutAdvantage, evaluatePolicy, withDetection } from '../../../game/incentives.ts';
+import {
+  BASE_CUT_ADVANTAGE,
+  type IncentiveRules,
+  type Regime,
+  cutAdvantage,
+  evaluatePolicy,
+  regimeFor,
+  sanitizeRules,
+  withDetection,
+} from '../../../game/incentives.ts';
 
 /** Lesson 5 wording that depends on the learner's predictions and rules. Pure, so tests can pin it to the model. */
 
@@ -58,34 +68,94 @@ export type DetectionPrediction = 'yes' | 'no' | 'depends';
 export const DETECTION_PREDICTIONS: readonly { id: DetectionPrediction; label: string }[] = [
   { id: 'yes', label: 'Yes — companies will still keep prices' },
   { id: 'no', label: 'No — the price war comes back' },
-  { id: 'depends', label: 'It depends on something else' },
+  { id: 'depends', label: 'Can’t tell — it could go either way' },
 ];
 
-export function detectionHolds(rules: IncentiveRules, detection = HALF_DETECTED): boolean {
-  return evaluatePolicy(withDetection(rules, detection)).regime === 'maintain-dominant';
+/** The regime once penalties are discounted by the detection rate (`detection` is a share, 0–1). */
+export function detectionRegime(rules: IncentiveRules, detection = HALF_DETECTED): Regime {
+  return regimeFor(withDetection(rules, detection));
 }
 
+export function detectionHolds(rules: IncentiveRules, detection = HALF_DETECTED): boolean {
+  return detectionRegime(rules, detection) === 'maintain-dominant';
+}
+
+/** The answer the model gives: maintaining still dominant, cutting dominant again, or an exact tie. */
+export function detectionOutcome(rules: IncentiveRules, detection = HALF_DETECTED): DetectionPrediction {
+  const regime = detectionRegime(rules, detection);
+  return regime === 'maintain-dominant' ? 'yes' : regime === 'cut-dominant' ? 'no' : 'depends';
+}
+
+const REGIME_CONCLUSION: Record<Regime, string> = {
+  'maintain-dominant': 'Still below zero, so maintaining still wins.',
+  'cut-dominant': 'Above zero, so cutting pays again.',
+  tie: 'Exactly zero: cutting and maintaining now earn the same against either rival choice, so this model can’t say which way the companies go. Your rule no longer reliably keeps prices up.',
+};
+
 export function detectionFeedback(pick: DetectionPrediction, rules: IncentiveRules): Feedback {
-  const holds = detectionHolds(rules);
-  const truth: DetectionPrediction = holds ? 'yes' : 'no';
+  const regime = detectionRegime(rules);
+  const truth = detectionOutcome(rules);
   const r = withDetection(rules, HALF_DETECTED);
-  const why = `With half of cuts caught, your penalty of ${fmt(rules.cutPenalty)} works like ${fmt(r.cutPenalty)}. Cutting's edge becomes ${BASE_CUT_ADVANTAGE} − ${fmt(r.cutPenalty)} − ${fmt(r.maintainReward)} = ${fmt(cutAdvantage(r))}.`;
-  if (pick === truth) return { verdict: 'match', text: `${why} ${holds ? 'Still below zero, so maintaining still wins.' : 'Above zero, so cutting pays again.'}` };
+  const why = `With half of cuts caught, your penalty of ${fmt(rules.cutPenalty)} works like ${fmt(r.cutPenalty)}. Cutting's edge becomes ${BASE_CUT_ADVANTAGE} − ${fmt(r.cutPenalty)} − ${fmt(r.maintainReward)} = ${fmt(cutAdvantage(r))}. ${REGIME_CONCLUSION[regime]}`;
+  if (pick === truth) return { verdict: 'match', text: why };
+  if (regime === 'tie') {
+    return pick === 'no'
+      ? { verdict: 'defensible', text: `Close: the rule stops working, but nothing pushes the companies to cut either. ${why}` }
+      : { verdict: 'misconception', text: `Nothing in the payoffs favours maintaining any more. ${why}` };
+  }
   if (pick === 'depends') {
     return {
       verdict: 'depends',
-      text: `In general it depends on how much of your rule is penalty versus reward — rewards don't need anyone to be caught. ${why}`,
+      text: `In general it depends on how much of your rule is penalty versus reward — rewards don't need anyone to be caught. For your rule the table does decide. ${why}`,
     };
   }
   return { verdict: 'misconception', text: why };
 }
 
+// ── Policy sandbox ───────────────────────────────────────────────────────────
+
+/** Whether the rules currently make maintaining strictly dominant — the sandbox's goal. Always about the current rules. */
+export function ruleWorks(rules: IncentiveRules): boolean {
+  return regimeFor(rules) === 'maintain-dominant';
+}
+
+/** The stress test belongs to one set of rules, so it starts over whenever those rules change. */
+export const ENFORCEMENT_RESET = {
+  detectionPrediction: emptyPrediction<DetectionPrediction>(),
+  detection: 100,
+  detectionTouched: false,
+};
+
+/**
+ * Apply a slider change or reset in the sandbox. If the rules actually change, the stress-test prediction and
+ * results made for the old rules are cleared, so nothing stale carries forward.
+ */
+export function changeRules(
+  current: { penalty: number; reward: number },
+  patch: Partial<{ penalty: number; reward: number }>,
+): { penalty: number; reward: number } & Partial<typeof ENFORCEMENT_RESET> {
+  const next = sanitizeRules({ cutPenalty: patch.penalty ?? current.penalty, maintainReward: patch.reward ?? current.reward });
+  const rules = { penalty: next.cutPenalty, reward: next.maintainReward };
+  const changed = rules.penalty !== current.penalty || rules.reward !== current.reward;
+  return changed ? { ...rules, ...ENFORCEMENT_RESET } : rules;
+}
+
+/** Which lever a working rule relies on. */
+export function leverMix(rules: IncentiveRules): 'penalty' | 'reward' | 'both' {
+  if (rules.maintainReward === 0) return 'penalty';
+  if (rules.cutPenalty === 0) return 'reward';
+  return 'both';
+}
+
 // ── Completion ───────────────────────────────────────────────────────────────
 
+/**
+ * Built from the current, locked state only: rule lines appear only while the rules actually work, and the
+ * stress-test line only for a prediction locked against those same rules.
+ */
 export function incentiveRecap(d: {
   proposalPick: ProposalPrediction | null;
   rules: IncentiveRules;
-  flipped: boolean;
   detectionPick: DetectionPrediction | null;
 }): string[] {
   const lines: string[] = [];
@@ -96,16 +166,18 @@ export function incentiveRecap(d: {
         : `You expected the 1.5 reward to mean “${proposalLabel(d.proposalPick).toLowerCase()}”; both companies still cut.`,
     );
   }
-  if (d.flipped) {
-    const p = fmt(d.rules.cutPenalty);
-    const r = fmt(d.rules.maintainReward);
-    lines.push(`Your final rules: penalty ${p}, reward ${r}.`);
-    lines.push(
-      d.rules.maintainReward > 0
-        ? 'Your rule leans on a reward, so the council keeps paying while it works — but it doesn’t depend on catching anyone.'
-        : 'Your rule leans on a penalty: free while it works, but only if cuts are actually caught.',
-    );
-  }
+  if (!ruleWorks(d.rules)) return lines;
+  const p = fmt(d.rules.cutPenalty);
+  const r = fmt(d.rules.maintainReward);
+  lines.push(`Your final rules: penalty ${p}, reward ${r}.`);
+  const mix = leverMix(d.rules);
+  lines.push(
+    mix === 'reward'
+      ? 'Your rule relies on a reward, so the council keeps paying while it works — but it doesn’t depend on catching anyone.'
+      : mix === 'penalty'
+        ? 'Your rule relies on a penalty: free while it works, but only if cuts are actually caught.'
+        : 'Your rule mixes both levers: the reward costs the council every week, and the penalty only bites if cuts are caught.',
+  );
   if (d.detectionPick) {
     lines.push(
       detectionFeedback(d.detectionPick, d.rules).verdict === 'match'

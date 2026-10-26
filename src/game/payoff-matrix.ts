@@ -99,6 +99,43 @@ export function bestReplyMarks<R extends string, C extends string>(game: MatrixG
   );
 }
 
+export interface MixedEquilibrium<R extends string, C extends string> {
+  /** Probability the row player plays `rows[0]` (the rest goes to `rows[1]`). */
+  rowFirst: number;
+  /** Probability the column player plays `cols[0]`. */
+  colFirst: number;
+  rows: readonly [R, R];
+  cols: readonly [C, C];
+  /** Expected [row, column] payoffs at the equilibrium. */
+  payoffs: readonly [number, number];
+}
+
+/**
+ * The fully mixed equilibrium of a 2×2 game, if one exists: each player mixes so the other is indifferent
+ * between their two actions. Returns null for non-2×2 games, or when the indifference probabilities are not
+ * strictly between 0 and 1 (e.g. a game with a dominant strategy, like the pricing game).
+ */
+export function mixedEquilibrium2x2<R extends string, C extends string>(game: MatrixGame<R, C>): MixedEquilibrium<R, C> | null {
+  if (game.rows.length !== 2 || game.cols.length !== 2) return null;
+  const a = (r: number, c: number) => game.payoffs[r][c][0];
+  const b = (r: number, c: number) => game.payoffs[r][c][1];
+  // Column player indifferent: x·b00 + (1−x)·b10 = x·b01 + (1−x)·b11.
+  const xDen = b(0, 0) - b(1, 0) - b(0, 1) + b(1, 1);
+  // Row player indifferent: y·a00 + (1−y)·a01 = y·a10 + (1−y)·a11.
+  const yDen = a(0, 0) - a(0, 1) - a(1, 0) + a(1, 1);
+  if (Math.abs(xDen) < EPSILON || Math.abs(yDen) < EPSILON) return null;
+  const x = (b(1, 1) - b(1, 0)) / xDen;
+  const y = (a(1, 1) - a(0, 1)) / yDen;
+  if (x <= EPSILON || x >= 1 - EPSILON || y <= EPSILON || y >= 1 - EPSILON) return null;
+  return {
+    rowFirst: x,
+    colFirst: y,
+    rows: [game.rows[0], game.rows[1]],
+    cols: [game.cols[0], game.cols[1]],
+    payoffs: [y * a(0, 0) + (1 - y) * a(0, 1), x * b(0, 0) + (1 - x) * b(1, 0)],
+  };
+}
+
 /** Map every payoff through a function — used to apply incentive changes without touching structure. */
 export function mapPayoffs<R extends string, C extends string>(
   game: MatrixGame<R, C>,

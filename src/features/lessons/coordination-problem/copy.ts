@@ -1,5 +1,5 @@
 import type { Feedback } from '../../../components/lesson/verdict.ts';
-import { MEETUP_GAME, type MeetupResult, type Place } from '../../../game/coordination.ts';
+import { MEETUP_GAME, type MeetupResult, type Place, meetupAnalysis } from '../../../game/coordination.ts';
 import { payoffAt, rowBestResponses } from '../../../game/payoff-matrix.ts';
 
 /** Lesson 3 wording that depends on the learner's predictions and picks. Pure, so tests can pin it to the model. */
@@ -41,6 +41,24 @@ export function meetupFeedback(round: 1 | 2, predicted: Place, r: Pick<MeetupRes
     verdict: 'misconception',
     text: `You expected ${PLACE_NAME[predicted]} and went to ${PLACE_NAME[r.you]}. Nina was at ${PLACE_NAME[r.friend]}.`,
   };
+}
+
+const COUNT_WORD = ['No', 'One', 'Two', 'Three', 'Four'];
+const pct = (p: number) => `${Math.round(p * 100)}%`;
+
+/**
+ * How to describe the table's equilibria, from the engine's analysis. Pure-strategy equilibria are counted as
+ * such, and the mixed equilibrium is described only if the engine finds one.
+ */
+export function equilibriumSummary(analysis = meetupAnalysis()): { title: string; mixedNote: string | null } {
+  const n = analysis.equilibria.length;
+  const dominant = analysis.rowDominance.kind !== 'none' || analysis.colDominance.kind !== 'none';
+  const title = `${COUNT_WORD[n] ?? n} pure-strategy ${n === 1 ? 'equilibrium' : 'equilibria'}, ${dominant ? 'with' : 'no'} dominant strategy`;
+  const m = analysis.mixed;
+  const mixedNote = m
+    ? `There is also a mixed-strategy equilibrium: if you went to ${PLACE_NAME[m.rows[0]]} ${pct(m.rowFirst)} of the time and Nina ${pct(m.colFirst)} of the time, neither of you could do better by changing alone. But you would meet only about ${pct(m.meetChance)} of the time, expecting ${m.payoffs[0].toFixed(1)} and ${m.payoffs[1].toFixed(1)} — worse for both than either meeting.`
+    : null;
+  return { title, mixedNote };
 }
 
 /** Who benefits from the message: the sender chooses which of the two meetings happens. */

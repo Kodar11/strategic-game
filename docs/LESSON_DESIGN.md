@@ -6,7 +6,17 @@ Every lesson follows the same learning cycle, adapted to its subject:
 
 Not every stage gets its own screen, and no lesson is forced into an identical template. The rules that hold everywhere:
 
-- **Predict before the reveal.** Predictions use `PredictionPrompt` (cyan, crosshair) so they never look like a decision (blue/orange) or an explanation (amber). A prediction locks when the learner commits, and is compared with the outcome using `PredictionResult`.
+- **Predict before the reveal.** Predictions use `PredictionPrompt` (cyan, crosshair) so they never look like a decision (blue/orange) or an explanation (amber). Each prediction is a `PredictionAttempt` (`src/components/lesson/prediction-state.ts`) with a lifecycle of **unanswered → draft → locked → evaluated**:
+  - While it is a draft, the learner can change both the answer and the confidence freely. Nothing about correctness is shown.
+  - It locks only through an explicit action. That is either the step's primary button ("Lock prediction", "Submit my number", "Go there", "Run the comparison") or a "Confirm prediction" button inside the prompt, for predictions that open an experiment on the same screen.
+  - Locking requires an answer **and** a confidence. A locked attempt is never edited, and locking is idempotent, so double taps can't misfire.
+  - Feedback, reveals and recaps only ever read `lockedAnswer(...)`.
+  - Replaying a lesson starts from fresh, empty attempts.
+- **Confidence, 1–5, before every prediction is evaluated.** The scale is: 1 Just guessing, 2 Slightly, 3 Somewhat, 4 Very, 5 Extremely confident.
+  - Nothing is pre-selected.
+  - It is stored on the attempt it belongs to and shown back in `PredictionResult` and the locked prompt.
+  - It never affects verdicts, gating or recaps.
+  - Transfer questions are not predictions (they are answers checked immediately with feedback), so they don't ask for confidence. Neither do decisions such as prices, places, shots and the promise.
 - **Name a concept only after the evidence.** "Dominant strategy", "level-k", "Nash equilibrium", "focal point" and "mixed strategy" each appear on the screen *after* the learner has seen the pattern they describe.
 - **Feedback is graded, not green-by-default.** `FeedbackPanel` takes a `Verdict` (`match`, `defensible`, `misconception`, `depends`). Green is reserved for answers that match the model.
 - **Feedback comes from state.** All learner-dependent wording lives in each lesson's `copy.ts` as pure functions of lesson state and the game engine, and is covered by `src/features/lessons/__tests__/lesson-copy.test.ts`.
@@ -53,4 +63,26 @@ This replaces the earlier "run QuickEats for another week" steps, which repeated
 
 ### Model extension: imperfect detection
 
-`withDetection(rules, d)` in `src/game/incentives.ts` multiplies the penalty by the detection rate `d` and leaves the reward unchanged. This assumes companies weigh a fine by the chance of paying it. Everything else reuses the existing formulas, so the threshold becomes `d·p + r > 2`. The base payoffs and the `p + r` threshold are unchanged, and the screen labels the extension as a "what if".
+`withDetection(rules, d)` in `src/game/incentives.ts` multiplies the penalty by the detection rate `d` (a share from 0 to 1; the slider's percentage is divided by 100) and leaves the reward unchanged. This assumes companies weigh a fine by the chance of paying it. Everything else reuses the existing formulas, so the regime is decided by comparing `d·p + r` with 2:
+- below 2, cutting is dominant again (stress-test answer "No");
+- exactly 2 is a tie, where the model makes no prediction (answer "Can't tell");
+- above 2, maintaining stays dominant (answer "Yes").
+
+The base payoffs and the `p + r` threshold are unchanged, and the screen labels the extension as a "what if".
+
+### Sandbox state
+Whether the learner's rule works is always computed from the **current** sliders (`ruleWorks`); there is no latch.
+- Continue is enabled only while maintaining is strictly dominant.
+- The recap mentions the rule only if it works.
+- Any actual change to the rules clears the stress-test prediction, slider and result (`changeRules`), because they belonged to the old rule.
+
+### Lesson 4 lab phases
+`mixLabPhase` runs **predict → experiment → review**:
+- **Predict:** the prediction is a draft.
+- **Experiment:** the prediction is locked, and the slider and simulation are available. Expected values and feedback stay hidden.
+- **Review:** reached after the first simulation. Expected values and feedback on the 80% prediction are shown.
+- **"Start the lab over"** returns the lab to its initial state, including a fresh prediction.
+
+### Shared scenario data
+- **Lesson 2:** the round-1 crowd (population and seed) is exported from `strategy-detective/copy.ts`. The crowd lab reuses that seed, so its "Round 1 mix" is exactly the crowd the learner played.
+- **Lesson 3:** `meetupAnalysis` reports two pure-strategy equilibria and the mixed equilibrium (café 8/15 and 3/7, meeting about 50% of the time).

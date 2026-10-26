@@ -1,7 +1,20 @@
 import type { Feedback } from '../../../components/lesson/verdict.ts';
-import { type Population, type RoundResult, bestGuess, bestGuessForPopulation, levelKGuess } from '../../../game/two-thirds-game.ts';
+import { type Population, type RoundResult, bestGuess, bestGuessForPopulation, levelKGuess, shiftPopulation } from '../../../game/two-thirds-game.ts';
 
 /** Lesson 2 wording that depends on the learner's predictions and picks. Pure, so tests can pin it to the model. */
+
+// ── The scenario (single source of truth for the screen, the lab and the tests) ───
+
+/** Round 1 crowd: a mix of reasoning depths. Round 2: the same people, each one level deeper. */
+export const ROUND1_POP: Population = { level0: 4, level1: 3, level2: 2, level3: 1, equilibrium: 0 };
+export const ROUND2_POP = shiftPopulation(ROUND1_POP);
+export const ROUND1_SEED = 11;
+export const ROUND2_SEED = 12;
+/**
+ * The crowd lab reuses round 1's seed, so its "Round 1 mix" preset is exactly the crowd the learner played
+ * (Instinctive players draw first, so the same seed gives them the same picks).
+ */
+export const LAB_SEED = ROUND1_SEED;
 
 export type AverageGuess = 'random' | 'one-step' | 'two-step' | 'zero';
 
@@ -78,8 +91,16 @@ export const LAB_PREDICTIONS: readonly { id: LabPrediction; label: string }[] = 
 export const ALL_INSTINCTIVE: Population = { level0: 10, level1: 0, level2: 0, level3: 0, equilibrium: 0 };
 export const ALL_THEORISTS: Population = { level0: 0, level1: 0, level2: 0, level3: 0, equilibrium: 10 };
 
-/** Compare the best pick against a mixed crowd and against an all-Theorist crowd, from the engine. */
-export function labPredictionFeedback(pick: LabPrediction, mixed: Population, seed: number): Feedback {
+/** Whether the lab crowd actually changed — re-selecting the current crowd is not an experiment. */
+export function populationChanged(a: Population, b: Population): boolean {
+  return (Object.keys(a) as (keyof Population)[]).some((t) => a[t] !== b[t]);
+}
+
+/**
+ * Compare the best pick against a mixed crowd and against an all-Theorist crowd, from the engine.
+ * Defaults to the round-1 scenario the learner actually played, so the numbers match what they saw.
+ */
+export function labPredictionFeedback(pick: LabPrediction, mixed: Population = ROUND1_POP, seed: number = ROUND1_SEED): Feedback {
   const before = bestGuessForPopulation(mixed, seed);
   const after = bestGuessForPopulation(ALL_THEORISTS, seed);
   const numbers = `Against the round-1 mix the best pick is ${before.toFixed(1)}; against ten Theorists it is ${after.toFixed(1)}.`;

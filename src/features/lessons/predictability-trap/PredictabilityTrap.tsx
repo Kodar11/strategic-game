@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Dices, Repeat, Repeat2 } from '@/src/components/ui/icons';
+import { ArrowLeft, ArrowRight, Dices, Repeat, Repeat2, RotateCcw } from '@/src/components/ui/icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { z } from 'zod';
@@ -8,6 +8,16 @@ import { Completion } from '@/src/components/lesson/Completion';
 import { LessonShell, type StepDef } from '@/src/components/lesson/LessonShell';
 import { Dialogue, FeedbackPanel, Panel, Stat, StepHeading } from '@/src/components/lesson/Panels';
 import { PredictionPrompt } from '@/src/components/lesson/Prediction';
+import {
+  canLock,
+  chooseAnswer,
+  emptyPrediction,
+  lockPrediction,
+  lockedAnswer,
+  missingForLock,
+  predictionSchema,
+  rateConfidence,
+} from '@/src/components/lesson/prediction-state';
 import { TransferQuestion, type TransferOption } from '@/src/components/lesson/TransferQuestion';
 import { useEnter } from '@/src/components/lesson/motion';
 import { useLessonFlow } from '@/src/components/lesson/useLessonFlow';
@@ -36,7 +46,17 @@ import {
 import { createRng } from '@/src/game/rng';
 import { haptic } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
-import { COMPARE_PREDICTIONS, LAB_PREDICTIONS, comparePredictionFeedback, labPredictionFeedback, predictabilityRecap } from './copy';
+import {
+  COMPARE_PREDICTIONS,
+  LAB_PREDICTIONS,
+  MIX_LAB_RESET,
+  comparePredictionFeedback,
+  mixLabFeedback,
+  mixLabPhase,
+  predictabilityRecap,
+  runComparison,
+  simulateMixRun,
+} from './copy';
 
 const SHOTS_TO_TAKE = 8;
 const KEEPER_SEED = 4242;
@@ -56,9 +76,9 @@ const shotSchema = z.object({
 const schema = z.object({
   firstPick: side.nullable(),
   shots: z.array(shotSchema).max(SHOTS_TO_TAKE),
-  comparePick: z.enum(['repeat', 'alternate', 'random']).nullable(),
+  comparePrediction: predictionSchema(z.enum(['repeat', 'alternate', 'random'])),
   compareSeed: z.number().int().min(0).nullable(),
-  labPick: z.enum(['high', 'half', 'low']).nullable(),
+  labPrediction: predictionSchema(z.enum(['high', 'half', 'low'])),
   q: z.number().min(0).max(1),
   simSeed: z.number().int().min(0).nullable(),
   transferPick: z.string().nullable(),
@@ -69,11 +89,9 @@ type Data = z.infer<typeof schema>;
 const INITIAL: Data = {
   firstPick: null,
   shots: [],
-  comparePick: null,
+  comparePrediction: emptyPrediction(),
   compareSeed: null,
-  labPick: null,
-  q: 0.8,
-  simSeed: null,
+  ...MIX_LAB_RESET,
   transferPick: null,
   transferChecked: false,
 };
@@ -261,20 +279,28 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
     {
       key: 'compare',
       canContinue: data.compareSeed !== null,
-      blockedHint: data.comparePick ? 'Run the comparison to continue.' : 'Predict the winner, then run the comparison.',
+      blockedHint:
+        missingForLock(data.comparePrediction) === 'answer'
+          ? 'Predict the winner, then run the comparison.'
+          : missingForLock(data.comparePrediction) === 'confidence'
+            ? 'Rate how confident you are, then run the comparison.'
+            : 'Run the comparison to continue.',
       render: () => {
         const seed = data.compareSeed;
         const results = seed === null ? null : STRATEGIES.map((s) => ({ ...s, result: playSeries(strategySequence(s.id, COMPARE_SHOTS, seed + 1), KEEPER_SEED + seed) }));
-        const compareFb = results && data.comparePick ? comparePredictionFeedback(data.comparePick, results.map((r) => ({ id: r.id, goals: r.result.goals }))) : null;
+        const comparePick = lockedAnswer(data.comparePrediction);
+        const compareFb = results && comparePick ? comparePredictionFeedback(comparePick, results.map((r) => ({ id: r.id, goals: r.result.goals }))) : null;
         return (
           <>
             <StepHeading kicker="Experiment" title="Three strikers, same keeper" body={`Each strategy takes ${COMPARE_SHOTS} shots against Maya's stated policy. Her policy never changes — only the striker does.`} />
             <PredictionPrompt
               question="Which striker will score the most?"
               options={COMPARE_PREDICTIONS}
-              value={data.comparePick}
-              onChange={(comparePick) => update({ comparePick })}
-              locked={seed !== null}
+              value={data.comparePrediction.answer}
+              onChange={(a) => update((d) => ({ comparePrediction: chooseAnswer(d.comparePrediction, a) }))}
+              confidence={data.comparePrediction.confidence}
+              onConfidence={(c) => update((d) => ({ comparePrediction: rateConfidence(d.comparePrediction, c) }))}
+              locked={data.comparePrediction.locked}
             />
             <Card style={{ gap: space.lg }}>
               {STRATEGIES.map((s, i) => {
@@ -303,8 +329,8 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
             <Button
               label={seed === null ? 'Run the comparison' : 'Run again with new coin flips'}
               variant="secondary"
-              disabled={!data.comparePick}
-              onPress={() => update((d) => ({ compareSeed: d.compareSeed === null ? 1 : d.compareSeed + 1 }))}
+              disabled={!data.comparePrediction.locked && !canLock(data.comparePrediction)}
+              onPress={() => update(runComparison)}
             />
             <NarrateOn clip="l4.compare.patterns" trigger={seed !== null} />
             {results && compareFb ? (
@@ -350,65 +376,86 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
     },
     {
       key: 'lab',
-      canContinue: data.simSeed !== null,
-      blockedHint: data.labPick ? 'Run at least one simulation.' : 'Make a prediction first.',
+      canContinue: mixLabPhase(data) === 'review',
+      blockedHint:
+        mixLabPhase(data) === 'experiment'
+          ? 'Run at least one simulation.'
+          : missingForLock(data.labPrediction) === 'confidence'
+            ? 'Rate how confident you are, then confirm.'
+            : 'Make and confirm a prediction first.',
       render: () => {
         const q = data.q;
+        const phase = mixLabPhase(data);
         const sim = data.simSeed === null ? null : simulateMix(q, SIM_SHOTS, data.simSeed);
-        const labFb = data.labPick ? labPredictionFeedback(data.labPick) : null;
+        const labFb = mixLabFeedback(data);
         return (
           <>
             <StepHeading kicker="Simulation lab" title="Tune your mix" body="Set how often you shoot left. Assume Maya has studied you long enough to know this number, and always dives to the side that hurts you most." />
             <PredictionPrompt
               question="You shoot left 80% of the time, and Maya knows it. How many goals a shot can you count on?"
               options={LAB_PREDICTIONS}
-              value={data.labPick}
-              onChange={(labPick) => update({ labPick })}
-              locked={!!data.labPick}
+              value={data.labPrediction.answer}
+              onChange={(a) => update((d) => ({ labPrediction: chooseAnswer(d.labPrediction, a) }))}
+              confidence={data.labPrediction.confidence}
+              onConfidence={(c) => update((d) => ({ labPrediction: rateConfidence(d.labPrediction, c) }))}
+              onConfirm={() => update((d) => ({ labPrediction: lockPrediction(d.labPrediction) }))}
+              locked={data.labPrediction.locked}
             />
-            {labFb ? (
-              <FeedbackPanel verdict={labFb.verdict} title="Your prediction">
-                {labFb.text}
-              </FeedbackPanel>
-            ) : null}
-            {data.labPick ? (
+            {phase !== 'predict' ? (
               <>
-            <Card style={{ gap: space.lg }}>
-              <Slider
-                label="Chance you shoot left"
-                value={Math.round(q * 100)}
-                min={0}
-                max={100}
-                step={5}
-                formatValue={(v) => `${v}%`}
-                marker={{ value: 50, label: '50/50' }}
-                onChange={(v) => update({ q: v / 100 })}
-              />
-              <View style={{ flexDirection: 'row', gap: space.sm }}>
-                <Stat label="Expected if she dives left" value={expectedPayoff(q, 1).toFixed(2)} />
-                <Stat label="Expected if she dives right" value={expectedPayoff(q, 0).toFixed(2)} />
-              </View>
-              <Stat label="What you can count on (she picks the worse one for you)" value={guaranteedPayoff(q).toFixed(2)} tone="amber" />
-            </Card>
-            <Button
-              label={sim ? 'Simulate again' : `Simulate ${SIM_SHOTS} shots`}
-              variant="secondary"
-              icon={Dices}
-              iconPosition="left"
-              onPress={() => update((d) => ({ simSeed: d.simSeed === null ? 1 : d.simSeed + 1 }))}
-            />
-            {sim ? (
-              <Card style={{ gap: space.md }}>
-                <View style={{ flexDirection: 'row', gap: space.sm }}>
-                  <Stat label="Observed this run" value={sim.observed.toFixed(2)} tone="blue" caption={`${sim.goals} goals of ${sim.shots}`} />
-                  <Stat label="Expected" value={sim.expected.toFixed(2)} tone="amber" caption={`she dives ${SIDE_NAME[sim.keeperDive]}`} />
-                </View>
-                <RunningChart running={sim.running} expected={sim.expected} />
-                <AppText variant="caption" color={colors.textMuted}>
-                  Short runs wander around the expected value; longer runs settle closer. Run it again to see a different sequence.
-                </AppText>
-              </Card>
-            ) : null}
+                <Card style={{ gap: space.lg }}>
+                  <Slider
+                    label="Chance you shoot left"
+                    value={Math.round(q * 100)}
+                    min={0}
+                    max={100}
+                    step={5}
+                    formatValue={(v) => `${v}%`}
+                    marker={{ value: 50, label: '50/50' }}
+                    onChange={(v) => update({ q: v / 100 })}
+                  />
+                  {/* Expected values would answer the prediction, so they wait for the first simulation. */}
+                  {phase === 'review' ? (
+                    <>
+                      <View style={{ flexDirection: 'row', gap: space.sm }}>
+                        <Stat label="Expected if she dives left" value={expectedPayoff(q, 1).toFixed(2)} />
+                        <Stat label="Expected if she dives right" value={expectedPayoff(q, 0).toFixed(2)} />
+                      </View>
+                      <Stat label="What you can count on (she picks the worse one for you)" value={guaranteedPayoff(q).toFixed(2)} tone="amber" />
+                    </>
+                  ) : (
+                    <AppText variant="small" color={colors.textMuted}>
+                      Your prediction is locked. Set any mix you like, then simulate {SIM_SHOTS} shots against a keeper who knows it.
+                    </AppText>
+                  )}
+                </Card>
+                <Button
+                  label={sim ? 'Simulate again' : `Simulate ${SIM_SHOTS} shots`}
+                  variant="secondary"
+                  icon={Dices}
+                  iconPosition="left"
+                  onPress={() => update(simulateMixRun)}
+                />
+                {sim ? (
+                  <Card style={{ gap: space.md }}>
+                    <View style={{ flexDirection: 'row', gap: space.sm }}>
+                      <Stat label="Observed this run" value={sim.observed.toFixed(2)} tone="blue" caption={`${sim.goals} goals of ${sim.shots}`} />
+                      <Stat label="Expected" value={sim.expected.toFixed(2)} tone="amber" caption={`she dives ${SIDE_NAME[sim.keeperDive]}`} />
+                    </View>
+                    <RunningChart running={sim.running} expected={sim.expected} />
+                    <AppText variant="caption" color={colors.textMuted}>
+                      Short runs wander around the expected value; longer runs settle closer. Run it again to see a different sequence.
+                    </AppText>
+                  </Card>
+                ) : null}
+                {labFb ? (
+                  <FeedbackPanel verdict={labFb.verdict} title="Your prediction">
+                    {labFb.text}
+                  </FeedbackPanel>
+                ) : null}
+                {phase === 'review' ? (
+                  <Button label="Start the lab over" variant="ghost" compact icon={RotateCcw} iconPosition="left" onPress={() => update(MIX_LAB_RESET)} />
+                ) : null}
               </>
             ) : null}
           </>
@@ -470,7 +517,7 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
             'A mixed strategy can make your result independent of the opponent’s choice.',
             'Short-run results are noisy; judge a strategy by its expected value.',
           ]}
-          recap={predictabilityRecap({ shots: data.shots, comparePick: data.comparePick, labPick: data.labPick })}
+          recap={predictabilityRecap({ shots: data.shots, comparePick: lockedAnswer(data.comparePrediction), labPick: lockedAnswer(data.labPrediction) })}
           reflection="Where could someone exploit a routine of yours — and where does the same routine help the people on your side?"
           nextHook="So far you have played inside the rules. Next, you get to rewrite them."
           onReplay={restart}

@@ -9,7 +9,18 @@ import { Completion } from '@/src/components/lesson/Completion';
 import { LessonShell, type StepDef } from '@/src/components/lesson/LessonShell';
 import { Bullet, Dialogue, FeedbackPanel, Panel, StepHeading } from '@/src/components/lesson/Panels';
 import { PayoffMatrix } from '@/src/components/lesson/PayoffMatrix';
-import { PredictionPrompt, PredictionResult } from '@/src/components/lesson/Prediction';
+import { ConfidenceScale, PredictionPrompt, PredictionResult } from '@/src/components/lesson/Prediction';
+import {
+  type Confidence,
+  canLock,
+  chooseAnswer,
+  emptyPrediction,
+  lockPrediction,
+  lockedAnswer,
+  missingForLock,
+  predictionSchema,
+  rateConfidence,
+} from '@/src/components/lesson/prediction-state';
 import { TransferQuestion, type TransferOption } from '@/src/components/lesson/TransferQuestion';
 import { useEnter } from '@/src/components/lesson/motion';
 import { useLessonFlow } from '@/src/components/lesson/useLessonFlow';
@@ -42,9 +53,8 @@ import {
 
 const action = z.enum(['maintain', 'cut']);
 const schema = z.object({
-  predicted: action.nullable(),
+  prediction: predictionSchema(action),
   predictReason: z.enum(['either', 'grab', 'mutual', 'mirror']).nullable(),
-  predictLocked: z.boolean(),
   choice: action.nullable(),
   committed: z.boolean(),
   rival: action.nullable(),
@@ -54,7 +64,7 @@ const schema = z.object({
   inspected: z.object({ row: action, col: action }).nullable(),
   showBR: z.boolean(),
   promise: action.nullable(),
-  penaltyGuess: z.enum(['one', 'two', 'over-two', 'five']).nullable(),
+  penaltyPrediction: predictionSchema(z.enum(['one', 'two', 'over-two', 'five'])),
   penalty: z.number().min(PENALTY_RANGE.min).max(PENALTY_RANGE.max),
   foundFlip: z.boolean(),
   transferPick: z.string().nullable(),
@@ -63,9 +73,8 @@ const schema = z.object({
 type Data = z.infer<typeof schema>;
 
 const INITIAL: Data = {
-  predicted: null,
+  prediction: emptyPrediction(),
   predictReason: null,
-  predictLocked: false,
   choice: null,
   committed: false,
   rival: null,
@@ -75,7 +84,7 @@ const INITIAL: Data = {
   inspected: null,
   showBR: false,
   promise: null,
-  penaltyGuess: null,
+  penaltyPrediction: emptyPrediction(),
   penalty: 0,
   foundFlip: false,
   transferPick: null,
@@ -136,6 +145,8 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
   const outcome = data.choice && data.rival ? { row: data.choice, col: data.rival } : null;
   const outcomePay = outcome ? payoffAt(BASE_PRICING_GAME, outcome.row, outcome.col) : null;
   const penaltyGame = applyCutPenalty(data.penalty);
+  const predicted = lockedAnswer(data.prediction);
+  const penaltyGuess = lockedAnswer(data.penaltyPrediction);
 
   const steps: StepDef[] = [
     {
@@ -196,12 +207,15 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
     {
       // Prediction: reason about the rival before any choice or explanation.
       key: 'predict',
-      cta: data.predictLocked ? 'Continue' : 'Lock prediction',
-      canContinue: !!data.predicted && !!data.predictReason,
-      blockedHint: data.predicted ? 'Pick the reason closest to yours.' : 'Predict what Rohan will do.',
-      onContinue: () => {
-        if (!data.predictLocked) update({ predictLocked: true });
-      },
+      cta: data.prediction.locked ? 'Continue' : 'Lock prediction',
+      canContinue: data.prediction.locked || (canLock(data.prediction) && !!data.predictReason),
+      blockedHint:
+        data.prediction.answer === null
+          ? 'Predict what Rohan will do.'
+          : !data.predictReason
+            ? 'Pick the reason closest to yours.'
+            : 'Rate how confident you are.',
+      onContinue: () => update((d) => (d.predictReason ? { prediction: lockPrediction(d.prediction) } : {})),
       render: () => (
         <>
           <StepHeading kicker="Before you decide" title="What will Rohan do?" body="He's choosing at the same moment, from the same table you just read." />
@@ -209,20 +223,24 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
             question="Rohan will…"
             layout="row"
             options={(['maintain', 'cut'] as const).map((a) => ({ id: a, label: RIVAL_MOVE[a] }))}
-            value={data.predicted}
-            onChange={(predicted) => update({ predicted })}
-            locked={data.predictLocked}
+            value={data.prediction.answer}
+            onChange={(a) => update((d) => ({ prediction: chooseAnswer(d.prediction, a) }))}
+            confidence={data.prediction.confidence}
+            locked={data.prediction.locked}
           />
-          {data.predicted ? (
+          {data.prediction.answer ? (
             <PredictionPrompt
               label="Your reasoning"
               question="Which is closest to why?"
               options={RIVAL_REASONS}
               value={data.predictReason}
-              onChange={(predictReason) => update({ predictReason })}
-              locked={data.predictLocked}
+              onChange={(predictReason) => update((d) => (d.prediction.locked ? {} : { predictReason }))}
+              locked={data.prediction.locked}
               delay={80}
             />
+          ) : null}
+          {data.prediction.answer && data.predictReason && !data.prediction.locked ? (
+            <ConfidenceScale value={data.prediction.confidence} onChange={(c) => update((d) => ({ prediction: rateConfidence(d.prediction, c) }))} />
           ) : null}
         </>
       ),
@@ -241,9 +259,9 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
       render: () => (
         <>
           <StepHeading kicker="Your decision" title="Set this week's price" body="Now choose for QuickEats. Rohan can't see your choice, and you won't see his until Monday." />
-          {data.predicted ? (
+          {predicted ? (
             <AppText variant="small" color={colors.accent}>
-              Your prediction: {RIVAL_MOVE[data.predicted].toLowerCase()}.
+              Your prediction: {RIVAL_MOVE[predicted].toLowerCase()}.
             </AppText>
           ) : null}
           <View style={{ flexDirection: 'row', gap: space.sm }} accessibilityRole="radiogroup">
@@ -277,7 +295,7 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
       key: 'reveal',
       render: () =>
         outcome && outcomePay ? (
-          <Reveal you={outcome.row} rival={outcome.col} payoffs={outcomePay} predicted={data.predicted} />
+          <Reveal you={outcome.row} rival={outcome.col} payoffs={outcomePay} predicted={predicted} confidence={data.prediction.confidence} />
         ) : null,
     },
     {
@@ -443,10 +461,14 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
       // Experiment: predict, then change one incentive and watch the best replies move.
       key: 'penalty',
       canContinue: data.foundFlip,
-      blockedHint: data.penaltyGuess ? 'Find a penalty that changes the predicted outcome.' : 'Make a prediction first.',
+      blockedHint: data.penaltyPrediction.locked
+        ? 'Find a penalty that changes the predicted outcome.'
+        : missingForLock(data.penaltyPrediction) === 'confidence'
+          ? 'Rate how confident you are, then confirm.'
+          : 'Make and confirm a prediction first.',
       render: () => {
         const ex = penaltyExplanation(data.penalty);
-        const gf = data.penaltyGuess ? penaltyGuessFeedback(data.penaltyGuess) : null;
+        const gf = penaltyGuess ? penaltyGuessFeedback(penaltyGuess) : null;
         return (
           <>
             <StepHeading
@@ -457,11 +479,14 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
             <PredictionPrompt
               question="What is the smallest penalty that makes maintaining the better choice for QuickEats, whatever FoodKart does?"
               options={PENALTY_GUESSES}
-              value={data.penaltyGuess}
-              onChange={(penaltyGuess) => update({ penaltyGuess })}
-              locked={!!data.penaltyGuess}
+              value={data.penaltyPrediction.answer}
+              onChange={(a) => update((d) => ({ penaltyPrediction: chooseAnswer(d.penaltyPrediction, a) }))}
+              confidence={data.penaltyPrediction.confidence}
+              onConfidence={(c) => update((d) => ({ penaltyPrediction: rateConfidence(d.penaltyPrediction, c) }))}
+              onConfirm={() => update((d) => ({ penaltyPrediction: lockPrediction(d.penaltyPrediction) }))}
+              locked={data.penaltyPrediction.locked}
             />
-            {data.penaltyGuess ? (
+            {data.penaltyPrediction.locked ? (
               <>
                 <Card style={{ gap: space.lg }}>
                   <Slider
@@ -572,12 +597,12 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
             'Lasting cooperation usually needs changed incentives, not just promises.',
           ]}
           recap={cooperationRecap({
-            predicted: data.predicted,
-            reason: data.predictReason,
+            predicted,
+            reason: predicted ? data.predictReason : null,
             choice: data.choice,
             rival: data.rival,
             promise: data.promise,
-            penaltyGuess: data.penaltyGuess,
+            penaltyGuess,
           })}
           reflection="Think of a place where everyone would be better off holding back — but each person gains by not holding back. What would have to change in the payoffs to make holding back the better choice?"
           nextHook="Here, your best move didn't depend on Rohan. Next, the right answer depends entirely on how deeply everyone else thinks."
@@ -595,11 +620,13 @@ function Reveal({
   rival,
   payoffs,
   predicted,
+  confidence,
 }: {
   you: PriceAction;
   rival: PriceAction;
   payoffs: readonly [number, number];
   predicted: PriceAction | null;
+  confidence: Confidence | null;
 }) {
   const reduced = useMotionReduced();
   const [shown, setShown] = useState(reduced);
@@ -632,6 +659,7 @@ function Reveal({
               predicted={RIVAL_MOVE[predicted]}
               actual={RIVAL_MOVE[rival]}
               verdict={check.verdict}
+              confidence={confidence}
               title={check.verdict === 'match' ? 'You read him right' : 'Not what happened'}
               delay={500}>
               {check.text}

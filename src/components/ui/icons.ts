@@ -20,6 +20,7 @@ export { default as Gift } from 'lucide-react-native/icons/gift';
 export { default as House } from 'lucide-react-native/icons/house';
 export { default as Info } from 'lucide-react-native/icons/info';
 export { default as Lightbulb } from 'lucide-react-native/icons/lightbulb';
+export { default as Lock } from 'lucide-react-native/icons/lock';
 export { default as MessageCircle } from 'lucide-react-native/icons/message-circle';
 export { default as Minus } from 'lucide-react-native/icons/minus';
 export { default as Play } from 'lucide-react-native/icons/play';

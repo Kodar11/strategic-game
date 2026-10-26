@@ -1,3 +1,4 @@
+import { type PredictionAttempt, emptyPrediction, lockPrediction, lockedAnswer } from '../../../components/lesson/prediction-state.ts';
 import type { Feedback } from '../../../components/lesson/verdict.ts';
 import { type ShotRecord, type StrikerStrategy, guaranteedPayoff, keeperBestResponse } from '../../../game/mixed-strategy.ts';
 
@@ -32,8 +33,18 @@ export function comparePredictionFeedback(pick: StrikerStrategy, results: readon
   }
   return {
     verdict: 'misconception',
-    text: 'Always shooting left is the easiest pattern of all: once Maya has three shots of history, she dives left every time.',
+    text: 'Always shooting left is the easiest pattern of all: once Maya has two shots of history, she dives left every time.',
   };
+}
+
+/**
+ * "Run the comparison" locks the prediction and runs (or reruns) with a new seed. Nothing runs, and no seed is
+ * spent, until the prediction has an answer and a confidence.
+ */
+export function runComparison(d: { comparePrediction: PredictionAttempt<StrikerStrategy>; compareSeed: number | null }) {
+  const comparePrediction = lockPrediction(d.comparePrediction);
+  if (!comparePrediction.locked) return {};
+  return { comparePrediction, compareSeed: d.compareSeed === null ? 1 : d.compareSeed + 1 };
 }
 
 // ── Mix lab ──────────────────────────────────────────────────────────────────
@@ -42,6 +53,37 @@ export function comparePredictionFeedback(pick: StrikerStrategy, results: readon
 export const LAB_START_Q = 0.8;
 
 export type LabPrediction = 'high' | 'half' | 'low';
+
+/**
+ * The lab's three phases: predict (draft), experiment (locked; slider and simulation available, nothing revealed),
+ * review (after the first simulation: expected values and feedback on the prediction are shown).
+ */
+export type MixLabPhase = 'predict' | 'experiment' | 'review';
+
+export interface MixLabState {
+  labPrediction: PredictionAttempt<LabPrediction>;
+  q: number;
+  simSeed: number | null;
+}
+
+export const MIX_LAB_RESET: MixLabState = { labPrediction: emptyPrediction(), q: LAB_START_Q, simSeed: null };
+
+export function mixLabPhase(lab: MixLabState): MixLabPhase {
+  if (!lab.labPrediction.locked) return 'predict';
+  return lab.simSeed === null ? 'experiment' : 'review';
+}
+
+/** Run a (new) simulation. Only possible once the prediction is locked, so a simulation can never pre-empt it. */
+export function simulateMixRun(lab: MixLabState): Partial<MixLabState> {
+  if (!lab.labPrediction.locked) return {};
+  return { simSeed: lab.simSeed === null ? 1 : lab.simSeed + 1 };
+}
+
+/** Feedback on the prediction, or null while it would give the answer away. */
+export function mixLabFeedback(lab: MixLabState): Feedback | null {
+  const pick = lockedAnswer(lab.labPrediction);
+  return pick && mixLabPhase(lab) === 'review' ? labPredictionFeedback(pick) : null;
+}
 
 export const LAB_PREDICTIONS: readonly { id: LabPrediction; label: string; value: number }[] = [
   { id: 'high', label: 'About 0.8 goals a shot', value: 0.8 },

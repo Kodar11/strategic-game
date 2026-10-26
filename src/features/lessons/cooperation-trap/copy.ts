@@ -1,6 +1,6 @@
 import type { Feedback, Verdict } from '../../../components/lesson/verdict.ts';
 import { BASE_PRICING_GAME, type PriceAction, applyCutPenalty, cutAdvantage, regimeFor, type Regime } from '../../../game/incentives.ts';
-import { payoffAt } from '../../../game/payoff-matrix.ts';
+import { payoffAt, rowBestResponses } from '../../../game/payoff-matrix.ts';
 
 /**
  * Lesson 1 wording that depends on what the learner did. Pure functions of lesson state and the payoff
@@ -201,9 +201,18 @@ export function cooperationRecap(d: CooperationRecapInput): string[] {
   if (d.choice && d.rival) {
     const [mine] = payoffAt(BASE_PRICING_GAME, d.choice, d.rival);
     lines.push(`You chose to ${d.choice} and earned ${mine}.`);
-    if (d.predicted === d.rival && d.choice !== d.rival) {
-      const [matched] = payoffAt(BASE_PRICING_GAME, d.rival, d.rival);
-      lines.push(`You expected him to ${d.rival}, yet chose to ${d.choice}. Against that move, choosing to ${d.rival} would have earned you ${matched}.`);
+    // Follow-through: was the choice a best reply to the move the learner themselves expected? Judged against the
+    // prediction, not against whatever Rohan happened to do, so it holds for any rival policy.
+    if (d.predicted) {
+      const best = rowBestResponses(BASE_PRICING_GAME, d.predicted);
+      if (!best.includes(d.choice)) {
+        const [ifExpected] = payoffAt(BASE_PRICING_GAME, d.choice, d.predicted);
+        const [bestPay] = payoffAt(BASE_PRICING_GAME, best[0], d.predicted);
+        const joiner = d.predicted === d.choice ? 'and chose to' : 'yet chose to';
+        lines.push(
+          `You expected him to ${d.predicted}, ${joiner} ${d.choice}. Against that move, choosing to ${best[0]} would have earned you ${bestPay} instead of ${ifExpected}.`,
+        );
+      }
     }
   }
   if (d.reason === 'either') lines.push('Strength: you reasoned from his payoffs against both of your choices — the core move of this lesson.');

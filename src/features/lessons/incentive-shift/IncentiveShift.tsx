@@ -11,6 +11,16 @@ import { LessonShell, type StepDef } from '@/src/components/lesson/LessonShell';
 import { Dialogue, FeedbackPanel, Panel, Stat, StepHeading } from '@/src/components/lesson/Panels';
 import { PayoffMatrix } from '@/src/components/lesson/PayoffMatrix';
 import { PredictionPrompt, PredictionResult } from '@/src/components/lesson/Prediction';
+import {
+  canLock,
+  chooseAnswer,
+  emptyPrediction,
+  lockPrediction,
+  lockedAnswer,
+  missingForLock,
+  predictionSchema,
+  rateConfidence,
+} from '@/src/components/lesson/prediction-state';
 import { TransferQuestion, type TransferOption } from '@/src/components/lesson/TransferQuestion';
 import { useEnter } from '@/src/components/lesson/motion';
 import { useLessonFlow } from '@/src/components/lesson/useLessonFlow';
@@ -30,7 +40,6 @@ import {
   applyRules,
   cutAdvantage,
   evaluatePolicy,
-  regimeFor,
   withDetection,
 } from '@/src/game/incentives';
 import { haptic } from '@/src/utils/feedback';
@@ -38,6 +47,7 @@ import { colors, radius, space } from '@/src/theme/tokens';
 import { PRICE_LABEL } from '../shared/pricing';
 import {
   DETECTION_PREDICTIONS,
+  ENFORCEMENT_RESET,
   PROPOSAL,
   PROPOSAL_PREDICTIONS,
   detectionFeedback,
@@ -46,15 +56,15 @@ import {
   proposalFeedback,
   proposalLabel,
   proposalOutcome,
+  changeRules,
+  ruleWorks,
 } from './copy';
 
 const schema = z.object({
-  proposalPick: z.enum(['maintain', 'cut', 'split', 'unclear']).nullable(),
-  proposalLocked: z.boolean(),
+  proposal: predictionSchema(z.enum(['maintain', 'cut', 'split', 'unclear'])),
   penalty: z.number().min(PENALTY_RANGE.min).max(PENALTY_RANGE.max),
   reward: z.number().min(REWARD_RANGE.min).max(REWARD_RANGE.max),
-  flipped: z.boolean(),
-  detectionPick: z.enum(['yes', 'no', 'depends']).nullable(),
+  detectionPrediction: predictionSchema(z.enum(['yes', 'no', 'depends'])),
   detection: z.number().int().min(0).max(100),
   detectionTouched: z.boolean(),
   opened: z.array(z.string()),
@@ -64,14 +74,10 @@ const schema = z.object({
 type Data = z.infer<typeof schema>;
 
 const INITIAL: Data = {
-  proposalPick: null,
-  proposalLocked: false,
+  proposal: emptyPrediction(),
   penalty: 0,
   reward: 0,
-  flipped: false,
-  detectionPick: null,
-  detection: 100,
-  detectionTouched: false,
+  ...ENFORCEMENT_RESET,
   opened: [],
   transferPick: null,
   transferChecked: false,
@@ -157,6 +163,10 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
   const before = evaluatePolicy(NO_RULES);
   const after = evaluatePolicy(rules);
   const ruledGame = applyRules(rules);
+  // Always judged on the current rules, so changing them back can never leave a stale "it works".
+  const ruleOk = ruleWorks(rules);
+  const proposalPick = lockedAnswer(data.proposal);
+  const detectionPick = lockedAnswer(data.detectionPrediction);
 
   const steps: StepDef[] = [
     {
@@ -193,12 +203,10 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
     {
       // Prediction: judge a proposed incentive before seeing what it does.
       key: 'proposal',
-      cta: data.proposalLocked ? 'Continue' : 'Lock prediction',
-      canContinue: !!data.proposalPick,
-      blockedHint: 'Predict what the companies will do.',
-      onContinue: () => {
-        if (!data.proposalLocked) update({ proposalLocked: true });
-      },
+      cta: data.proposal.locked ? 'Continue' : 'Lock prediction',
+      canContinue: data.proposal.locked || canLock(data.proposal),
+      blockedHint: missingForLock(data.proposal) === 'confidence' ? 'Rate how confident you are.' : 'Predict what the companies will do.',
+      onContinue: () => update((d) => ({ proposal: lockPrediction(d.proposal) })),
       render: () => (
         <>
           <StepHeading kicker="A proposal" title="Will a reward end the price war?" />
@@ -208,9 +216,11 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
           <PredictionPrompt
             question="With a reward of 1.5 for maintaining, what will the companies do?"
             options={PROPOSAL_PREDICTIONS}
-            value={data.proposalPick}
-            onChange={(proposalPick) => update({ proposalPick })}
-            locked={data.proposalLocked}
+            value={data.proposal.answer}
+            onChange={(a) => update((d) => ({ proposal: chooseAnswer(d.proposal, a) }))}
+            confidence={data.proposal.confidence}
+            onConfidence={(c) => update((d) => ({ proposal: rateConfidence(d.proposal, c) }))}
+            locked={data.proposal.locked}
           />
         </>
       ),
@@ -220,7 +230,7 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
       key: 'verdict',
       render: () => {
         const outcome = proposalOutcome();
-        const fb = data.proposalPick ? proposalFeedback(data.proposalPick) : null;
+        const fb = proposalPick ? proposalFeedback(proposalPick) : null;
         return (
           <>
             <StepHeading kicker="The verdict" title="The reward changed the numbers, not the choice" />
@@ -230,8 +240,8 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
                 Dots mark payoffs the reward changed: only cells where a company maintains.
               </AppText>
             </Card>
-            {data.proposalPick && fb ? (
-              <PredictionResult predicted={proposalLabel(data.proposalPick)} actual={proposalLabel(outcome)} verdict={fb.verdict}>
+            {proposalPick && fb ? (
+              <PredictionResult predicted={proposalLabel(proposalPick)} actual={proposalLabel(outcome)} verdict={fb.verdict} confidence={data.proposal.confidence}>
                 {fb.text}
               </PredictionResult>
             ) : null}
@@ -284,20 +294,16 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
     {
       // Experiment: two levers, one threshold.
       key: 'sandbox',
-      canContinue: data.flipped,
+      canContinue: ruleOk,
       blockedHint: 'Find rules that make maintaining the best choice.',
       render: () => {
         const regime = after.regime;
         const adv = cutAdvantage(rules);
-        const setRules = (patch: Partial<Pick<Data, 'penalty' | 'reward'>>) =>
-          update((d) => {
-            const next = { cutPenalty: patch.penalty ?? d.penalty, maintainReward: patch.reward ?? d.reward };
-            return { ...patch, flipped: d.flipped || regimeFor(next) === 'maintain-dominant' };
-          });
+        const setRules = (patch: Partial<Pick<Data, 'penalty' | 'reward'>>) => update((d) => changeRules(d, patch));
         return (
           <>
             <StepHeading kicker="Policy sandbox" title="Set the rules" body="Combine the two levers. Watch which payoffs move, and when the best replies flip." />
-            <NarrateOn clip="l5.sandbox.flip" trigger={data.flipped} />
+            <NarrateOn clip="l5.sandbox.flip" trigger={ruleOk} />
             <Card style={{ gap: space.lg }}>
               <Slider label="Penalty for cutting (p)" tone="orange" value={data.penalty} min={PENALTY_RANGE.min} max={PENALTY_RANGE.max} step={PENALTY_RANGE.step} formatValue={(v) => v.toFixed(1)} onChange={(penalty) => setRules({ penalty })} />
               <Slider label="Reward for maintaining (r)" value={data.reward} min={REWARD_RANGE.min} max={REWARD_RANGE.max} step={REWARD_RANGE.step} formatValue={(v) => v.toFixed(1)} onChange={(reward) => setRules({ reward })} />
@@ -317,7 +323,7 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
               <Stat label="Penalties you collect" value={after.predicted ? fmt(after.penaltiesCollected) : '—'} tone="orange" caption="at the predicted outcome" />
               <Stat label="Rewards you pay" value={after.predicted ? fmt(after.rewardsPaid) : '—'} tone="blue" caption="at the predicted outcome" />
             </View>
-            <Button label="Reset rules" variant="ghost" compact icon={RotateCcw} iconPosition="left" onPress={() => update({ penalty: 0, reward: 0 })} />
+            <Button label="Reset rules" variant="ghost" compact icon={RotateCcw} iconPosition="left" onPress={() => setRules({ penalty: 0, reward: 0 })} />
           </>
         );
       },
@@ -325,13 +331,17 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
     {
       // Experiment: stress-test the rule against imperfect enforcement (an explicit extension of the model).
       key: 'enforcement',
-      canContinue: !!data.detectionPick && data.detectionTouched,
-      blockedHint: data.detectionPick ? 'Move the detection slider to test your rule.' : 'Make a prediction first.',
+      canContinue: data.detectionPrediction.locked && data.detectionTouched,
+      blockedHint: data.detectionPrediction.locked
+        ? 'Move the detection slider to test your rule.'
+        : missingForLock(data.detectionPrediction) === 'confidence'
+          ? 'Rate how confident you are, then confirm.'
+          : 'Make and confirm a prediction first.',
       render: () => {
         const d = data.detection / 100;
         const effective = withDetection(rules, d);
         const tested = evaluatePolicy(effective);
-        const fb = data.detectionPick ? detectionFeedback(data.detectionPick, rules) : null;
+        const fb = detectionPick ? detectionFeedback(detectionPick, rules) : null;
         return (
           <>
             <StepHeading
@@ -348,11 +358,14 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
             <PredictionPrompt
               question="If only half of all price cuts are caught, will your rule still keep both companies from cutting?"
               options={DETECTION_PREDICTIONS}
-              value={data.detectionPick}
-              onChange={(detectionPick) => update({ detectionPick })}
-              locked={!!data.detectionPick}
+              value={data.detectionPrediction.answer}
+              onChange={(a) => update((d) => ({ detectionPrediction: chooseAnswer(d.detectionPrediction, a) }))}
+              confidence={data.detectionPrediction.confidence}
+              onConfidence={(c) => update((d) => ({ detectionPrediction: rateConfidence(d.detectionPrediction, c) }))}
+              onConfirm={() => update((d) => ({ detectionPrediction: lockPrediction(d.detectionPrediction) }))}
+              locked={data.detectionPrediction.locked}
             />
-            {data.detectionPick ? (
+            {data.detectionPrediction.locked ? (
               <>
                 <Card style={{ gap: space.lg }}>
                   <Slider
@@ -503,7 +516,7 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
             'Penalties and rewards can flip the same choice at very different costs.',
             'Every rule has side effects outside the model. Look for them before you celebrate.',
           ]}
-          recap={incentiveRecap({ proposalPick: data.proposalPick, rules, flipped: data.flipped, detectionPick: data.detectionPick })}
+          recap={incentiveRecap({ proposalPick, rules, detectionPick })}
           reflection="Prediction challenge: a city starts charging for every bag of household rubbish. What do you expect most people to do — and what unwanted behaviour might the charge also create?"
           onReplay={restart}
         />

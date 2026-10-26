@@ -11,6 +11,17 @@ import { LessonShell, type StepDef } from '@/src/components/lesson/LessonShell';
 import { Dialogue, Panel, StepHeading } from '@/src/components/lesson/Panels';
 import { PayoffMatrix } from '@/src/components/lesson/PayoffMatrix';
 import { PredictionPrompt, PredictionResult } from '@/src/components/lesson/Prediction';
+import {
+  type Confidence,
+  canLock,
+  chooseAnswer,
+  emptyPrediction,
+  lockPrediction,
+  lockedAnswer,
+  missingForLock,
+  predictionSchema,
+  rateConfidence,
+} from '@/src/components/lesson/prediction-state';
 import { TransferQuestion, type TransferOption } from '@/src/components/lesson/TransferQuestion';
 import { useEnter } from '@/src/components/lesson/motion';
 import { useLessonFlow } from '@/src/components/lesson/useLessonFlow';
@@ -22,20 +33,20 @@ import type { LessonMeta } from '@/src/content/lessons';
 import { getClip } from '@/src/features/audio/clips';
 import { meetupReactionClip } from '@/src/features/audio/reactions';
 import { NarrateOn } from '@/src/features/audio/useNarration';
-import { type FriendInfo, MEETUP_GAME, type MeetupResult, type Place, friendPolicy, meetupAnalysis, resolveMeetup } from '@/src/game/coordination';
+import { type FriendInfo, MEETUP_GAME, type MeetupResult, type Place, friendPolicy, resolveMeetup } from '@/src/game/coordination';
 import { payoffAt, rowBestResponses } from '@/src/game/payoff-matrix';
 import { useMotionReduced } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
-import { PLACE_NAME as NAME, coordinationRecap, meetupFeedback, messageExplanation } from './copy';
+import { PLACE_NAME as NAME, coordinationRecap, equilibriumSummary, meetupFeedback, messageExplanation } from './copy';
 
 const place = z.enum(['cafe', 'park']);
 const schema = z.object({
-  predict1: place.nullable(),
+  predict1: predictionSchema(place),
   pick1: place.nullable(),
   committed1: z.boolean(),
   inspected: z.object({ row: place, col: place }).nullable(),
   showBR: z.boolean(),
-  predict2: place.nullable(),
+  predict2: predictionSchema(place),
   pick2: place.nullable(),
   committed2: z.boolean(),
   message: place.nullable(),
@@ -45,12 +56,12 @@ const schema = z.object({
 type Data = z.infer<typeof schema>;
 
 const INITIAL: Data = {
-  predict1: null,
+  predict1: emptyPrediction(),
   pick1: null,
   committed1: false,
   inspected: null,
   showBR: false,
-  predict2: null,
+  predict2: emptyPrediction(),
   pick2: null,
   committed2: false,
   message: null,
@@ -106,12 +117,14 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
   const TOTAL = 11;
   const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL);
   const enter = useEnter();
-  const analysis = meetupAnalysis();
+  const equilibria = equilibriumSummary();
 
   const friend1 = friendPolicy({ kind: 'none' });
   const friend2 = friendPolicy(FOCAL);
   const r1 = data.committed1 && data.pick1 ? resolveMeetup(data.pick1, friend1) : null;
   const r2 = data.committed2 && data.pick2 ? resolveMeetup(data.pick2, friend2) : null;
+  const predict1 = lockedAnswer(data.predict1);
+  const predict2 = lockedAnswer(data.predict2);
 
   const steps: StepDef[] = [
     {
@@ -150,11 +163,20 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
       // Prediction, then decision.
       key: 'pick1',
       cta: data.committed1 ? 'See what happened' : 'Go there',
-      canContinue: !!data.predict1 && !!data.pick1,
-      blockedHint: data.predict1 ? 'Choose where to go.' : 'First, predict where Nina will go.',
-      onContinue: () => {
-        if (!data.committed1) update({ committed1: true });
-      },
+      canContinue: data.committed1 || (canLock(data.predict1) && !!data.pick1),
+      blockedHint:
+        missingForLock(data.predict1) === 'answer'
+          ? 'First, predict where Nina will go.'
+          : missingForLock(data.predict1) === 'confidence'
+            ? 'Rate how confident you are in your prediction.'
+            : 'Choose where to go.',
+      // Going there locks the prediction together with the decision.
+      onContinue: () =>
+        update((d) => {
+          if (d.committed1 || !d.pick1) return {};
+          const predict1 = lockPrediction(d.predict1);
+          return predict1.locked ? { predict1, committed1: true } : {};
+        }),
       render: () => (
         <>
           <StepHeading kicker="Your move" title="Where do you go?" body="Nina is deciding at the same moment, with the same information you have." />
@@ -162,11 +184,13 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
             question="Where do you think Nina will go?"
             layout="row"
             options={(['cafe', 'park'] as const).map((p) => ({ id: p, label: NINA_AT[p] }))}
-            value={data.predict1}
-            onChange={(predict1) => update({ predict1 })}
-            locked={data.committed1}
+            value={data.predict1.answer}
+            onChange={(a) => update((d) => ({ predict1: chooseAnswer(d.predict1, a) }))}
+            confidence={data.predict1.confidence}
+            onConfidence={(c) => update((d) => ({ predict1: rateConfidence(d.predict1, c) }))}
+            locked={data.predict1.locked}
           />
-          {data.predict1 ? <PlacePicker value={data.pick1} onChange={(p) => update({ pick1: p })} locked={data.committed1} /> : null}
+          {data.predict1.answer ? <PlacePicker value={data.pick1} onChange={(p) => update({ pick1: p })} locked={data.committed1} /> : null}
         </>
       ),
     },
@@ -177,7 +201,7 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
         r1 ? (
           <>
             <MeetReveal round={1} result={r1}>
-              {data.predict1 ? <MeetPrediction round={1} predicted={data.predict1} result={r1} /> : null}
+              {predict1 ? <MeetPrediction round={1} predicted={predict1} confidence={data.predict1.confidence} result={r1} /> : null}
               <Panel tone="info" title="Nina's reasoning (now revealed)" delay={300}>
                 With nothing else to go on, Nina went where she would most like to meet: {NAME[friend1]}. She follows this rule whatever you do.
               </Panel>
@@ -218,12 +242,17 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
             <Button label="Show best replies" variant="secondary" onPress={() => update({ showBR: true })} />
           ) : (
             <>
-              <Panel tone="insight" title={`${analysis.equilibria.length} equilibria, no dominant strategy`}>
+              <Panel tone="insight" title={equilibria.title}>
                 Your best move is simply &ldquo;go where Nina goes&rdquo; — and the same for her. Each meeting outcome is a Nash equilibrium: once you&apos;re there, nobody gains by leaving alone. The hard part is knowing which one you&apos;re aiming for.
               </Panel>
               <AppText variant="small" color={colors.textMuted}>
                 {`If Nina picks the café, your best reply is the ${rowBestResponses(MEETUP_GAME, 'cafe')[0] === 'cafe' ? 'café' : 'park'}; if she picks the park, it's the ${rowBestResponses(MEETUP_GAME, 'park')[0] === 'park' ? 'park' : 'café'}. Your best move flips with hers, so no single choice is best whatever she does — unlike cutting prices in Lesson 1.`}
               </AppText>
+              {equilibria.mixedNote ? (
+                <AppText variant="caption" color={colors.textMuted}>
+                  {equilibria.mixedNote}
+                </AppText>
+              ) : null}
             </>
           )}
         </>
@@ -233,11 +262,20 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
       // A shared expectation appears: predict again, then choose.
       key: 'pick2',
       cta: data.committed2 ? 'See what happened' : 'Go there',
-      canContinue: !!data.predict2 && !!data.pick2,
-      blockedHint: data.predict2 ? 'Choose where to go.' : 'First, predict where Nina will go.',
-      onContinue: () => {
-        if (!data.committed2) update({ committed2: true });
-      },
+      canContinue: data.committed2 || (canLock(data.predict2) && !!data.pick2),
+      blockedHint:
+        missingForLock(data.predict2) === 'answer'
+          ? 'First, predict where Nina will go.'
+          : missingForLock(data.predict2) === 'confidence'
+            ? 'Rate how confident you are in your prediction.'
+            : 'Choose where to go.',
+      // Going there locks the prediction together with the decision.
+      onContinue: () =>
+        update((d) => {
+          if (d.committed2 || !d.pick2) return {};
+          const predict2 = lockPrediction(d.predict2);
+          return predict2.locked ? { predict2, committed2: true } : {};
+        }),
       render: () => (
         <>
           <StepHeading kicker="A week later" title="Same problem, one clue" body="Phones dead again. Same places, same preferences. But you remember something you both know." />
@@ -251,11 +289,13 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
             question="Where do you think Nina will go this time?"
             layout="row"
             options={(['cafe', 'park'] as const).map((p) => ({ id: p, label: NINA_AT[p] }))}
-            value={data.predict2}
-            onChange={(predict2) => update({ predict2 })}
-            locked={data.committed2}
+            value={data.predict2.answer}
+            onChange={(a) => update((d) => ({ predict2: chooseAnswer(d.predict2, a) }))}
+            confidence={data.predict2.confidence}
+            onConfidence={(c) => update((d) => ({ predict2: rateConfidence(d.predict2, c) }))}
+            locked={data.predict2.locked}
           />
-          {data.predict2 ? <PlacePicker value={data.pick2} onChange={(p) => update({ pick2: p })} locked={data.committed2} /> : null}
+          {data.predict2.answer ? <PlacePicker value={data.pick2} onChange={(p) => update({ pick2: p })} locked={data.committed2} /> : null}
         </>
       ),
     },
@@ -265,7 +305,7 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
         r2 ? (
           <>
             <MeetReveal round={2} result={r2}>
-              {data.predict2 ? <MeetPrediction round={2} predicted={data.predict2} result={r2} /> : null}
+              {predict2 ? <MeetPrediction round={2} predicted={predict2} confidence={data.predict2.confidence} result={r2} /> : null}
               <Panel tone="info" title="Nina's reasoning" delay={300}>
                 With a reference point you both share, Nina went to it: {NAME[friend2]} — even though she enjoys the park a little more.
               </Panel>
@@ -362,7 +402,7 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
             'Look for what stands out to both of you: history, convention, prominence.',
             'A clear signal in advance is often worth more than a clever guess later.',
           ]}
-          recap={coordinationRecap({ predict1: data.predict1, r1, predict2: data.predict2, r2, message: data.message })}
+          recap={coordinationRecap({ predict1, r1, predict2, r2, message: data.message })}
           reflection="Think of a group you belong to — friends, a team, a household. Which unwritten conventions let you coordinate without discussing it? Where did one come from?"
           nextHook="Here, being easy to predict helped you find Nina. Next, being predictable is exactly what your opponent wants."
           onReplay={restart}
@@ -374,10 +414,10 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
   return <LessonShell lesson={lesson} steps={steps} step={step} goTo={goTo} />;
 }
 
-function MeetPrediction({ round, predicted, result }: { round: 1 | 2; predicted: Place; result: MeetupResult }) {
+function MeetPrediction({ round, predicted, confidence, result }: { round: 1 | 2; predicted: Place; confidence: Confidence | null; result: MeetupResult }) {
   const fb = meetupFeedback(round, predicted, result);
   return (
-    <PredictionResult predicted={NINA_AT[predicted]} actual={NINA_AT[result.friend]} verdict={fb.verdict} title="Your read of Nina" delay={250}>
+    <PredictionResult predicted={NINA_AT[predicted]} actual={NINA_AT[result.friend]} verdict={fb.verdict} confidence={confidence} title="Your read of Nina" delay={250}>
       {fb.text}
     </PredictionResult>
   );

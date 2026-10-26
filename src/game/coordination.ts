@@ -1,4 +1,4 @@
-import { type MatrixGame, payoffAt, pureNashEquilibria, rowDominance, colDominance } from './payoff-matrix.ts';
+import { type MatrixGame, colDominance, mixedEquilibrium2x2, payoffAt, pureNashEquilibria, rowDominance } from './payoff-matrix.ts';
 
 /** Lesson 3. Row = learner (Aarav), column = friend (Nina). */
 export type Place = 'cafe' | 'park';
@@ -57,8 +57,12 @@ export function resolveMeetup(you: Place, friend: Place, game = MEETUP_GAME): Me
 }
 
 export function meetupAnalysis(game = MEETUP_GAME) {
+  const mixed = mixedEquilibrium2x2(game);
   return {
+    /** Pure-strategy equilibria only. */
     equilibria: pureNashEquilibria(game),
+    /** The fully mixed equilibrium, plus how often the two would actually meet there. */
+    mixed: mixed ? { ...mixed, meetChance: mixed.rowFirst * mixed.colFirst + (1 - mixed.rowFirst) * (1 - mixed.colFirst) } : null,
     rowDominance: rowDominance(game),
     colDominance: colDominance(game),
   };

@@ -8,6 +8,17 @@ import { Completion } from '@/src/components/lesson/Completion';
 import { LessonShell, type StepDef } from '@/src/components/lesson/LessonShell';
 import { Dialogue, FeedbackPanel, Panel, Stat, StepHeading } from '@/src/components/lesson/Panels';
 import { PredictionPrompt, PredictionResult } from '@/src/components/lesson/Prediction';
+import {
+  type Confidence,
+  canLock,
+  chooseAnswer,
+  emptyPrediction,
+  lockPrediction,
+  lockedAnswer,
+  missingForLock,
+  predictionSchema,
+  rateConfidence,
+} from '@/src/components/lesson/prediction-state';
 import { TransferQuestion, type TransferOption } from '@/src/components/lesson/TransferQuestion';
 import { useEnter } from '@/src/components/lesson/motion';
 import { useLessonFlow } from '@/src/components/lesson/useLessonFlow';
@@ -32,7 +43,6 @@ import {
   opponentPicks,
   playRound,
   populationSize,
-  shiftPopulation,
   targetFor,
 } from '@/src/game/two-thirds-game';
 import { haptic } from '@/src/utils/feedback';
@@ -47,15 +57,16 @@ import {
   averagePredictionFeedback,
   detectiveRecap,
   labPredictionFeedback,
+  LAB_SEED,
+  type LabPrediction,
+  ROUND1_POP,
+  ROUND1_SEED,
+  ROUND2_POP,
+  ROUND2_SEED,
   othersAverage,
+  populationChanged,
 } from './copy';
 
-/** Round 1 crowd: a mix of reasoning depths. Round 2: the same people, each one level deeper. */
-const ROUND1_POP: Population = { level0: 4, level1: 3, level2: 2, level3: 1, equilibrium: 0 };
-const ROUND2_POP = shiftPopulation(ROUND1_POP);
-const ROUND1_SEED = 11;
-const ROUND2_SEED = 12;
-const LAB_SEED = 21;
 const MAX_ELIM = 8;
 
 const populationSchema = z.object({
@@ -67,12 +78,12 @@ const populationSchema = z.object({
 });
 const guess = z.number().int().min(MIN_GUESS).max(MAX_GUESS);
 const schema = z.object({
-  averageGuess: z.enum(['random', 'one-step', 'two-step', 'zero']).nullable(),
+  crowdPrediction: predictionSchema(z.enum(['random', 'one-step', 'two-step', 'zero'])),
   guess1: guess,
   committed1: z.boolean(),
   guess2: guess,
   committed2: z.boolean(),
-  labPrediction: z.enum(['up', 'down', 'same']).nullable(),
+  labPrediction: predictionSchema(z.enum(['up', 'down', 'same'])),
   lab: populationSchema,
   labTouched: z.boolean(),
   elim: z.number().int().min(0).max(MAX_ELIM),
@@ -82,12 +93,12 @@ const schema = z.object({
 type Data = z.infer<typeof schema>;
 
 const INITIAL: Data = {
-  averageGuess: null,
+  crowdPrediction: emptyPrediction(),
   guess1: 50,
   committed1: false,
   guess2: 50,
   committed2: false,
-  labPrediction: null,
+  labPrediction: emptyPrediction(),
   lab: ROUND1_POP,
   labTouched: false,
   elim: 0,
@@ -145,6 +156,7 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
 
   const round1 = data.committed1 ? playRound(data.guess1, ROUND1_POP, ROUND1_SEED) : null;
   const round2 = data.committed2 ? playRound(data.guess2, ROUND2_POP, ROUND2_SEED) : null;
+  const averageGuess = lockedAnswer(data.crowdPrediction);
 
   const steps: StepDef[] = [
     {
@@ -194,22 +206,28 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
       // Prediction + decision: model the crowd first, then pick.
       key: 'guess1',
       cta: data.committed1 ? 'See the results' : 'Submit my number',
-      canContinue: !!data.averageGuess,
-      blockedHint: 'Predict how the crowd will pick first.',
-      onContinue: () => {
-        if (!data.committed1) update({ committed1: true });
-      },
+      canContinue: data.committed1 || canLock(data.crowdPrediction),
+      blockedHint: missingForLock(data.crowdPrediction) === 'confidence' ? 'Rate how confident you are in your read of the crowd.' : 'Predict how the crowd will pick first.',
+      // Submitting the number also locks the crowd prediction it was based on.
+      onContinue: () =>
+        update((d) => {
+          if (d.committed1) return {};
+          const crowdPrediction = lockPrediction(d.crowdPrediction);
+          return crowdPrediction.locked ? { crowdPrediction, committed1: true } : {};
+        }),
       render: () => (
         <>
           <StepHeading kicker="Round 1" title="Read the crowd, then pick" body="Ten others are choosing right now. Start with them, not with your number." />
           <PredictionPrompt
             question="What do you think the other ten will average?"
             options={AVERAGE_GUESSES}
-            value={data.averageGuess}
-            onChange={(averageGuess) => update({ averageGuess })}
-            locked={data.committed1}
+            value={data.crowdPrediction.answer}
+            onChange={(a) => update((d) => ({ crowdPrediction: chooseAnswer(d.crowdPrediction, a) }))}
+            confidence={data.crowdPrediction.confidence}
+            onConfidence={(c) => update((d) => ({ crowdPrediction: rateConfidence(d.crowdPrediction, c) }))}
+            locked={data.crowdPrediction.locked}
           />
-          {data.averageGuess ? <NumberPicker value={data.guess1} onChange={(v) => update({ guess1: v })} locked={data.committed1} /> : null}
+          {data.crowdPrediction.answer ? <NumberPicker value={data.guess1} onChange={(v) => update({ guess1: v })} locked={data.committed1} /> : null}
         </>
       ),
     },
@@ -220,13 +238,14 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
         round1 ? (
           <>
             <RoundResultView result={round1} round={1} />
-            {data.averageGuess ? (
+            {averageGuess ? (
               <PredictionResult
-                predicted={averageGuessLabel(data.averageGuess).split(' — ')[0]}
+                predicted={averageGuessLabel(averageGuess).split(' — ')[0]}
                 actual={`Average ${othersAverage(round1).toFixed(1)}`}
-                verdict={averagePredictionFeedback(data.averageGuess, round1).verdict}
+                verdict={averagePredictionFeedback(averageGuess, round1).verdict}
+                confidence={data.crowdPrediction.confidence}
                 title="Your read of the crowd">
-                {averagePredictionFeedback(data.averageGuess, round1).text}
+                {averagePredictionFeedback(averageGuess, round1).text}
               </PredictionResult>
             ) : null}
           </>
@@ -303,14 +322,21 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
       // Experiment: predict, then change who you're playing against.
       key: 'lab',
       canContinue: data.labTouched,
-      blockedHint: data.labPrediction ? 'Change the crowd at least once to see the effect.' : 'Make a prediction first.',
+      blockedHint: data.labPrediction.locked
+        ? 'Change the crowd at least once to see the effect.'
+        : missingForLock(data.labPrediction) === 'confidence'
+          ? 'Rate how confident you are, then confirm.'
+          : 'Make and confirm a prediction first.',
       render: () => (
         <CrowdLab
           pop={data.lab}
           prediction={data.labPrediction}
           touched={data.labTouched}
-          onPredict={(labPrediction) => update({ labPrediction })}
-          onChange={(lab) => update({ lab, labTouched: true })}
+          onPredict={(a) => update((d) => ({ labPrediction: chooseAnswer(d.labPrediction, a) }))}
+          onConfidence={(c) => update((d) => ({ labPrediction: rateConfidence(d.labPrediction, c) }))}
+          onConfirm={() => update((d) => ({ labPrediction: lockPrediction(d.labPrediction) }))}
+          // Only a real change of crowd counts as running the experiment, and only after the prediction is locked.
+          onChange={(lab) => update((d) => (d.labPrediction.locked && populationChanged(d.lab, lab) ? { lab, labTouched: true } : {}))}
         />
       ),
     },
@@ -410,7 +436,7 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
             'Theory tells you where perfect reasoning leads; real players often stop earlier.',
             'Thinking one step beyond the crowd usually beats thinking ten steps beyond it.',
           ]}
-          recap={detectiveRecap({ averageGuess: data.averageGuess, round1, round2 })}
+          recap={detectiveRecap({ averageGuess, round1, round2 })}
           reflection="Think of a recent choice that depended on what other people would do — a queue, a sale, a deadline. Did you assume they'd think one step ahead, or several? What would have told you which?"
           nextHook="Here, everyone wanted to out-think each other. Next, two people want the same thing — to find each other — and still might fail."
           onReplay={restart}
@@ -505,30 +531,38 @@ function CrowdLab({
   prediction,
   touched,
   onPredict,
+  onConfidence,
+  onConfirm,
   onChange,
 }: {
   pop: Population;
   prediction: Data['labPrediction'];
   touched: boolean;
-  onPredict: (p: NonNullable<Data['labPrediction']>) => void;
+  onPredict: (p: LabPrediction) => void;
+  onConfidence: (c: Confidence) => void;
+  onConfirm: () => void;
   onChange: (p: Population) => void;
 }) {
   const others = opponentPicks(pop, LAB_SEED);
   const best = bestGuessForPopulation(pop, LAB_SEED);
   const n = populationSize(pop);
   const { average, target } = targetFor([...others.map((o) => o.guess), best]);
-  const fb = prediction ? labPredictionFeedback(prediction, ROUND1_POP, LAB_SEED) : null;
+  const pick = lockedAnswer(prediction);
+  const fb = pick ? labPredictionFeedback(pick) : null;
   return (
     <>
       <StepHeading kicker="Crowd lab" title="Change the crowd, not the rules" body="Your best number is the one that lands exactly on the target, given what everyone else picks." />
       <PredictionPrompt
         question="Swap the round-1 mix for ten Theorists. What happens to your best pick?"
         options={LAB_PREDICTIONS}
-        value={prediction}
+        value={prediction.answer}
         onChange={onPredict}
-        locked={!!prediction}
+        confidence={prediction.confidence}
+        onConfidence={onConfidence}
+        onConfirm={onConfirm}
+        locked={prediction.locked}
       />
-      {prediction ? (
+      {prediction.locked ? (
         <>
           <Card style={{ gap: space.sm }}>
             <SectionLabel>Players by reasoning type</SectionLabel>
