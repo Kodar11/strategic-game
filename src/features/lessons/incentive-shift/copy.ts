@@ -10,7 +10,7 @@ import {
   sanitizeRules,
   withDetection,
 } from '../../../game/incentives.ts';
-import { type LearningAttempt, recordAttempt } from '../../learning/records.ts';
+import { type NewAttempt, recordAttempt } from '../../learning/records.ts';
 
 /** Lesson 5 wording that depends on the learner's predictions and rules. Pure, so tests can pin it to the model. */
 
@@ -204,7 +204,7 @@ export function incentiveRecords(d: {
   reward: number;
   detectionPrediction: PredictionAttempt<DetectionPrediction>;
   detectionTouched: boolean;
-}): (LearningAttempt | null)[] {
+}): (NewAttempt | null)[] {
   const proposal = lockedAnswer(d.proposal);
   const detection = lockedAnswer(d.detectionPrediction);
   const rules = { cutPenalty: d.penalty, maintainReward: d.reward };

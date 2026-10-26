@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { z } from 'zod';
 
 import type { LessonId } from '@/src/content/lessons';
-import type { LearningAttempt } from '@/src/features/learning/records';
+import type { NewAttempt } from '@/src/features/learning/records';
 import { narration } from '@/src/features/audio/narration';
 import { useProgress } from '@/src/store/progress';
 
@@ -20,7 +20,7 @@ export function useLessonFlow<S extends z.ZodType>(
    * The lesson's evaluated predictions for the current state (null for anything not evaluated yet). A module-level
    * pure function; records are deduplicated by attempt id, so calling it on every change is safe.
    */
-  records?: (data: z.infer<S>) => (LearningAttempt | null)[],
+  records?: (data: z.infer<S>) => (NewAttempt | null)[],
 ) {
   type Data = z.infer<S>;
 

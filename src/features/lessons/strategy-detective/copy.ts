@@ -9,7 +9,7 @@ import {
   playRound,
   shiftPopulation,
 } from '../../../game/two-thirds-game.ts';
-import { type LearningAttempt, recordAttempt } from '../../learning/records.ts';
+import { type NewAttempt, recordAttempt } from '../../learning/records.ts';
 
 /** Lesson 2 wording that depends on the learner's predictions and picks. Pure, so tests can pin it to the model. */
 
@@ -178,7 +178,7 @@ export function detectiveRecords(d: {
   committed1: boolean;
   labPrediction: PredictionAttempt<LabPrediction>;
   labTouched: boolean;
-}): (LearningAttempt | null)[] {
+}): (NewAttempt | null)[] {
   const crowd = lockedAnswer(d.crowdPrediction);
   const lab = lockedAnswer(d.labPrediction);
   const round1 = crowd && d.committed1 ? playRound(d.guess1, ROUND1_POP, ROUND1_SEED) : null;

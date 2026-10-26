@@ -36,6 +36,8 @@ export { default as Trophy } from 'lucide-react-native/icons/trophy';
 export { default as UserRound } from 'lucide-react-native/icons/user-round';
 export { default as Compass } from 'lucide-react-native/icons/compass';
 export { default as Download } from 'lucide-react-native/icons/download';
+export { default as BookOpen } from 'lucide-react-native/icons/book-open';
+export { default as Target } from 'lucide-react-native/icons/target';
 export { default as Volume2 } from 'lucide-react-native/icons/volume-2';
 export { default as VolumeX } from 'lucide-react-native/icons/volume-x';
 export { default as X } from 'lucide-react-native/icons/x';

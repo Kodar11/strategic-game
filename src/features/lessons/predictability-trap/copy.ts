@@ -1,7 +1,7 @@
 import { type PredictionAttempt, emptyPrediction, lockPrediction, lockedAnswer } from '../../../components/lesson/prediction-state.ts';
 import type { Feedback } from '../../../components/lesson/verdict.ts';
 import { type ShotRecord, type StrikerStrategy, guaranteedPayoff, keeperBestResponse, playSeries, strategySequence } from '../../../game/mixed-strategy.ts';
-import { type LearningAttempt, recordAttempt } from '../../learning/records.ts';
+import { type NewAttempt, recordAttempt } from '../../learning/records.ts';
 
 /** The keeper's base seed and the length of each comparison run. Shared by the screen and the learning record. */
 export const KEEPER_SEED = 4242;
@@ -139,9 +139,9 @@ export function predictabilityRecap(d: { shots: readonly ShotRecord[]; comparePi
  * Lesson 4's evaluated predictions. The comparison is recorded from the first run after locking (later reruns
  * share the attempt id, so they never rewrite it); the lab once its first simulation reveals the answer.
  */
-export function predictabilityRecords(d: MixLabState & { comparePrediction: PredictionAttempt<StrikerStrategy>; compareSeed: number | null }): (LearningAttempt | null)[] {
+export function predictabilityRecords(d: MixLabState & { comparePrediction: PredictionAttempt<StrikerStrategy>; compareSeed: number | null }): (NewAttempt | null)[] {
   const pick = lockedAnswer(d.comparePrediction);
-  let compare: LearningAttempt | null = null;
+  let compare: NewAttempt | null = null;
   if (pick && d.compareSeed !== null) {
     const results = compareResults(d.compareSeed).map((r) => ({ id: r.id, goals: r.result.goals }));
     const top = results.reduce((a, b) => (b.goals > a.goals ? b : a));

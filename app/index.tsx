@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ArrowRight, CircleCheck, Clock, Play, RotateCcw, Settings, UserRound } from '@/src/components/ui/icons';
+import { ArrowRight, CircleCheck, Clock, Play, RotateCcw, Settings, Target, UserRound } from '@/src/components/ui/icons';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,8 @@ import { Button, IconButton } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Card';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { LESSONS, type LessonId, type LessonMeta } from '@/src/content/lessons';
+import { CHALLENGES } from '@/src/features/challenges/content';
+import { triedCount } from '@/src/features/challenges/progress';
 import { type LessonRuntime, useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, shadow, space } from '@/src/theme/tokens';
 
@@ -26,6 +28,7 @@ export default function Home() {
   const hydrated = useProgress((s) => s.hydrated);
   const completed = useProgress((s) => s.completed);
   const runtime = useProgress((s) => s.runtime);
+  const learning = useProgress((s) => s.learning);
 
   if (!hydrated) return <MessageScreen loading />;
 
@@ -103,6 +106,25 @@ export default function Home() {
               </Pressable>
             </Animated.View>
           ) : null}
+
+          <Animated.View entering={enter(100)}>
+            <Pressable
+              onPress={() => router.push('/challenges')}
+              accessibilityRole="button"
+              accessibilityLabel={`Practice in new situations. ${triedCount(learning)} of ${CHALLENGES.length} challenges tried. No lesson required.`}
+              style={({ pressed }) => [styles.practice, pressed && { backgroundColor: colors.surfaceHigh }]}>
+              <View style={styles.practiceIcon}>
+                <Target size={20} color={colors.primaryText} strokeWidth={2.2} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="bodyStrong">Practice in new situations</AppText>
+                <AppText variant="caption" color={colors.textMuted}>
+                  {triedCount(learning)} of {CHALLENGES.length} challenges tried · open any time
+                </AppText>
+              </View>
+              <ArrowRight size={18} color={colors.textMuted} />
+            </Pressable>
+          </Animated.View>
 
           <View style={styles.sectionHead}>
             <AppText variant="heading">Lessons</AppText>
@@ -223,6 +245,18 @@ const styles = StyleSheet.create({
     marginBottom: space.xxl,
   },
   resumeIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  practice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: space.lg,
+    marginBottom: space.xxl,
+  },
+  practiceIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: space.md },
   card: { backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   cardNumber: {

@@ -21,6 +21,10 @@ function openLesson(id: LessonId) {
   router.push({ pathname: '/lesson/[lessonId]', params: { lessonId: id } });
 }
 
+function openChallenges(id: LessonId) {
+  router.push({ pathname: '/challenges/[lessonId]', params: { lessonId: id } });
+}
+
 const lessonNumber = (id: LessonId) => LESSONS.find((l) => l.id === id)!.number;
 
 /**
@@ -44,7 +48,7 @@ export default function ProfileScreen() {
   if (!hydrated) return <MessageScreen loading />;
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
-  const { progress, primary, secondary, confidence, next } = profile;
+  const { progress, primary, secondary, confidence, next, practice } = profile;
   const showGoalPicker = editingGoal || (goal === null && !goalSkipped);
   const pct = progress.total ? progress.completed / progress.total : 0;
 
@@ -90,6 +94,9 @@ export default function ProfileScreen() {
                 ? 'No predictions recorded yet — they appear here as you play.'
                 : `${progress.predictions} ${progress.predictions === 1 ? 'prediction' : 'predictions'} recorded${progress.inProgress ? ` · ${progress.inProgress} lesson${progress.inProgress === 1 ? '' : 's'} in progress` : ''}.`}
             </AppText>
+            <AppText variant="caption" color={colors.textMuted}>
+              {progress.challengesTried} of {progress.challengesTotal} practice challenges tried.
+            </AppText>
           </Card>
 
           {/* 2 · Skill areas */}
@@ -117,6 +124,26 @@ export default function ProfileScreen() {
               </Card>
             )}
           </View>
+
+          {/* First tries, practice and transfer — first attempts are the evidence; retries only show what changed. */}
+          <Card style={{ gap: space.md }}>
+            <SectionLabel>First tries and practice</SectionLabel>
+            <PracticeRow title="First tries" text={practice.first.text} ready={practice.first.ready} />
+            <PracticeRow title="After feedback" text={practice.improvement.text} ready={practice.improvement.ready} />
+            <View style={{ gap: 4 }}>
+              <AppText variant="small" weight="semibold">
+                New situations
+              </AppText>
+              {practice.transfer.lines.map((l) => (
+                <AppText key={l.lesson} variant="small" color={colors.textBody}>
+                  {l.text}
+                </AppText>
+              ))}
+              <AppText variant="small" color={colors.textMuted}>
+                {practice.transfer.text}
+              </AppText>
+            </View>
+          </Card>
 
           {/* 4 · Confidence vs results */}
           <Card style={{ gap: space.sm }}>
@@ -192,7 +219,7 @@ export default function ProfileScreen() {
             <AppText variant="small" color={colors.textBody}>
               {next.body}
             </AppText>
-            <Button label={next.cta} icon={ArrowRight} compact onPress={() => openLesson(next.lesson)} />
+            <Button label={next.cta} icon={ArrowRight} compact onPress={() => (next.kind === 'challenges' ? openChallenges(next.lesson) : openLesson(next.lesson))} />
           </View>
 
           <AppText variant="caption" color={colors.textMuted} align="center">
@@ -229,6 +256,19 @@ function InsightCard({ insight, primary }: { insight: Insight; primary?: boolean
           style={{ alignSelf: 'flex-start' }}
         />
       ) : null}
+    </View>
+  );
+}
+
+function PracticeRow({ title, text, ready }: { title: string; text: string; ready: boolean }) {
+  return (
+    <View style={{ gap: 4 }} accessible accessibilityLabel={`${title}. ${text}`}>
+      <AppText variant="small" weight="semibold">
+        {title}
+      </AppText>
+      <AppText variant="small" color={ready ? colors.textBody : colors.textMuted}>
+        {text}
+      </AppText>
     </View>
   );
 }

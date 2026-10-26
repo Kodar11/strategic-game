@@ -64,7 +64,7 @@ export default function SettingsScreen() {
           <Card style={{ gap: space.md }}>
             <AppText variant="bodyStrong">Progress</AppText>
             <AppText variant="small" color={colors.textMuted}>
-              Progress is saved on this device only. Resetting clears completed lessons, any lesson in progress and your recorded predictions. Your goal is kept.
+              Progress is saved on this device only. Resetting clears completed lessons, any lesson in progress, your recorded predictions and challenge answers. Your goal is kept.
             </AppText>
             {confirmReset ? (
               <View style={{ flexDirection: 'row', gap: space.sm }}>
@@ -123,7 +123,7 @@ function LearningDataCard() {
     <Card style={{ gap: space.md }}>
       <AppText variant="bodyStrong">Learning data</AppText>
       <AppText variant="small" color={colors.textMuted}>
-        Your predictions, confidence ratings and how each was evaluated are kept only on this device. They power your profile. Export a copy as a JSON file to keep, inspect or share — no names or account details are included.
+        Your predictions and challenge answers — first tries and retries — with confidence ratings and how each was evaluated are kept only on this device. They power your profile. Export a copy as a JSON file to keep, inspect or share — no names or account details are included.
       </AppText>
       <AppText variant="caption" color={colors.textMuted}>
         {learning.length === 0

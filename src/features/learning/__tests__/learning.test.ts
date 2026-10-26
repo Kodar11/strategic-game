@@ -30,9 +30,9 @@ const locked = <T extends string>(answer: T, confidence: Confidence, at: number)
   lockPrediction(rateConfidence(chooseAnswer(emptyPrediction<T>(), answer), confidence), at);
 
 /** A hand-made record for profile tests. */
-function rec(prediction: PredictionKey, evaluation: Evaluation, confidence: Confidence, at: number): LearningAttempt {
+function rec(prediction: PredictionKey, evaluation: Evaluation, confidence: Confidence, at: number, attempt = 1): LearningAttempt {
   const meta = PREDICTIONS[prediction];
-  return { id: `${prediction}@${at}`, schemaVersion: 1, lesson: meta.lesson, prediction, skill: meta.skill, basis: meta.basis, answer: 'x', confidence, evaluation, outcome: '', lockedAt: at };
+  return { id: `${prediction}@${at}`, schemaVersion: 1, lesson: meta.lesson, prediction, skill: meta.skill, basis: meta.basis, answer: 'x', confidence, evaluation, outcome: '', lockedAt: at, kind: 'lesson', attempt, lessonCompleted: null, contentVersion: null };
 }
 
 describe('Learning records', () => {
@@ -44,7 +44,8 @@ describe('Learning records', () => {
     const r = recordAttempt('l1.rival', locked('cut', 4, 1000), 'match', 'Rohan chose to cut');
     assert.deepEqual(r, {
       id: 'l1.rival@1000',
-      schemaVersion: 1,
+      schemaVersion: 2,
+      kind: 'lesson',
       lesson: 'cooperation-trap',
       prediction: 'l1.rival',
       skill: 'anticipating',
@@ -54,7 +55,12 @@ describe('Learning records', () => {
       evaluation: 'correct',
       outcome: 'Rohan chose to cut',
       lockedAt: 1000,
+      contentVersion: null,
     });
+    // The attempt number and lesson-completion context are added when it joins the history.
+    const [joined] = mergeAttempts([], [r], { completed: ['cooperation-trap'] });
+    assert.equal(joined.attempt, 1);
+    assert.equal(joined.lessonCompleted, true);
   });
 
   it('maps verdicts to evaluations, keeping reasonable misses apart from misconceptions', () => {
@@ -74,13 +80,16 @@ describe('Learning records', () => {
     assert.equal(mergeAttempts(once, [a]), once, 'unchanged history keeps its identity (no store update)');
     const replay = mergeAttempts(once, [rec('l1.rival', 'misconception', 2, 2)]);
     assert.equal(replay.length, 2, 'a replay locks a new attempt with a new id');
+    assert.deepEqual(replay.map((x) => x.attempt), [1, 2], 'numbered per item; the first stays attempt 1');
   });
 
-  it('keeps history bounded and ordered', () => {
+  it('keeps history bounded and ordered, never dropping a first attempt', () => {
     const many = Array.from({ length: MAX_ATTEMPTS + 5 }, (_, i) => rec('l1.rival', 'correct', 3, MAX_ATTEMPTS + 5 - i));
     const kept = mergeAttempts([], many);
     assert.equal(kept.length, MAX_ATTEMPTS);
-    assert.equal(kept[0].lockedAt, 6, 'the oldest are dropped');
+    assert.equal(kept[0].lockedAt, 1, 'the first attempt is kept');
+    assert.equal(kept[0].attempt, 1);
+    assert.equal(kept[1].lockedAt, 7, 'the oldest retries are dropped');
   });
 
   it('loads old, missing or malformed saved data safely', () => {
@@ -153,7 +162,7 @@ describe('Strategic Thinking Profile', () => {
 
   it('a new user gets honest empty states and a first lesson to try', () => {
     const p = buildProfile(empty);
-    assert.deepEqual(p.progress, { completed: 0, total: 5, inProgress: 0, predictions: 0 });
+    assert.deepEqual(p.progress, { completed: 0, total: 5, inProgress: 0, predictions: 0, challengesTried: 0, challengesTotal: 15 });
     assert.equal(p.primary, null);
     assert.ok(p.skills.every((s) => s.status === 'not-started'));
     assert.equal(p.confidence.ready, false);
@@ -217,7 +226,9 @@ describe('Strategic Thinking Profile', () => {
     assert.ok(!p.secondary || !p.secondary.mentions.some((m) => p.primary!.mentions.includes(m)), String(p.secondary?.id));
     assert.equal(p.next.reason, 'gap');
     assert.equal(p.next.lesson, 'predictability-trap');
-    assert.match(p.next.title, /^Replay/);
+    // The lesson is complete and its challenges are untried, so practise in new situations rather than replay.
+    assert.equal(p.next.kind, 'challenges');
+    assert.match(p.next.title, /^Try the challenges for The Predictability Trap/);
   });
 
   it('a chosen goal leads the insights and the next step, without changing any result', () => {
@@ -238,7 +249,7 @@ describe('Strategic Thinking Profile', () => {
   });
 
   it('a replay updates a prediction rather than piling up', () => {
-    const attempts = [rec('l4.lab', 'misconception', 5, 1), rec('l4.lab', 'correct', 3, 9)];
+    const attempts = [rec('l4.lab', 'misconception', 5, 1), rec('l4.lab', 'correct', 3, 9, 2)];
     assert.equal(latestAttempts(attempts).length, 1);
     assert.equal(latestAttempts(attempts)[0].evaluation, 'correct');
     assert.equal(buildProfile({ ...empty, attempts }).progress.predictions, 2, 'progress still counts every prediction made');
@@ -254,10 +265,18 @@ describe('Learning data export', () => {
     const parsed = JSON.parse(JSON.stringify(data));
     assert.deepEqual(Object.keys(parsed).sort(), ['attempts', 'exportedAt', 'format', 'goal', 'lessons', 'schemaVersion']);
     assert.equal(parsed.format, EXPORT_FORMAT);
-    assert.equal(parsed.schemaVersion, 1);
+    assert.equal(parsed.schemaVersion, 2);
     assert.equal(parsed.exportedAt, '2026-10-26T12:00:00.000Z');
     assert.equal(parsed.lessons.length, 5);
-    assert.deepEqual(parsed.lessons[0], { id: 'cooperation-trap', number: 1, title: 'The Cooperation Trap', completed: true, inProgress: false });
+    assert.deepEqual(parsed.lessons[0], {
+      id: 'cooperation-trap',
+      number: 1,
+      title: 'The Cooperation Trap',
+      completed: true,
+      inProgress: false,
+      challengesTried: 0,
+      challengesTotal: 3,
+    });
     assert.equal(parsed.lessons[1].inProgress, true);
     assert.deepEqual(parsed.attempts[0], {
       id: 'l2.crowd@1761350400000',
@@ -270,6 +289,11 @@ describe('Learning data export', () => {
       evaluation: 'reasonable-miss',
       outcome: '',
       recordSchemaVersion: 1,
+      kind: 'lesson',
+      attempt: 1,
+      isFirstAttempt: true,
+      lessonCompleted: null,
+      contentVersion: null,
       question: 'What will the other ten average?',
       lockedAt: '2025-10-25T00:00:00.000Z',
     });

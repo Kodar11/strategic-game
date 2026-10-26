@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { ArrowRight, House, RotateCcw, Trophy } from '@/src/components/ui/icons';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { ZoomIn } from 'react-native-reanimated';
 
@@ -9,6 +9,9 @@ import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Badge, Card } from '@/src/components/ui/Card';
 import { type LessonMeta, nextLesson } from '@/src/content/lessons';
+import { challengesFor } from '@/src/features/challenges/content';
+import { isTried } from '@/src/features/challenges/progress';
+import { useProgress } from '@/src/store/progress';
 import type { ClipId } from '@/src/features/audio/clips';
 import { useNarrateOnMount } from '@/src/features/audio/useNarration';
 import { haptic, useMotionReduced } from '@/src/utils/feedback';
@@ -46,6 +49,11 @@ export function Completion({
   useNarrateOnMount(takeawayClip);
   const reduced = useMotionReduced();
   const next = nextLesson(lesson.id);
+  // Optional practice in new situations. Dismissable, and never required to finish or leave the lesson.
+  const [practiceOpen, setPracticeOpen] = useState(true);
+  const learning = useProgress((s) => s.learning);
+  const challenges = challengesFor(lesson.id);
+  const tried = challenges.filter((c) => isTried(learning, c.id)).length;
 
   useEffect(() => {
     haptic.success();
@@ -112,6 +120,28 @@ export function Completion({
         </Animated.View>
       ) : null}
 
+      {practiceOpen ? (
+        <Animated.View entering={enter(210)} style={styles.practice}>
+          <AppText variant="overline" color={colors.primaryText}>
+            Practice
+          </AppText>
+          <AppText variant="heading">Ready to try this idea somewhere new?</AppText>
+          <AppText variant="small" color={colors.textBody}>
+            {challenges.length === 3 ? 'Three' : challenges.length} short challenges. New situations. The same strategic thinking.{tried ? ` You've tried ${tried} of ${challenges.length}.` : ''}
+          </AppText>
+          <Button
+            label={tried === challenges.length ? 'Revisit challenges' : 'Start challenges'}
+            icon={ArrowRight}
+            compact
+            onPress={() => router.push({ pathname: '/challenges/[lessonId]', params: { lessonId: lesson.id } })}
+          />
+          <View style={{ flexDirection: 'row', gap: space.sm }}>
+            <Button label="Review lesson" variant="ghost" compact onPress={onReplay} style={{ flex: 1 }} />
+            <Button label="Not now" variant="ghost" compact onPress={() => setPracticeOpen(false)} style={{ flex: 1 }} />
+          </View>
+        </Animated.View>
+      ) : null}
+
       <Animated.View entering={enter(220)} style={{ gap: space.sm }}>
         {next && nextHook ? (
           <AppText variant="small" color={colors.textMuted} align="center">
@@ -146,6 +176,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(34,211,238,0.3)',
     backgroundColor: colors.bgRaised,
+  },
+  practice: {
+    gap: space.sm,
+    padding: space.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
   },
   trophy: {
     width: 76,

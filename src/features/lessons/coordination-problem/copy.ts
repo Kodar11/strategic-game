@@ -1,7 +1,7 @@
 import { type PredictionAttempt, lockedAnswer } from '../../../components/lesson/prediction-state.ts';
 import type { Feedback } from '../../../components/lesson/verdict.ts';
 import { type FriendInfo, MEETUP_GAME, type MeetupResult, type Place, friendPolicy, meetupAnalysis, resolveMeetup } from '../../../game/coordination.ts';
-import { type LearningAttempt, recordAttempt } from '../../learning/records.ts';
+import { type NewAttempt, recordAttempt } from '../../learning/records.ts';
 import { payoffAt, rowBestResponses } from '../../../game/payoff-matrix.ts';
 
 /** Lesson 3 wording that depends on the learner's predictions and picks. Pure, so tests can pin it to the model. */
@@ -156,7 +156,7 @@ export function coordinationRecords(d: {
   predict2: PredictionAttempt<Place>;
   pick2: Place | null;
   committed2: boolean;
-}): (LearningAttempt | null)[] {
+}): (NewAttempt | null)[] {
   const round = (n: 1 | 2, attempt: PredictionAttempt<Place>, pick: Place | null, committed: boolean) => {
     const predicted = lockedAnswer(attempt);
     if (!predicted || !pick || !committed) return null;

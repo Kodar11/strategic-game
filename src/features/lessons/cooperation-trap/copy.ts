@@ -1,6 +1,6 @@
 import { type PredictionAttempt, lockedAnswer } from '../../../components/lesson/prediction-state.ts';
 import type { Feedback, Verdict } from '../../../components/lesson/verdict.ts';
-import { type LearningAttempt, recordAttempt } from '../../learning/records.ts';
+import { type NewAttempt, recordAttempt } from '../../learning/records.ts';
 import { BASE_CUT_ADVANTAGE, BASE_PRICING_GAME, type PriceAction, applyCutPenalty, cutAdvantage, regimeFor, type Regime } from '../../../game/incentives.ts';
 import { payoffAt, rowBestResponses } from '../../../game/payoff-matrix.ts';
 
@@ -274,7 +274,7 @@ export function cooperationRecords(d: {
   rival: PriceAction | null;
   penaltyPrediction: PredictionAttempt<PenaltyGuess>;
   foundFlip: boolean;
-}): (LearningAttempt | null)[] {
+}): (NewAttempt | null)[] {
   const predicted = lockedAnswer(d.prediction);
   const guess = lockedAnswer(d.penaltyPrediction);
   return [

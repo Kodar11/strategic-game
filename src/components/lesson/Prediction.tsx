@@ -39,6 +39,8 @@ export function PredictionPrompt<T extends string>({
   confidence,
   onConfidence,
   onConfirm,
+  confirmLabel = "Confirm prediction",
+  lockedNote = "Locked in — you'll compare it with what happens.",
 }: {
   label?: string;
   question: string;
@@ -53,6 +55,9 @@ export function PredictionPrompt<T extends string>({
   onConfidence?: (c: Confidence) => void;
   /** Lock from inside the prompt. Omit when the step's primary action locks the prediction. */
   onConfirm?: () => void;
+  confirmLabel?: string;
+  /** Caption under a locked answer. */
+  lockedNote?: string;
 }) {
   const enter = useEnter();
   const chosen = options.find((o) => o.id === value);
@@ -76,7 +81,7 @@ export function PredictionPrompt<T extends string>({
             </AppText>
           ) : null}
           <AppText variant="caption" color={colors.textMuted}>
-            Locked in — you&apos;ll compare it with what happens.
+            {lockedNote}
           </AppText>
         </View>
       ) : (
@@ -94,7 +99,7 @@ export function PredictionPrompt<T extends string>({
               Draft — you can change {onConfidence ? 'either answer' : 'it'} until you lock it in.
             </AppText>
           ) : null}
-          {onConfirm ? <Button label="Confirm prediction" variant="secondary" compact disabled={!ready} onPress={onConfirm} /> : null}
+          {onConfirm ? <Button label={confirmLabel} variant="secondary" compact disabled={!ready} onPress={onConfirm} /> : null}
         </>
       )}
     </Animated.View>
