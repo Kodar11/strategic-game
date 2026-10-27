@@ -1,17 +1,18 @@
 import { router } from 'expo-router';
-import { ArrowLeft, ArrowRight, ChevronDown, Compass, Lightbulb, Target, TrendingUp, Trophy } from '@/src/components/ui/icons';
+import { ArrowRight, ChevronDown, Compass, Lightbulb, Target, TrendingUp, Trophy } from '@/src/components/ui/icons';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
-import { Button, IconButton } from '@/src/components/ui/Button';
+import { Button } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { allLessons, type LessonId, allModules, getLesson } from '@/src/content/lessons';
 import { useDaily } from '@/src/data/daily-session';
+import { GameRecordCard } from '@/src/features/games/ui/GameRecordCard';
 import { dailyEvidence } from '@/src/features/daily/evidence';
 import { type Insight, type PeriodCount, type SkillSummary, buildProfile, lessonsForSkill } from '@/src/features/learning/profile';
 import { allGoals, type GoalId } from '@/src/features/learning/records';
@@ -51,7 +52,6 @@ export default function ProfileScreen() {
 
   if (!hydrated) return <MessageScreen loading />;
 
-  const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
   const { progress, glance, trend, confidence, next } = profile;
 
   return (
@@ -60,7 +60,6 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: insets.top + space.md, paddingBottom: insets.bottom + space.xxl }}>
         <View style={styles.column}>
           <View style={styles.head}>
-            <IconButton icon={ArrowLeft} label="Back" onPress={close} />
             <AppText variant="title" accessibilityRole="header" style={{ flex: 1 }}>
               Your strategic thinking
             </AppText>
@@ -177,6 +176,9 @@ export default function ProfileScreen() {
               </AppText>
             )}
           </Card>
+
+          {/* Games: a separate, competitive record — never mixed into the learning measures above */}
+          <GameRecordCard />
 
           {/* E · Optional details */}
           <Pressable

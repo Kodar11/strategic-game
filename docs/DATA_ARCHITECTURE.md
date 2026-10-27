@@ -126,3 +126,10 @@ Functions:
 - `get_daily_reveal`
 
 Daily data never goes through the progress outbox or the progress store. It has its own in-memory cache (`src/features/daily/store.ts`). Publishing is one SQL statement, `content_admin.publish_daily_challenge(...)`. Everything else is in `docs/DAILY_CHALLENGE.md`: the publishing template, interaction types, secrecy, versions, and how daily answers feed the profile.
+
+## Games
+
+Five bot games, Game of the Week, leaderboards, Hall of Fame, nicknames and friend challenges live in their own tables
+(`…_games.sql`) and their own in-memory store (`src/features/games/store.ts`). Practice games run on the device;
+competition and challenge matches run on the server, round by round, with SQL ports of the TypeScript engines. Games
+never touch lesson progress or the learning record. Everything is in `docs/GAMES.md`.

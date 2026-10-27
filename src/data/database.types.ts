@@ -21,6 +21,18 @@ export interface Database {
       check_daily_practice: { Args: { request: Json }; Returns: Json };
       get_daily_reveal: { Args: { request: Json }; Returns: Json };
       daily_challenge_today: { Args: Record<string, never>; Returns: string };
+      get_games_overview: { Args: Record<string, never>; Returns: Json };
+      set_nickname: { Args: { request: Json }; Returns: Json };
+      start_match: { Args: { request: Json }; Returns: Json };
+      play_match_round: { Args: { request: Json }; Returns: Json };
+      get_match: { Args: { request: Json }; Returns: Json };
+      get_leaderboard: { Args: { request: Json }; Returns: Json };
+      get_hall_of_fame: { Args: { request?: Json }; Returns: Json };
+      create_challenge: { Args: { request: Json }; Returns: Json };
+      get_challenge: { Args: { request: Json }; Returns: Json };
+      record_practice_game: { Args: { request: Json }; Returns: Json };
+      get_my_games: { Args: Record<string, never>; Returns: Json };
+      finalize_due_competitions: { Args: Record<string, never>; Returns: number };
     };
     Enums: { content_status: 'draft' | 'published' };
     CompositeTypes: Record<string, never>;

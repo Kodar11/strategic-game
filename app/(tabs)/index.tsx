@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ArrowRight, CalendarDays, CircleCheck, Clock, Lock, Play, RotateCcw, Settings, Target, Trophy, UserRound } from '@/src/components/ui/icons';
+import { ArrowRight, CalendarDays, CircleCheck, Clock, Lock, Play, RotateCcw, Settings, Target, Trophy } from '@/src/components/ui/icons';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -69,7 +69,6 @@ export default function Home() {
               </AppText>
             </View>
             <View style={{ flexDirection: 'row', gap: space.xs }}>
-              <IconButton icon={UserRound} label="Your strategic thinking profile" onPress={() => router.push('/profile')} />
               <IconButton icon={Settings} label="Settings" onPress={() => router.push('/settings')} />
             </View>
           </View>

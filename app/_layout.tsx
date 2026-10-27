@@ -20,6 +20,9 @@ export {
   ErrorBoundary,
 } from 'expo-router';
 
+// A deep link (e.g. a friend challenge) opens above the tabs, so Back always has somewhere to go.
+export const unstable_settings = { initialRouteName: '(tabs)' };
+
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 const theme = {
@@ -72,9 +75,8 @@ function AppStack({ reduced }: { reduced: boolean }) {
         contentStyle: { backgroundColor: colors.bg },
         animation: reduced ? 'fade' : 'slide_from_right',
       }}>
-      <Stack.Screen name="index" />
+      <Stack.Screen name="(tabs)" />
       <Stack.Screen name="lesson/[lessonId]" />
-      <Stack.Screen name="profile" />
       <Stack.Screen name="challenges/index" />
       <Stack.Screen name="challenges/[lessonId]" />
       <Stack.Screen name="scenario/[scenarioId]" />
@@ -82,6 +84,11 @@ function AppStack({ reduced }: { reduced: boolean }) {
       <Stack.Screen name="daily" />
       <Stack.Screen name="daily/play" />
       <Stack.Screen name="settings" options={{ presentation: 'modal', animation: reduced ? 'fade' : 'slide_from_bottom' }} />
+      <Stack.Screen name="games/[gameId]" />
+      <Stack.Screen name="games/play" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="leaderboard" />
+      <Stack.Screen name="challenge/[token]" />
+      <Stack.Screen name="nickname" options={{ presentation: 'modal', animation: reduced ? 'fade' : 'slide_from_bottom' }} />
     </Stack>
   );
 }

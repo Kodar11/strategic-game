@@ -17,6 +17,7 @@ import { DataError, toDataError } from './errors.ts';
  * - get_my_progress()              the signed-in learner's progress
  * - apply_progress_changes(changes) one batch of progress changes
  * - the Daily Challenge functions   see src/data/daily.ts
+ * - the games functions             see src/data/games.ts
  *
  * `Rpc` is the only thing a repository needs, so tests run the repositories against the real SQL (PGlite).
  */
@@ -29,7 +30,18 @@ export type RpcName =
   | 'get_daily_challenges'
   | 'submit_daily_challenge'
   | 'check_daily_practice'
-  | 'get_daily_reveal';
+  | 'get_daily_reveal'
+  | 'get_games_overview'
+  | 'set_nickname'
+  | 'start_match'
+  | 'play_match_round'
+  | 'get_match'
+  | 'get_leaderboard'
+  | 'get_hall_of_fame'
+  | 'create_challenge'
+  | 'get_challenge'
+  | 'record_practice_game'
+  | 'get_my_games';
 
 export interface Rpc {
   /** Resolve with the function's JSON result, or throw the database / network error. */
