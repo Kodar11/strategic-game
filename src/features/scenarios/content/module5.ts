@@ -914,7 +914,7 @@ const L18: ScenarioSpec[] = [
       information: 'Hidden types; prior 50% high.',
       payoffs: 'Candidate: wage − exam cost. Employers pay expected productivity.',
       opponent: 'Candidates best-respond to wages; employers’ beliefs are consistent on path and pessimistic off path.',
-      solution: 'Separating requires low-type cost ≥ 6: at 7 or 9 it holds (and pooling fails the intuitive criterion); at 3 or 5 only pooling (wage 7) survives.',
+      solution: 'Separating requires low-type cost ≥ 6: at 7 or 9 it holds, and pooling fails the intuitive criterion. At 3 or 5 low types would imitate, so the only pure-strategy equilibrium is pooling (wage 7). (At 5 the intuitive criterion would also reject pooling, pointing to a partly separating mix that this model leaves out.)',
       source: 'adapted',
       sourceNote: 'Spence (1973) with pooling and separating equilibria; selection via the intuitive criterion (Cho & Kreps, 1987).',
     },

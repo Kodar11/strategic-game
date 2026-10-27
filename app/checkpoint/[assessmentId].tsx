@@ -9,11 +9,11 @@ import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Badge, Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
-import { Check, House, Lock, RotateCcw, X } from '@/src/components/ui/icons';
+import { ArrowRight, Check, CircleCheck, House, Lock, RotateCcw, X } from '@/src/components/ui/icons';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { getLesson, getModule } from '@/src/content/lessons';
-import { ASSESSMENTS, type Assessment, type AssessmentItem, getAssessment } from '@/src/features/assessments/content';
-import { assessmentScore, currentAssessmentRun, finalUnlocked, isComplete, itemScore } from '@/src/features/assessments/scoring';
+import { ASSESSMENTS, type Assessment, type AssessmentItem, getAssessment, splitAssessmentTitle } from '@/src/features/assessments/content';
+import { type AssessmentRun, assessmentScore, currentAssessmentRun, finalUnlocked, isComplete, itemScore } from '@/src/features/assessments/scoring';
 import { DataTable } from '@/src/features/scenarios/visuals';
 import { useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
@@ -36,20 +36,58 @@ export default function CheckpointScreen() {
 
 function Locked() {
   const runs = useProgress((s) => s.assessmentRuns);
-  const remaining = ASSESSMENTS.filter((x) => x.id !== 'final' && !(runs[x.id]?.attempts ?? 0));
+  const checkpoints = ASSESSMENTS.filter((x) => x.id !== 'final');
+  const submitted = checkpoints.filter((x) => (runs[x.id]?.attempts ?? 0) > 0).length;
   return (
     <Frame title="Final assessment">
-      <Card style={{ gap: space.sm }}>
-        <Lock size={22} color={colors.textMuted} />
-        <AppText variant="heading">Opens after the six module checkpoints</AppText>
+      <Card style={{ gap: space.md }}>
+        <View style={styles.lockHead}>
+          <View style={styles.lockIcon}>
+            <Lock size={20} color={colors.textMuted} />
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <AppText variant="heading">Opens after the six module checkpoints</AppText>
+            <AppText variant="caption" color={colors.textMuted} tabular>
+              {submitted} of {checkpoints.length} submitted
+            </AppText>
+          </View>
+        </View>
         <AppText variant="small" color={colors.textMuted}>
           The final assessment tests transfer across the whole curriculum. Submit each checkpoint once to unlock it — passing isn’t required.
         </AppText>
-        {remaining.map((r) => (
-          <Button key={r.id} label={r.title} variant="secondary" compact onPress={() => router.replace({ pathname: '/checkpoint/[assessmentId]', params: { assessmentId: r.id } })} />
-        ))}
+        <View style={{ gap: space.sm }}>
+          {checkpoints.map((c) => (
+            <CheckpointRow key={c.id} a={c} run={runs[c.id]} />
+          ))}
+        </View>
       </Card>
     </Frame>
+  );
+}
+
+/** One checkpoint in the unlock list: available (not yet submitted) or submitted, with the best score once known. */
+function CheckpointRow({ a, run }: { a: Assessment; run?: AssessmentRun }) {
+  const done = (run?.attempts ?? 0) > 0;
+  const { kicker, subject } = splitAssessmentTitle(a.title);
+  const best = run?.bestScore ?? null;
+  const status = done ? `Submitted${best !== null ? ` · best ${fmtScore(best, a)}` : ''}` : `Not submitted · ${a.items.length} questions`;
+  return (
+    <Pressable
+      onPress={() => router.replace({ pathname: '/checkpoint/[assessmentId]', params: { assessmentId: a.id } })}
+      accessibilityRole="button"
+      accessibilityLabel={`${a.title}. ${status}.`}
+      style={({ pressed }) => [styles.cpRow, done && styles.cpRowDone, pressed && { backgroundColor: colors.surfaceHigh }]}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <AppText variant="overline" color={done ? colors.success : colors.primaryText}>
+          {kicker}
+        </AppText>
+        <AppText variant="bodyStrong">{subject}</AppText>
+        <AppText variant="caption" color={colors.textMuted}>
+          {status}
+        </AppText>
+      </View>
+      {done ? <CircleCheck size={20} color={colors.success} strokeWidth={2.4} /> : <ArrowRight size={18} color={colors.textMuted} />}
+    </Pressable>
   );
 }
 
@@ -234,6 +272,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlignVertical: 'top',
   },
+  lockHead: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  lockIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceHigh, alignItems: 'center', justifyContent: 'center' },
+  cpRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 64, paddingVertical: space.md, paddingHorizontal: space.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.borderStrong, backgroundColor: colors.bgRaised },
+  cpRowDone: { borderColor: 'rgba(74,222,128,0.35)' },
   check: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 44 },
   box: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' },
   boxOn: { backgroundColor: colors.primary, borderColor: colors.primary },

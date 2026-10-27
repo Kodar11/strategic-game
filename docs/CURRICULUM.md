@@ -200,7 +200,7 @@ When signals stop meaning anything, markets change shape. Main experience: scena
 
 | Slot | Scenario | Source | Solution concept |
 |---|---|---|---|
-| A | How hard should the exam be? (`l18.a.pooling-separating`) | adapted — Spence (1973) with pooling and separating equilibria; selection via the intuitive criterion (Cho & Kreps, 1987). | Separating requires low-type cost ≥ 6: at 7 or 9 it holds (and pooling fails the intuitive criterion); at 3 or 5 only pooling (wage 7) survives. |
+| A | How hard should the exam be? (`l18.a.pooling-separating`) | adapted — Spence (1973) with pooling and separating equilibria; selection via the intuitive criterion (Cho & Kreps, 1987). | Separating requires low-type cost ≥ 6: at 7 or 9 it holds, and pooling fails the intuitive criterion. At 3 or 5 low types would imitate, so the only pure-strategy equilibrium is pooling (wage 7). (At 5 the intuitive criterion would also reject pooling, pointing to a partly separating mix that this model leaves out.) |
 | B | Two full tables (`l18.b.copy-the-leader`) | adapted — Information cascades (Bikhchandani, Hirshleifer & Welch, 1992; Banerjee, 1992). | Two A hints and one B hint: P(A better) = 0.7. Choosing A is rational — and starts an information cascade. |
 | C | The used-car lot (`l18.c.lemons`) | adapted — Akerlof (1970), “The Market for Lemons”, in a discrete version. | At price p, only cars ≤ p are offered; average quality (10 + p)/2, worth 0.75(10 + p) to you. Surplus is non-negative only up to p = 30. |
 
@@ -236,7 +236,7 @@ Creating risk on purpose — and when it backfires. Main experience: scenario A,
 |---|---|---|---|
 | A | Chicken (`l21.a.chicken`) | canonical — The game of Chicken (cf. Russell, 1959; Schelling, 1960), with this app’s payoffs. | Two pure equilibria (one swerves, the other doesn’t) and a mixed one in which each goes straight with probability 0.1 (from −p = 1 − 11p). |
 | B | The escalation ladder (`l21.b.escalation-ladder`) | adapted — Brinkmanship as “the threat that leaves something to chance” (Schelling, 1960); the ladder is this app’s model. | Dynamic programming: escalate to level 1, then hold (expected ≈ 2.2). Climbing higher adds more risk than pressure. |
-| C | Burning the bridge (`l21.c.point-of-no-return`) | original — Commitment in Chicken (cf. Schelling, 1960), with this app’s probabilities. | Locking in: 0.8 × 1 + 0.2 × (−10) = −1.2. Staying open: −0.1. Don’t burn the bridge. |
+| C | Burning the bridge (`l21.c.point-of-no-return`) | original — Commitment in Chicken (cf. Schelling, 1960), with this app’s probabilities. | Locking in: 0.8 × 1 + 0.2 × (−10) = −1.2. Staying open, they stand firm with probability 0.2 + 0.8 × 0.1 = 0.28, so backing down is worth −0.28 (standing firm −2.08). Don’t burn the bridge. |
 
 ### Lesson 22 · Strategic Thinking in Practice (`strategic-practice`)
 

@@ -45,7 +45,7 @@ export const CURRICULUM_LESSONS: Partial<Record<LessonId, CurriculumLessonSpec>>
       line: { character: 'sen', expression: 'explaining', text: 'An action is strictly dominated if another action pays more against every choice of the other side. Rational players never use it — and if everyone knows that, you can delete it and look again.' },
       panels: [
         { tone: 'insight', title: 'Round by round', body: 'Deleting one player’s dominated options can make another player’s option dominated. Each round adds one more layer of “they know that I know they’re rational”.' },
-        { tone: 'caution', title: 'Weak dominance needs care', body: 'An action that is never better and sometimes worse is only weakly dominated. Deleting weakly dominated options in different orders can leave different results — in one small game, one order leaves the row player 2 and another leaves 1. Strict dominance never has that problem.' },
+        { tone: 'caution', title: 'Weak dominance needs care', body: 'An action that is never better and sometimes worse is only weakly dominated. Deleting weakly dominated options in different orders can leave different results. Rows T, M, B against columns L, R, with payoffs T (1, 1) (0, 0), M (1, 1) (2, 1), B (0, 0) (2, 1): delete T first and the row player ends with 2; delete B first and they end with 1. Strict dominance never has that problem.' },
       ],
     },
     transfer: {
@@ -195,7 +195,7 @@ export const CURRICULUM_LESSONS: Partial<Record<LessonId, CurriculumLessonSpec>>
     transfer: {
       question: 'You’re selling a car and will name a price; the buyer can accept, or walk away and buy a similar car elsewhere for 9,000. What should guide your price?',
       options: [
-        { id: 'outside', label: 'What the buyer can get elsewhere: just under 9,000 if the cars are equal', verdict: 'strong', feedback: 'Working back from the buyer’s choice: they accept if your price is no worse than their alternative.' },
+        { id: 'outside', label: 'What the buyer can get elsewhere: up to 9,000 if the cars are equal', verdict: 'strong', feedback: 'Working back from the buyer’s choice: they accept if your price is no worse than their alternative.' },
         { id: 'cost', label: 'What I paid for the car', verdict: 'misconception', feedback: 'Your past cost doesn’t change what the buyer will accept.' },
         { id: 'high', label: 'As high as possible — they can negotiate down', verdict: 'defensible', feedback: 'With bargaining that might work, but here the buyer only accepts or walks away.' },
       ],
@@ -260,7 +260,7 @@ export const CURRICULUM_LESSONS: Partial<Record<LessonId, CurriculumLessonSpec>>
       title: 'Bargaining power: outside options, delay and credible rejection',
       line: { character: 'sen', expression: 'explaining', text: 'Each side accepts any deal at least as good as what it gets by refusing. Change the cost of delay or the outside option, and the split changes with it.' },
       panels: [
-        { tone: 'insight', title: 'Delay costs create first-mover power', body: 'When the pie shrinks a lot after each rejection, the first proposer can keep most of it. When delay is cheap, the split moves towards equal.' },
+        { tone: 'insight', title: 'Delay costs create first-mover power', body: 'When the pie shrinks a lot after each rejection, the first proposer can keep most of it. With many rounds and cheap delay, the split moves towards equal — but in a short game, the last proposer gains power too.' },
         { tone: 'info', title: 'Model vs people', body: 'A money-only model predicts tiny ultimatum offers. Real responders often reject offers they see as unfair, and proposers anticipate it. Kavya’s threshold was an assumption standing in for that.' },
       ],
     },
@@ -441,7 +441,7 @@ export const CURRICULUM_LESSONS: Partial<Record<LessonId, CurriculumLessonSpec>>
       line: { character: 'sen', expression: 'explaining', text: 'Pay-your-bid auctions reward shading. Second-price auctions make bidding your value weakly dominant — when values are private. When the value is common and uncertain, winning itself is bad news about your estimate.' },
       panels: [
         { tone: 'insight', title: 'Private vs common values', body: 'A camera worth 60 to you is a private value. A jar of coins is worth the same to everyone; only the estimates differ.' },
-        { tone: 'caution', title: 'The winner’s curse', body: 'The highest of many estimates is usually too high. Bid as if your estimate were the highest — because if you win, it was.' },
+        { tone: 'caution', title: 'The winner’s curse', body: 'The highest of many estimates is usually too high. Bid as if your estimate were the highest — because if you win, it probably was.' },
       ],
     },
     transfer: {
@@ -553,7 +553,7 @@ export const CURRICULUM_LESSONS: Partial<Record<LessonId, CurriculumLessonSpec>>
       ],
     },
     transfer: {
-      question: 'A club chooses its next trip in two rounds: first beach vs mountains, then the winner vs a city break. The organiser loves the city. What order would favour the city if members vote sincerely and majorities cycle?',
+      question: 'A club picks its next trip — beach, mountains or a city break — by two pairwise votes, and the organiser, who loves the city, sets the order. If members vote sincerely and majorities cycle, which order favours the city?',
       options: [
         { id: 'last', label: 'Hold the city back for the final vote against the option it beats', verdict: 'strong', feedback: 'With cyclic majorities, the option kept to the end and pitted against the one it beats wins.' },
         { id: 'first', label: 'Put the city in the first vote to build momentum', verdict: 'misconception', feedback: 'Entering early means the city must beat two options in a row — which a cycle rules out.' },

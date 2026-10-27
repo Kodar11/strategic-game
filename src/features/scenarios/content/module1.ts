@@ -223,7 +223,7 @@ const L1: ScenarioSpec[] = [
     }),
     explain: [
       'With five people, each token you give creates 1.6 tokens of value, but only 0.32 of it comes back to you. Free-riding on others’ contributions is individually best, even though everyone giving 10 would make each person 16 instead of 10.',
-      'The trap would disappear only if 1.6 ÷ 5 were above 1 — if the group were small enough, or the multiplier big enough, that a token returned more than it cost you.',
+      'The trap would disappear only if 1.6 ÷ 5 were above 1 — that is, if the multiplier were bigger than the number of people sharing the pot, so that a token returned more than it cost you.',
     ],
     takeaway: 'In shared pots, each person bears the full cost of contributing but receives only a fraction of the benefit. Bigger groups make that fraction smaller.',
     skill: 'incentives',
@@ -350,7 +350,7 @@ const L2: ScenarioSpec[] = [
     version: 1,
     title: 'Peeling the negotiation',
     purpose: 'No option is dominant at the start — you have to delete in rounds.',
-    setup: 'You’re a supplier choosing which proposal to send; the client then decides how to respond without seeing your other options. Payoffs: yours first, client’s second.',
+    setup: 'You’re a supplier choosing which proposal to send. At the same moment, the client commits to how it will respond — without knowing which proposal you chose. Payoffs: yours first, client’s second.',
     rules: ['You propose fast delivery, a discount, or a bundle.', 'The client accepts, counters, or shops around — at the same time, without seeing your proposal in advance.', 'Payoffs are exactly as in the table.'],
     formal: {
       players: 'You (rows) and the client (columns).',
@@ -401,7 +401,7 @@ const L2: ScenarioSpec[] = [
     explain: [
       'Round 1: for the client, “shop around” pays more than “counter” in every row (2 > 1, 6 > 4, 8 > 6), so a rational client never counters. Delete it.',
       'Round 2: without “counter”, fast delivery beats discount (4 > 2, 6 > 3) and bundle (4 > 3, 6 > 2). Round 3: against fast delivery, the client accepts (3 > 2).',
-      'Each round assumes one more level of “they know that I know they’re rational”. Strict dominance is safe to delete in any order; weak dominance is not (see the lesson’s lab).',
+      'Each round assumes one more level of “they know that I know they’re rational”. Strict dominance is safe to delete in any order; weak dominance is not (the lesson’s concept step shows a small example).',
     ],
     takeaway: 'When nothing is obviously best, delete what nobody would play — then look again. Removing their bad options can make your best one appear.',
     skill: 'anticipating',

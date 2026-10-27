@@ -11,7 +11,7 @@ import { Button, IconButton } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
-import { LESSONS, type LessonId } from '@/src/content/lessons';
+import { LESSONS, type LessonId, MODULES, getLesson } from '@/src/content/lessons';
 import { type Insight, type SkillSummary, buildProfile, lessonsForSkill } from '@/src/features/learning/profile';
 import { GOALS, type GoalId } from '@/src/features/learning/records';
 import { useProgress } from '@/src/store/progress';
@@ -103,8 +103,11 @@ export default function ProfileScreen() {
           <Card style={{ gap: space.md }}>
             <SectionLabel>Your strategic thinking</SectionLabel>
             {profile.skills.map((s) => (
-              <SkillRow key={s.id} skill={s} />
+              <SkillRow key={s.id} skill={s} completed={completed} />
             ))}
+            <AppText variant="caption" color={colors.textMuted}>
+              Chips show the lessons that practise each area, by module: completed / total.
+            </AppText>
           </Card>
 
           {/* 3 · Decision-making pattern (the primary insight) */}
@@ -273,22 +276,44 @@ function PracticeRow({ title, text, ready }: { title: string; text: string; read
   );
 }
 
-function SkillRow({ skill }: { skill: SkillSummary }) {
-  const from = lessonsForSkill(skill.id).map(lessonNumber).join(' & ');
+/**
+ * One skill area. The lessons that practise it are summarised per module (completed / total) instead of as a raw
+ * list of lesson numbers; the full list stays in the accessibility label.
+ */
+function SkillRow({ skill, completed }: { skill: SkillSummary; completed: readonly LessonId[] }) {
+  const lessons = lessonsForSkill(skill.id);
+  const done = lessons.filter((id) => completed.includes(id)).length;
+  const byModule = MODULES.map((m) => {
+    const inModule = lessons.filter((id) => getLesson(id)!.module === m.id);
+    return { module: m, total: inModule.length, done: inModule.filter((id) => completed.includes(id)).length };
+  }).filter((g) => g.total > 0);
+  const label = `${skill.label}. ${skill.text} Practised in lessons ${lessons.map(lessonNumber).join(', ')}; ${done} of ${lessons.length} completed.`;
   return (
-    <View style={{ gap: 4 }} accessible accessibilityLabel={`${skill.label}. ${skill.text}`}>
+    <View style={styles.skill} accessible accessibilityLabel={label}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.sm }}>
         <AppText variant="bodyStrong" style={{ flex: 1 }}>
           {skill.label}
         </AppText>
-        <AppText variant="caption" color={colors.textMuted}>
-          Lesson {from}
+        <AppText variant="caption" color={colors.textMuted} tabular>
+          {done} of {lessons.length} lessons done
         </AppText>
       </View>
       {skill.status === 'observed' ? <Dots total={skill.judged} filled={skill.matched} /> : null}
       <AppText variant="small" color={skill.status === 'observed' ? colors.textBody : colors.textMuted}>
         {skill.text}
       </AppText>
+      <View style={styles.modules} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+        {byModule.map(({ module, total, done: d }) => (
+          <View key={module.id} style={[styles.moduleChip, d === total && styles.moduleChipDone]}>
+            <AppText variant="caption" color={d === total ? colors.success : colors.textBody} tabular>
+              M{module.number}
+            </AppText>
+            <AppText variant="caption" color={colors.textMuted} tabular>
+              {d}/{total}
+            </AppText>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -312,6 +337,10 @@ const styles = StyleSheet.create({
   insight: { gap: space.sm, padding: space.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   insightPrimary: { backgroundColor: colors.insightSoft, borderColor: 'rgba(253,186,116,0.35)' },
   next: { gap: space.sm, padding: space.lg, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  skill: { gap: space.xs, paddingBottom: space.md, borderBottomWidth: 1, borderBottomColor: colors.border },
+  modules: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs, marginTop: space.xxs },
+  moduleChip: { flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingHorizontal: space.sm, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: 'rgba(148,163,184,0.10)' },
+  moduleChipDone: { backgroundColor: colors.successSoft },
   dot: { width: 10, height: 10, borderRadius: 5, borderWidth: 1.5, borderColor: colors.textMuted },
   dotOn: { backgroundColor: colors.primaryText, borderColor: colors.primaryText },
 });

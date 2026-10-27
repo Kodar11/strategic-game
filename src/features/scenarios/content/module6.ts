@@ -523,9 +523,14 @@ interface NoReturnState {
   commit: boolean | null;
   move: 'swerve' | 'straight' | null;
 }
-export function noReturnValue(commit: boolean, move: 'swerve' | 'straight' = 'swerve'): number {
-  if (commit) return (1 - PRECOMMIT) * 1 + PRECOMMIT * -10;
-  return move === 'swerve' ? CHICKEN_STRAIGHT * -1 : CHICKEN_STRAIGHT * -10 + (1 - CHICKEN_STRAIGHT) * 1;
+/** Chance the other side stands firm when you stay open: always if it has already locked in, otherwise its 10% mix. */
+export function openFirmChance(precommit = PRECOMMIT): number {
+  return precommit + (1 - precommit) * CHICKEN_STRAIGHT;
+}
+export function noReturnValue(commit: boolean, move: 'swerve' | 'straight' = 'swerve', precommit = PRECOMMIT): number {
+  if (commit) return (1 - precommit) * 1 + precommit * -10;
+  const firm = openFirmChance(precommit);
+  return move === 'swerve' ? firm * -1 : firm * -10 + (1 - firm) * 1;
 }
 const noReturnPlay: ScenarioPlay<NoReturnState> = {
   init: (seed) => ({ seed, commit: null, move: null }),
@@ -552,9 +557,12 @@ const noReturnPlay: ScenarioPlay<NoReturnState> = {
       you = theyLocked ? -10 : 1;
       line = theyLocked ? 'They had already locked in too. Neither side could back down: collision.' : 'They hadn’t locked in, saw your commitment and backed down.';
     } else {
-      const straight = rng() < CHICKEN_STRAIGHT;
+      // A side that has already locked in can't back down; otherwise it stands firm with its 10% mix.
+      const straight = theyLocked || rng() < CHICKEN_STRAIGHT;
       you = s.move === 'swerve' ? (straight ? -1 : 0) : straight ? -10 : 1;
-      line = `They ${straight ? 'stood firm' : 'backed down'} (they stand firm ${pct(CHICKEN_STRAIGHT)} of the time).`;
+      line = theyLocked
+        ? `They had already locked in, so they stood firm.`
+        : `They ${straight ? 'stood firm' : 'backed down'} (when not locked in, they stand firm ${pct(CHICKEN_STRAIGHT)} of the time).`;
     }
     return {
       headline: line,
@@ -563,7 +571,10 @@ const noReturnPlay: ScenarioPlay<NoReturnState> = {
         { label: 'Expected: lock in', value: fmt(noReturnValue(true), 2), tone: 'amber' },
         { label: 'Expected: stay open', value: fmt(noReturnValue(false), 2), tone: 'amber' },
       ],
-      lines: [`There was a ${pct(PRECOMMIT)} chance they had already locked themselves in. Locking in is worth ${fmt(noReturnValue(true), 2)}; staying open is worth ${fmt(noReturnValue(false), 2)} (backing down or standing firm are equally good against their 10% mix).`],
+      lines: [
+        `There was a ${pct(PRECOMMIT)} chance they had already locked themselves in. If you stay open, they stand firm ${pct(openFirmChance())} of the time in total (${pct(PRECOMMIT)} locked in, plus 10% of the rest).`,
+        `Locking in is worth ${fmt(noReturnValue(true), 2)}. Staying open and backing down is worth ${fmt(noReturnValue(false, 'swerve'), 2)}; staying open and standing firm, ${fmt(noReturnValue(false, 'straight'), 2)}.`,
+      ],
     };
   },
 };
@@ -653,7 +664,7 @@ const L21: ScenarioSpec[] = [
       basis: 'calculable',
       modelAnswer: 'Escalate one step, then hold.',
       options: [
-        { id: 'one-step', label: 'Escalate one step, then hold', verdict: 'match', feedback: 'Level 1 creates some pressure (35%) for little risk (5%). Level 2 triples the risk for a modest gain in pressure: expected value falls from about 2.2 to below 0.' },
+        { id: 'one-step', label: 'Escalate one step, then hold', verdict: 'match', feedback: 'Level 1 creates some pressure (35%) for little risk (5%). Level 2 triples the risk for a modest gain in pressure: once at level 1, stepping up is worth less than 0, while holding is worth about 2.' },
         { id: 'top', label: 'Climb fast — maximum pressure', verdict: 'misconception', feedback: 'At level 4 the disaster risk is 50% per round. The pressure doesn’t make up for it.' },
         { id: 'never', label: 'Never escalate', verdict: 'defensible', feedback: 'Safe — at level 0 they never back down, so you’d end at 0. A small, controlled risk is worth about 2.2 here.' },
         { id: 'every', label: 'Escalate every round', verdict: 'misconception', feedback: 'Each step up raises the risk faster than the pressure.' },
@@ -677,13 +688,14 @@ const L21: ScenarioSpec[] = [
     id: 'l21.c.point-of-no-return',
     lesson: 'brinkmanship',
     slot: 'C',
-    version: 1,
+    // v2: a side that has already locked in now always stands firm if you stay open (v1 ignored it).
+    version: 2,
     title: 'Burning the bridge',
     purpose: 'Transfer: commit irreversibly to win a standoff — unless the other side already has.',
     setup: 'A council and a contractor are in a standoff over a deadline (the same payoffs as Chicken). You can publicly lock in your position so you can’t back down. There’s a 20% chance the other side has already done the same.',
     rules: [
       'Lock in: if they haven’t, they back down (you +1, they −1). If they have too: collision (−10 each).',
-      'Stay open: at the deadline you choose to back down or stand firm; they stand firm 10% of the time.',
+      'Stay open: at the deadline you choose to back down or stand firm. If they’ve locked in, they stand firm; otherwise they stand firm 10% of the time.',
       'Payoffs otherwise as in Chicken.',
     ],
     formal: {
@@ -692,20 +704,20 @@ const L21: ScenarioSpec[] = [
       timing: 'Commitment decision, then the standoff.',
       information: 'You don’t know whether they have already locked in (20%).',
       payoffs: 'Chicken payoffs (0, ±1, −10).',
-      opponent: 'Already locked in with probability 0.2; otherwise backs down if you lock in, or stands firm 10% of the time if you don’t.',
+      opponent: 'Already locked in with probability 0.2, and then always stands firm. Otherwise backs down if you lock in, or stands firm 10% of the time if you don’t.',
       chance: 'Whether they’re locked in; their move.',
-      solution: 'Locking in: 0.8 × 1 + 0.2 × (−10) = −1.2. Staying open: −0.1. Don’t burn the bridge.',
+      solution: 'Locking in: 0.8 × 1 + 0.2 × (−10) = −1.2. Staying open, they stand firm with probability 0.2 + 0.8 × 0.1 = 0.28, so backing down is worth −0.28 (standing firm −2.08). Don’t burn the bridge.',
       source: 'original',
       sourceNote: 'Commitment in Chicken (cf. Schelling, 1960), with this app’s probabilities.',
     },
     predict: {
       question: 'With a 20% chance the other side has already locked in, is locking in worth it?',
       basis: 'calculable',
-      modelAnswer: 'No: −1.2 vs −0.1 for staying open.',
+      modelAnswer: 'No: −1.2 vs −0.28 for staying open and backing down.',
       options: [
-        { id: 'no', label: 'No — the chance of a double lock-in is too costly', verdict: 'match', feedback: 'Locking in wins 1 with probability 0.8 but costs 10 with probability 0.2: −1.2. Staying open is worth −0.1.' },
+        { id: 'no', label: 'No — the chance of a double lock-in is too costly', verdict: 'match', feedback: 'Locking in wins 1 with probability 0.8 but costs 10 with probability 0.2: −1.2. Staying open and backing down if needed is worth −0.28.' },
         { id: 'yes', label: 'Yes — commitment always wins Chicken', verdict: 'misconception', feedback: 'It wins only if the other side can still back down. If both commit, nobody can.' },
-        { id: 'depends', label: 'Only if the chance were much lower', verdict: 'defensible', feedback: 'Right direction: with about a 5% chance, locking in would pay. At 20% it doesn’t.' },
+        { id: 'depends', label: 'Only if the chance were much lower', verdict: 'defensible', feedback: 'Right direction: below about an 11% chance, locking in would pay. At 20% it doesn’t.' },
       ],
       solve: () => (noReturnValue(true) < Math.max(noReturnValue(false, 'swerve'), noReturnValue(false, 'straight')) ? 'no' : 'yes'),
     },

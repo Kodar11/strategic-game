@@ -568,3 +568,9 @@ export function getAssessment(id: string | undefined): Assessment | undefined {
 export function moduleCheckpoint(module: ModuleId): Assessment {
   return ASSESSMENTS.find((a) => a.id === module)!;
 }
+
+/** "Checkpoint 2 · Coordination, …" → kicker and subject, so cards can show them on separate lines. */
+export function splitAssessmentTitle(title: string): { kicker: string; subject: string } {
+  const i = title.indexOf(' · ');
+  return i < 0 ? { kicker: title, subject: '' } : { kicker: title.slice(0, i), subject: title.slice(i + 3) };
+}

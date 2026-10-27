@@ -197,7 +197,7 @@ const L11: ScenarioSpec[] = [
     play: offersPlay,
     explain: [
       'Bargaining power comes from what happens if you say no. Here, delay is costly for both, so each side’s alternative is worth less than the current pie — and the first proposer can capture the difference.',
-      'Change the delay costs and the split changes: if the pie shrank only slightly each round, the advantage of proposing first would almost disappear.',
+      'Change the delay costs and the split changes. In a short game like this, whoever makes the last offer has power too: if the pie barely shrank, you (proposing in round 3) could keep almost everything. Only with many rounds and cheap delay — Rubinstein’s infinite-horizon model — does the split approach half each.',
     ],
     takeaway: 'In a negotiation with delay, work backwards: what each side would get by waiting decides what they accept today.',
     skill: 'anticipating',

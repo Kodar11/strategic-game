@@ -2,7 +2,7 @@ import Animated from 'react-native-reanimated';
 import { View } from 'react-native';
 import { z } from 'zod';
 
-import { SceneArt } from '@/src/components/art/SceneArt';
+import { LessonArt } from '@/src/components/art/LessonArt';
 import { Completion } from '@/src/components/lesson/Completion';
 import { LessonShell, type StepDef } from '@/src/components/lesson/LessonShell';
 import { Dialogue, Panel, StepHeading } from '@/src/components/lesson/Panels';
@@ -46,7 +46,7 @@ export default function CurriculumLesson({ lesson }: { lesson: LessonMeta }) {
       render: () => (
         <>
           <Animated.View entering={enter(0, 'fade')} style={{ borderRadius: 20, overflow: 'hidden' }}>
-            <SceneArt scene={lesson.scene} height={170} />
+            <LessonArt lesson={lesson.id} height={170} />
           </Animated.View>
           <StepHeading kicker={spec.intro.kicker ?? `Lesson ${lesson.number}`} title={spec.intro.title} body={spec.intro.body} />
           {spec.intro.lines.map((l, i) => (

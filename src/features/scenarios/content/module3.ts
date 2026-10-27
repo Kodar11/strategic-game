@@ -179,7 +179,7 @@ const L8: ScenarioSpec[] = [
     }),
     explain: [
       'Backward induction predicts the game ends at the first move, with tiny payoffs. In laboratory versions, most people pass at least once — a well-documented gap between the formal prediction and behaviour.',
-      'The prediction depends on everyone being rational and believing everyone else is too, at every step. If you think Maya might pass, passing can be your best reply — which is exactly what happened here.',
+      'The prediction depends on everyone being rational and believing everyone else is too, at every step. If you think Maya might pass, passing can be your best reply — and this Maya was scripted to pass at her first turn.',
     ],
     takeaway: 'Backward induction tells you what perfectly rational players do. Real opponents may not be — and your best plan depends on what they actually do.',
     skill: 'anticipating',

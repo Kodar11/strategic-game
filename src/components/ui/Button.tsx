@@ -61,7 +61,7 @@ export function Button({
         ]}>
         <View style={styles.row}>
           {Icon && iconPosition === 'left' ? <Icon size={18} color={fg} strokeWidth={2.2} /> : null}
-          <AppText variant="bodyStrong" color={fg}>
+          <AppText variant="bodyStrong" color={fg} align="center" style={styles.label}>
             {label}
           </AppText>
           {Icon && iconPosition === 'right' ? <Icon size={18} color={fg} strokeWidth={2.2} /> : null}
@@ -102,7 +102,9 @@ const styles = StyleSheet.create({
   },
   compact: { minHeight: 44, paddingHorizontal: space.lg, borderRadius: radius.md },
   secondary: { borderWidth: 1, borderColor: colors.borderStrong },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, maxWidth: '100%' },
+  // Long labels wrap inside the button instead of overflowing it.
+  label: { flexShrink: 1 },
   icon: {
     width: 44,
     height: 44,

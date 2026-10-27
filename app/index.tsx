@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { SceneArt } from '@/src/components/art/SceneArt';
+import { LessonArt } from '@/src/components/art/LessonArt';
 import { Portrait } from '@/src/components/characters/Portrait';
 import { useEnter } from '@/src/components/lesson/motion';
 import { AppText } from '@/src/components/ui/AppText';
@@ -13,7 +13,7 @@ import { Button, IconButton } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Card';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { LESSONS, type LessonId, type LessonMeta, MODULES, type ModuleMeta } from '@/src/content/lessons';
-import { type Assessment, getAssessment, moduleCheckpoint } from '@/src/features/assessments/content';
+import { ASSESSMENTS, type Assessment, getAssessment, moduleCheckpoint, splitAssessmentTitle } from '@/src/features/assessments/content';
 import { type AssessmentRun, finalUnlocked } from '@/src/features/assessments/scoring';
 import { SCENARIOS } from '@/src/features/scenarios';
 import { type LessonRuntime, useProgress } from '@/src/store/progress';
@@ -149,7 +149,7 @@ export default function Home() {
                 <AssessmentCard a={moduleCheckpoint(m.id)} run={assessmentRuns[m.id]} />
               </Animated.View>
             ))}
-            <AssessmentCard a={getAssessment('final')!} run={assessmentRuns.final} locked={!finalUnlocked(assessmentRuns)} final />
+            <AssessmentCard a={getAssessment('final')!} run={assessmentRuns.final} locked={!finalUnlocked(assessmentRuns)} unlockedCount={ASSESSMENTS.filter((x) => x.id !== 'final' && (assessmentRuns[x.id]?.attempts ?? 0) > 0).length} final />
           </View>
 
           <AppText variant="caption" color={colors.textFaint} align="center" style={{ marginTop: space.xxl }}>
@@ -175,25 +175,46 @@ function ModuleHeader({ module, done, total }: { module: ModuleMeta; done: numbe
   );
 }
 
-function AssessmentCard({ a, run, locked, final }: { a: Assessment; run?: AssessmentRun; locked?: boolean; final?: boolean }) {
+/**
+ * A checkpoint or the final assessment. States: locked (final only, until every checkpoint is submitted), available,
+ * in progress (answers drafted), submitted (with best score; "passed" once the best score reaches the pass mark).
+ */
+function AssessmentCard({ a, run, locked, final, unlockedCount }: { a: Assessment; run?: AssessmentRun; locked?: boolean; final?: boolean; unlockedCount?: number }) {
   const score = run?.bestScore ?? null;
-  const status = locked ? 'Opens after all six checkpoints' : score !== null ? `Best ${Number.isInteger(score) ? score : score.toFixed(1)} / ${a.items.length}` : `${a.items.length} questions`;
+  const submitted = (run?.attempts ?? 0) > 0;
+  const passed = score !== null && score / a.items.length >= a.passMark - 1e-9;
+  const drafting = !submitted && !!run && Object.keys(run.answers).length > 0;
+  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+  const status = locked
+    ? `Locked · ${unlockedCount ?? 0} of 6 checkpoints submitted`
+    : submitted
+      ? `${passed ? 'Passed' : 'Submitted'} · best ${fmt(score!)} / ${a.items.length}`
+      : drafting
+        ? `In progress · ${a.items.length} questions`
+        : `${a.items.length} questions · pass mark ${Math.round(a.passMark * 100)}%`;
+  const { kicker, subject } = splitAssessmentTitle(a.title);
+  const tint = locked ? colors.textMuted : submitted ? colors.success : final ? colors.insight : colors.primaryText;
   return (
     <Pressable
       onPress={() => openAssessment(a.id)}
       accessibilityRole="button"
       accessibilityLabel={`${a.title}. ${status}.`}
-      style={({ pressed }) => [styles.assessment, final && styles.final, pressed && { backgroundColor: colors.surfaceHigh }]}>
-      <View style={[styles.practiceIcon, final && { backgroundColor: colors.insightSoft }]}>
+      style={({ pressed }) => [styles.assessment, final && styles.final, submitted && styles.assessmentDone, pressed && { backgroundColor: colors.surfaceHigh }]}>
+      <View style={[styles.practiceIcon, final && !locked && { backgroundColor: colors.insightSoft }, locked && { backgroundColor: colors.surfaceHigh }]}>
         {locked ? <Lock size={18} color={colors.textMuted} /> : final ? <Trophy size={18} color={colors.insight} /> : <Target size={18} color={colors.primaryText} />}
       </View>
       <View style={{ flex: 1, gap: 2 }}>
-        <AppText variant="bodyStrong">{a.title}</AppText>
+        <AppText variant="overline" color={tint}>
+          {kicker}
+        </AppText>
+        <AppText variant="bodyStrong" color={locked ? colors.textBody : colors.text}>
+          {subject}
+        </AppText>
         <AppText variant="caption" color={colors.textMuted}>
           {status}
         </AppText>
       </View>
-      {run?.attempts ? <CircleCheck size={16} color={colors.success} strokeWidth={2.4} /> : <ArrowRight size={18} color={colors.textMuted} />}
+      {submitted ? <CircleCheck size={20} color={colors.success} strokeWidth={2.4} /> : <ArrowRight size={18} color={colors.textMuted} />}
     </Pressable>
   );
 }
@@ -224,7 +245,7 @@ function LessonCard({ lesson, done, run }: { lesson: LessonMeta; done: boolean; 
         accessibilityRole="button"
         accessibilityLabel={`Lesson ${lesson.number}: ${lesson.title}. ${lesson.description} About ${lesson.minutes} minutes. ${done ? 'Completed.' : inProgress ? 'In progress.' : 'Not started.'}`}>
         <View>
-          <SceneArt scene={lesson.scene} height={104} />
+          <LessonArt lesson={lesson.id} height={104} />
           <View style={styles.cardNumber}>
             <AppText variant="caption" color={colors.text} tabular>
               {String(lesson.number).padStart(2, '0')}
@@ -313,9 +334,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: colors.borderStrong,
-    padding: space.md,
+    paddingVertical: space.md,
+    paddingHorizontal: space.lg,
   },
   final: { borderStyle: 'solid', borderColor: 'rgba(253,186,116,0.4)', padding: space.lg },
+  assessmentDone: { borderStyle: 'solid', borderColor: 'rgba(74,222,128,0.35)' },
   practiceIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: space.md },
   card: { backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
