@@ -65,7 +65,7 @@ export default function SettingsScreen() {
           <Card style={{ gap: space.md }}>
             <AppText variant="bodyStrong">Progress</AppText>
             <AppText variant="small" color={colors.textMuted}>
-              Progress is saved to the app’s server under an anonymous ID kept on this device. Resetting clears completed lessons, any lesson in progress, your recorded predictions and challenge answers. Your goal is kept.
+              Progress is saved to the app’s server under an anonymous ID kept on this device. Resetting clears completed lessons, any lesson in progress, your recorded predictions and challenge answers. Your goal and your official daily challenge answers are kept.
             </AppText>
             <SyncLine />
             {confirmReset ? (

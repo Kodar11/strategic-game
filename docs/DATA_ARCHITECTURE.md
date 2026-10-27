@@ -9,7 +9,16 @@ The app has three layers. Content and learner progress live in Supabase PostgreS
 | **Learner progress** | Supabase, `learner_profiles`, `lesson_progress`, `scenario_runs`, `scenario_completions`, `challenge_drafts`, `assessment_runs`, `learning_attempts` (`…_learner_progress.sql`) | Completed lessons, a lesson's in-progress step, scenario runs (prediction, inputs, seed), finished scenarios, challenge drafts, assessment answers and scores, every learning attempt, the goal. |
 | **Device** | AsyncStorage | Settings (`strategic-game/settings`: narration, motion, haptics). These are device preferences. Also the Supabase session (anonymous user token) and the sync outbox (`strategic-game/outbox`: writes not yet acknowledged). |
 
-The learning profile is never stored. It is computed on the device from the learning record, with the same rules as before (`src/features/learning/profile.ts`).
+The learning profile is never stored. It is computed on the device with the same rules as before (`src/features/learning/profile.ts`), from:
+- the learning record
+- official Daily Challenge answers that qualify as evidence (`src/features/daily/evidence.ts`)
+
+On top of the existing rules it adds:
+- a one-glance summary
+- one strength and one area to work on, using the existing `isStrong` / `isWeak` thresholds
+- a trend that appears only when each of two 28-day periods has at least 5 calculable first answers
+
+**Daily Challenge** content and official attempts live in Supabase too. See "Daily Strategic Challenge" below.
 
 ## Content: data plus registered engines
 
@@ -96,13 +105,24 @@ Limits:
 - **Shipping a change from the repository:** edit `content.json`, raise that row's `revision`, run `npm run content:seed-sql`, and run `supabase/seed.sql`.
 - `content_admin.validate_content()` checks the structural rules in SQL, and `content_admin.content_counts()` gives row counts.
 
-## Adding Daily Challenge later (not built)
+## Lesson categories
 
-The foundation is in place for a later Daily Challenge:
+`content_categories` and `content_lesson_categories` (`…_lesson_categories.sql`) give each lesson one primary category, read through `get_lesson_categories()`. They are kept out of `get_published_content()`, whose strict document schema would make older app builds refuse an unknown field. Categories are optional at start-up: if they fail to load, the lesson list shows no filter. Mapping and editing: `docs/LESSON_CATEGORIES.md`.
 
-- Challenges are already pure content with versions (`content_challenges` plus options).
-- Scenarios can be played by id outside lessons (`/scenario/[id]`).
-- Attempts have stable ids and append-only storage.
-- Progress writes go through one transactional function.
+## Daily Strategic Challenge
 
-A daily schedule would be a new content table pointing at a challenge or scenario per date. Server-side grading would join the existing option verdicts.
+Tables:
+- `daily_challenges`: public content, readable once published and dated today or earlier.
+- `daily_challenge_keys`: private, no client access.
+- `daily_challenge_attempts`: one official attempt per learner per UTC day.
+- `daily_challenge_history`: append-only.
+
+All four are defined in `…_daily_challenges.sql`.
+
+Functions:
+- `get_daily_challenges`
+- `submit_daily_challenge`: SECURITY DEFINER, idempotent.
+- `check_daily_practice`
+- `get_daily_reveal`
+
+Daily data never goes through the progress outbox or the progress store. It has its own in-memory cache (`src/features/daily/store.ts`). Publishing is one SQL statement, `content_admin.publish_daily_challenge(...)`. Everything else is in `docs/DAILY_CHALLENGE.md`: the publishing template, interaction types, secrecy, versions, and how daily answers feed the profile.

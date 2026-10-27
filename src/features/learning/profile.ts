@@ -26,12 +26,25 @@ export const MIN_FIRST_ATTEMPTS = 4;
 export const MIN_RETRIED = 2;
 /** Different challenges for one concept needed before saying anything about transfer. */
 export const MIN_TRANSFER_SCENARIOS = 2;
+/** Length of each period the trend compares (the latest one and the one before it). */
+export const TREND_WINDOW_DAYS = 28;
+/** Calculable first answers needed in *each* period before comparing them. */
+export const MIN_TREND_PERIOD = 5;
 
 export interface ProfileInput {
   attempts: readonly LearningAttempt[];
   completed: readonly LessonId[];
   inProgress: readonly LessonId[];
   goal: GoalId | null;
+  /**
+   * Official Daily Challenge answers that qualify as evidence (see `dailyEvidence` in src/features/daily/evidence.ts:
+   * server-graded, rated for confidence, tagged with a skill and a basis). Each is a first attempt by construction —
+   * there is one official answer per challenge. They join skill, confidence and trend evidence only; lesson progress,
+   * practice, transfer and next-step challenge counts never see them.
+   */
+  daily?: readonly LearningAttempt[];
+  /** Clock for the trend (ms since epoch). Defaults to now. */
+  now?: number;
 }
 
 export interface SkillSummary {
@@ -98,8 +111,43 @@ export interface NextStep {
   cta: string;
 }
 
+export interface PeriodCount {
+  judged: number;
+  matched: number;
+}
+
+/**
+ * Latest period against the one before it, on calculable first answers only. Different questions land in each
+ * period, so it is a rough signal; it is only reported when both periods have enough answers.
+ */
+export interface TrendSummary {
+  ready: boolean;
+  days: number;
+  recent: PeriodCount;
+  previous: PeriodCount;
+  /** Compares match rates; null until ready. */
+  direction: 'higher' | 'lower' | 'same' | null;
+  text: string;
+}
+
+/** The one-glance summary: overall first-answer evidence, one strength and one area to work on. */
+export interface Glance {
+  /** Calculable first answers (lessons, challenges, scenarios and qualifying daily challenges). */
+  judged: number;
+  matched: number;
+  /** Enough evidence to summarise at all (MIN_FIRST_ATTEMPTS). */
+  ready: boolean;
+  text: string;
+  /** The strongest area by the existing `isStrong` rule, if any. */
+  strength: SkillSummary | null;
+  /** The weakest area by the existing `isWeak` rule; otherwise, once there is some evidence, the least-tested area. */
+  focus: { skill: SkillSummary; reason: 'weak' | 'least-tested' } | null;
+}
+
 export interface Profile {
-  progress: { completed: number; total: number; inProgress: number; predictions: number; challengesTried: number; challengesTotal: number };
+  progress: { completed: number; total: number; inProgress: number; predictions: number; challengesTried: number; challengesTotal: number; dailyCounted: number };
+  glance: Glance;
+  trend: TrendSummary;
   skills: SkillSummary[];
   primary: Insight | null;
   secondary: Insight | null;
@@ -407,11 +455,67 @@ export function nextStep(input: ProfileInput, skills: readonly SkillSummary[]): 
   return lessonStep(leastSeen.lesson, 'replay', 'Try another round of predictions and see whether your confidence matches the result.');
 }
 
+export function summariseGlance(evidence: readonly LearningAttempt[], skills: readonly SkillSummary[]): Glance {
+  const judged = judgedOf(evidence);
+  const matched = matchedOf(judged);
+  const ready = judged.length >= MIN_FIRST_ATTEMPTS;
+  const ratio = (s: SkillSummary) => s.matched / s.judged;
+  const strength = skills.filter((s) => isStrong(s)).sort((a, b) => ratio(b) - ratio(a) || b.judged - a.judged)[0] ?? null;
+  const weakest = skills.filter(isWeak).sort((a, b) => ratio(a) - ratio(b) || b.judged - a.judged)[0];
+  // Without a weak area, point at the least-tested one — but only once there is something to compare it with.
+  const leastTested = evidence.length ? [...skills].filter((s) => s.id !== strength?.id).sort((a, b) => a.judged - b.judged)[0] : undefined;
+  const focus = weakest ? { skill: weakest, reason: 'weak' as const } : leastTested ? { skill: leastTested, reason: 'least-tested' as const } : null;
+  return {
+    judged: judged.length,
+    matched,
+    ready,
+    text: ready
+      ? `${matched} of ${judged.length} first answers you could work out matched the model.`
+      : judged.length === 0
+        ? 'No evidence yet. Make a few predictions and your profile will start to fill in.'
+        : `Still gathering evidence — ${plural(MIN_FIRST_ATTEMPTS - judged.length, 'more answer')} you can work out from the information given.`,
+    strength,
+    focus,
+  };
+}
+
+export function summariseTrend(evidence: readonly LearningAttempt[], now: number): TrendSummary {
+  const span = TREND_WINDOW_DAYS * 86_400_000;
+  const judged = judgedOf(evidence);
+  const count = (list: LearningAttempt[]): PeriodCount => ({ judged: list.length, matched: matchedOf(list) });
+  const recent = count(judged.filter((a) => a.lockedAt > now - span && a.lockedAt <= now));
+  const previous = count(judged.filter((a) => a.lockedAt > now - 2 * span && a.lockedAt <= now - span));
+  const weeks = TREND_WINDOW_DAYS / 7;
+  if (recent.judged < MIN_TREND_PERIOD || previous.judged < MIN_TREND_PERIOD) {
+    return {
+      ready: false,
+      days: TREND_WINDOW_DAYS,
+      recent,
+      previous,
+      direction: null,
+      text: `A trend appears once you have at least ${MIN_TREND_PERIOD} answers you could work out in each of two ${weeks}-week periods.`,
+    };
+  }
+  // Compare rates without division: recent.matched / recent.judged vs previous.matched / previous.judged.
+  const diff = recent.matched * previous.judged - previous.matched * recent.judged;
+  const direction = diff > 0 ? 'higher' : diff < 0 ? 'lower' : 'same';
+  return {
+    ready: true,
+    days: TREND_WINDOW_DAYS,
+    recent,
+    previous,
+    direction,
+    text: `Last ${weeks} weeks: ${recent.matched} of ${recent.judged} matched. The ${weeks} weeks before: ${previous.matched} of ${previous.judged}. Different questions each period, so treat it as a rough signal.`,
+  };
+}
+
 export function buildProfile(input: ProfileInput): Profile {
   const first = firstAttempts(input.attempts);
-  const skills = summariseSkills(first);
+  // Daily answers count as evidence about areas and confidence, never as lesson practice (see ProfileInput.daily).
+  const evidence = input.daily?.length ? [...first, ...input.daily].sort((a, b) => a.lockedAt - b.lockedAt) : first;
+  const skills = summariseSkills(evidence);
   const practice = summarisePractice(input.attempts, first);
-  const { primary, secondary } = pickInsights(candidateInsights(first, skills, practice), input.goal);
+  const { primary, secondary } = pickInsights(candidateInsights(evidence, skills, practice), input.goal);
   const tried = new Set(input.attempts.filter((a) => a.kind === 'challenge').map((a) => a.prediction));
   return {
     progress: {
@@ -421,11 +525,14 @@ export function buildProfile(input: ProfileInput): Profile {
       predictions: input.attempts.filter((a) => a.kind === 'lesson' || a.kind === 'scenario').length,
       challengesTried: tried.size,
       challengesTotal: allChallenges().length,
+      dailyCounted: input.daily?.length ?? 0,
     },
+    glance: summariseGlance(evidence, skills),
+    trend: summariseTrend(evidence, input.now ?? Date.now()),
     skills,
     primary,
     secondary,
-    confidence: summariseConfidence(first),
+    confidence: summariseConfidence(evidence),
     practice,
     next: nextStep(input, skills),
     goal: input.goal,

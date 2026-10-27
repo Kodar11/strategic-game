@@ -2,22 +2,34 @@ import { z } from 'zod';
 
 import { buildCatalog } from '../content/build.ts';
 import type { Catalog } from '../content/catalog.ts';
+import { type CategoryIndex, buildCategoryIndex } from '../content/categories.ts';
+import type { LessonMeta } from '../content/lessons.ts';
 import { type ProgressData, sanitizeProgress } from '../store/progress-state.ts';
 import type { ProgressChanges } from './changes.ts';
 import { DataError, toDataError } from './errors.ts';
 
 /**
  * Typed access to the database, one repository per concern. Screens and stores never issue queries: they call these.
- * Everything goes through three database functions (see supabase/migrations) so each read is one consistent snapshot
+ * Everything goes through database functions (see supabase/migrations) so each read is one consistent snapshot
  * and each write is one transaction:
  * - get_published_content()        the content catalog
+ * - get_lesson_categories()        lesson categories and each lesson's primary category
  * - get_my_progress()              the signed-in learner's progress
  * - apply_progress_changes(changes) one batch of progress changes
+ * - the Daily Challenge functions   see src/data/daily.ts
  *
  * `Rpc` is the only thing a repository needs, so tests run the repositories against the real SQL (PGlite).
  */
 
-export type RpcName = 'get_published_content' | 'get_my_progress' | 'apply_progress_changes';
+export type RpcName =
+  | 'get_published_content'
+  | 'get_lesson_categories'
+  | 'get_my_progress'
+  | 'apply_progress_changes'
+  | 'get_daily_challenges'
+  | 'submit_daily_challenge'
+  | 'check_daily_practice'
+  | 'get_daily_reveal';
 
 export interface Rpc {
   /** Resolve with the function's JSON result, or throw the database / network error. */
@@ -36,7 +48,7 @@ export interface ProgressRepository {
   apply(changes: ProgressChanges): Promise<{ skipped: number }>;
 }
 
-async function call(rpc: Rpc, fn: RpcName, args?: Record<string, unknown>): Promise<unknown> {
+export async function call(rpc: Rpc, fn: RpcName, args?: Record<string, unknown>): Promise<unknown> {
   try {
     return await rpc.call(fn, args);
   } catch (e) {
@@ -55,7 +67,22 @@ export function contentRepository(rpc: Rpc): ContentRepository {
   };
 }
 
-const applyResult = z.object({ ok: z.literal(true), skipped: z.number().int().nonnegative() });
+export interface CategoryRepository {
+  /** Categories checked against the installed lessons. Throws a DataError when the document is malformed. */
+  fetchCategories(lessons: readonly LessonMeta[]): Promise<{ index: CategoryIndex; warnings: string[] }>;
+}
+
+export function categoryRepository(rpc: Rpc): CategoryRepository {
+  return {
+    async fetchCategories(lessons) {
+      const built = buildCategoryIndex(await call(rpc, 'get_lesson_categories'), lessons);
+      if (!built.ok) throw new DataError('content', built.problems.join('\n'));
+      return { index: built.index, warnings: built.warnings };
+    },
+  };
+}
+
+const applyResult =z.object({ ok: z.literal(true), skipped: z.number().int().nonnegative() });
 
 export function progressRepository(rpc: Rpc): ProgressRepository {
   return {

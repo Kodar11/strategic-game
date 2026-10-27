@@ -216,8 +216,8 @@ function Formal({ spec, revealOpponent }: { spec: ScenarioSpec; revealOpponent: 
   );
 }
 
-/** The learner's move: a draft they can change freely until they commit it. */
-function Decision({ prompt, onCommit }: { prompt: DecisionPrompt; onCommit: (input: Input) => void }) {
+/** The learner's move: a draft they can change freely until they commit it. Also used by Daily Challenge scenarios. */
+export function Decision({ prompt, onCommit }: { prompt: DecisionPrompt; onCommit: (input: Input) => void }) {
   const [choice, setChoice] = useState<string | null>(null);
   const [num, setNum] = useState<number>(prompt.kind === 'number' ? prompt.initial : 0);
   const [alloc, setAlloc] = useState<number[]>(() =>

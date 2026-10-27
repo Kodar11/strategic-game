@@ -81,6 +81,9 @@ order by entity, action;
 
 -- Expect no rows: every structural rule holds.
 select * from content_admin.validate_content();
+
+-- Assign lesson categories to lessons that have none yet (never moves an existing assignment).
+select content_admin.seed_lesson_categories() as lesson_categories_assigned;
 `,
   );
   console.log(`wrote ${SEED_SQL} (${summary(c)})`);

@@ -46,7 +46,11 @@ export async function createDatabase({ seed = true }: { seed?: boolean } = {}): 
       throw new Error(`${file}: ${(e as Error).message}`);
     }
   }
-  if (seed) await importContent(db, seedDocument());
+  if (seed) {
+    await importContent(db, seedDocument());
+    // As seed.sql does: lessons arrive after the migrations, so their categories are assigned afterwards.
+    await db.query('select content_admin.seed_lesson_categories()');
+  }
   return db;
 }
 

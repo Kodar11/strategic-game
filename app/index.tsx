@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { ArrowRight, CircleCheck, Clock, Lock, Play, RotateCcw, Settings, Target, Trophy, UserRound } from '@/src/components/ui/icons';
+import { ArrowRight, CalendarDays, CircleCheck, Clock, Lock, Play, RotateCcw, Settings, Target, Trophy, UserRound } from '@/src/components/ui/icons';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +13,7 @@ import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Card';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
+import { type Category, type CategoryIndex, categoryProgress, lessonCategories, lessonsInCategory } from '@/src/content/categories';
 import { allLessons, type LessonId, type LessonMeta, allModules, type ModuleMeta } from '@/src/content/lessons';
 import { allAssessments, type Assessment, getAssessment, moduleCheckpoint, splitAssessmentTitle } from '@/src/features/assessments/content';
 import { type AssessmentRun, finalUnlocked } from '@/src/features/assessments/scoring';
@@ -35,8 +37,14 @@ export default function Home() {
   const runtime = useProgress((s) => s.runtime);
   const played = useProgress((s) => s.scenarioDone.length);
   const assessmentRuns = useProgress((s) => s.assessmentRuns);
+  // null = "All": the module view, exactly as before categories existed.
+  const [category, setCategory] = useState<string | null>(null);
+  const categories = lessonCategories();
 
   if (!hydrated) return <MessageScreen loading />;
+
+  const activeCategory = categories?.categories.find((c) => c.id === category) ?? null;
+  const categoryDone = activeCategory ? categoryProgress(categories!, allLessons(), completed).get(activeCategory.id) : undefined;
 
   // Resume the most recently touched unfinished lesson; otherwise suggest the first lesson not yet completed.
   const resume = allLessons().filter((l) => runtime[l.id] && runtime[l.id]!.step > 0).sort(
@@ -118,7 +126,7 @@ export default function Home() {
               onPress={() => router.push('/challenges')}
               accessibilityRole="button"
               accessibilityLabel={`Practice in new situations. ${played} of ${allScenarios().length} scenarios played. No lesson required.`}
-              style={({ pressed }) => [styles.practice, pressed && { backgroundColor: colors.surfaceHigh }]}>
+              style={({ pressed }) => [styles.practice, { marginBottom: space.md }, pressed && { backgroundColor: colors.surfaceHigh }]}>
               <View style={styles.practiceIcon}>
                 <Target size={20} color={colors.primaryText} strokeWidth={2.2} />
               </View>
@@ -132,6 +140,25 @@ export default function Home() {
             </Pressable>
           </Animated.View>
 
+          <Animated.View entering={enter(110)}>
+            <Pressable
+              onPress={() => router.push('/daily')}
+              accessibilityRole="button"
+              accessibilityLabel="Daily strategic challenge. One short decision a day, with a calendar of past challenges."
+              style={({ pressed }) => [styles.practice, pressed && { backgroundColor: colors.surfaceHigh }]}>
+              <View style={[styles.practiceIcon, { backgroundColor: colors.insightSoft }]}>
+                <CalendarDays size={20} color={colors.insight} strokeWidth={2.2} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="bodyStrong">Daily challenge</AppText>
+                <AppText variant="caption" color={colors.textMuted}>
+                  One short decision a day · calendar and past results
+                </AppText>
+              </View>
+              <ArrowRight size={18} color={colors.textMuted} />
+            </Pressable>
+          </Animated.View>
+
           <View style={styles.sectionHead}>
             <AppText variant="heading">Lessons</AppText>
             <AppText variant="small" color={colors.textMuted} tabular>
@@ -139,6 +166,16 @@ export default function Home() {
             </AppText>
           </View>
 
+          {categories ? <CategoryFilter index={categories} completed={completed} value={category} onChange={setCategory} /> : null}
+
+          {activeCategory ? (
+            <View style={{ gap: space.lg }}>
+              <CategoryHeader category={activeCategory} done={categoryDone?.done ?? 0} total={categoryDone?.total ?? 0} />
+              {lessonsInCategory(categories!, activeCategory.id, allLessons()).map((lesson) => (
+                <LessonCard key={lesson.id} lesson={lesson} done={completed.includes(lesson.id)} run={runtime[lesson.id]} />
+              ))}
+            </View>
+          ) : (
           <View style={{ gap: space.xxl }}>
             {allModules().map((m, mi) => (
               <Animated.View key={m.id} entering={enter(120 + mi * 60)} style={{ gap: space.lg }}>
@@ -151,6 +188,7 @@ export default function Home() {
             ))}
             <AssessmentCard a={getAssessment('final')!} run={assessmentRuns.final} locked={!finalUnlocked(assessmentRuns)} unlockedCount={allAssessments().filter((x) => x.id !== 'final' && (assessmentRuns[x.id]?.attempts ?? 0) > 0).length} final />
           </View>
+          )}
 
           <AppText variant="caption" color={colors.textFaint} align="center" style={{ marginTop: space.xxl }}>
             Simplified models of real situations. They sharpen how you reason — they don&apos;t predict everything.
@@ -171,6 +209,61 @@ function ModuleHeader({ module, done, total }: { module: ModuleMeta; done: numbe
       <AppText variant="small" color={colors.textMuted}>
         {module.objective}
       </AppText>
+    </View>
+  );
+}
+
+/**
+ * Browse by category. "All" is the module view (with checkpoints); a category lists its lessons in curriculum order.
+ * Counts are completed / total lessons in that category.
+ */
+function CategoryFilter({ index, completed, value, onChange }: { index: CategoryIndex; completed: readonly LessonId[]; value: string | null; onChange: (id: string | null) => void }) {
+  const progress = categoryProgress(index, allLessons(), completed);
+  const chips = [{ id: null, title: 'All', count: `${completed.length}/${allLessons().length}` }, ...index.categories.map((c) => ({ id: c.id, title: c.title, count: `${progress.get(c.id)!.done}/${progress.get(c.id)!.total}` }))];
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      accessibilityRole="tablist"
+      accessibilityLabel="Lesson categories"
+      style={{ marginHorizontal: -space.lg, marginBottom: space.lg }}
+      contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.sm }}>
+      {chips.map((c) => {
+        const on = c.id === value;
+        return (
+          <Pressable
+            key={c.id ?? 'all'}
+            onPress={() => onChange(c.id)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: on }}
+            accessibilityLabel={`${c.title}, ${c.count.replace('/', ' of ')} lessons complete`}
+            style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && !on && { backgroundColor: colors.surfaceHigh }]}>
+            <AppText variant="small" weight="semibold" color={on ? colors.text : colors.textBody}>
+              {c.title}
+            </AppText>
+            <AppText variant="caption" color={on ? colors.primaryText : colors.textMuted} tabular>
+              {c.count}
+            </AppText>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+function CategoryHeader({ category, done, total }: { category: Category; done: number; total: number }) {
+  return (
+    <View style={{ gap: space.xs }} accessibilityRole="header">
+      <AppText variant="overline" color={colors.primaryText}>
+        Category · {done}/{total} complete
+      </AppText>
+      <AppText variant="heading">{category.title}</AppText>
+      <AppText variant="small" color={colors.textMuted}>
+        {category.description}
+      </AppText>
+      <View style={[styles.miniTrack, { flex: 0, marginTop: space.xs }]}>
+        <View style={[styles.miniFill, { width: `${total ? (done / total) * 100 : 0}%` }]} />
+      </View>
     </View>
   );
 }
@@ -372,6 +465,18 @@ const styles = StyleSheet.create({
     paddingBottom: space.lg,
     paddingTop: space.xs,
   },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 40,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  chipOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   miniTrack: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.surfaceHigh, overflow: 'hidden' },
   miniFill: { height: '100%', backgroundColor: colors.primary, borderRadius: 2 },
 });

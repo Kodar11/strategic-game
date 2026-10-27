@@ -165,7 +165,7 @@ describe('Strategic Thinking Profile', () => {
 
   it('a new user gets honest empty states and a first lesson to try', () => {
     const p = buildProfile(empty);
-    assert.deepEqual(p.progress, { completed: 0, total: 22, inProgress: 0, predictions: 0, challengesTried: 0, challengesTotal: 15 });
+    assert.deepEqual(p.progress, { completed: 0, total: 22, inProgress: 0, predictions: 0, challengesTried: 0, challengesTotal: 15, dailyCounted: 0 });
     assert.equal(p.primary, null);
     assert.ok(p.skills.every((s) => s.status === 'not-started'));
     assert.equal(p.confidence.ready, false);

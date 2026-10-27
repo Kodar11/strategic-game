@@ -79,6 +79,8 @@ function AppStack({ reduced }: { reduced: boolean }) {
       <Stack.Screen name="challenges/[lessonId]" />
       <Stack.Screen name="scenario/[scenarioId]" />
       <Stack.Screen name="checkpoint/[assessmentId]" />
+      <Stack.Screen name="daily" />
+      <Stack.Screen name="daily/play" />
       <Stack.Screen name="settings" options={{ presentation: 'modal', animation: reduced ? 'fade' : 'slide_from_bottom' }} />
     </Stack>
   );
