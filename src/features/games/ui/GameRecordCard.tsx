@@ -15,8 +15,8 @@ import { colors, space } from '@/src/theme/tokens';
 const OUTCOME = { win: 'Won', loss: 'Lost', draw: 'Drew' } as const;
 
 /**
- * The player's game record inside the Thinking Profile: competitive standing, last weekly result and recent games.
- * Kept visibly apart from the learning measures — points come from weekly placings, not from reasoning in lessons —
+ * The player's game record at the foot of the Thinking Profile: competitive standing, last weekly result and recent
+ * games. Visually secondary to, and kept apart from, the learning measures — points come from weekly placings, not from reasoning in lessons —
  * and it draws no conclusions about strengths from a handful of matches.
  */
 export function GameRecordCard() {
@@ -35,7 +35,7 @@ export function GameRecordCard() {
         <SectionLabel>Games · competitive record</SectionLabel>
       </View>
       <AppText variant="caption" color={colors.textMuted}>
-        Separate from everything above: game points come from Game of the Week placings, not from your lesson answers.
+        Separate from your learning profile: points come from Game of the Week placings, not lesson answers.
       </AppText>
 
       {mine.status === 'loading' || mine.status === 'idle' ? (
@@ -125,7 +125,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
       <AppText variant="caption" color={colors.textMuted}>
         {label}
       </AppText>
-      <AppText variant="heading" tabular>
+      <AppText variant="bodyStrong" tabular>
         {value}
         {sub ? (
           <AppText variant="caption" color={colors.textMuted}>

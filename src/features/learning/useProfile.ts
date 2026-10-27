@@ -1,0 +1,28 @@
+import { useMemo } from 'react';
+
+import { allLessons } from '@/src/content/lessons';
+import { useDaily } from '@/src/data/daily-session';
+import { dailyEvidence } from '@/src/features/daily/evidence';
+import { useProgress } from '@/src/store/progress';
+import { buildProfile } from './profile';
+import { summariseProfile } from './summary';
+
+/**
+ * The Strategic Thinking Profile for the profile screens: built from the learning record, lesson progress and
+ * qualifying Daily Challenge answers (src/features/daily/evidence.ts). Nothing here is stored.
+ */
+export function useProfile() {
+  const hydrated = useProgress((s) => s.hydrated);
+  const learning = useProgress((s) => s.learning);
+  const completed = useProgress((s) => s.completed);
+  const runtime = useProgress((s) => s.runtime);
+  const goal = useProgress((s) => s.goal);
+  const dailyHistory = useDaily((s) => s.history);
+
+  const inProgress = useMemo(() => allLessons().filter((l) => (runtime[l.id]?.step ?? 0) > 0).map((l) => l.id), [runtime]);
+  const daily = useMemo(() => (dailyHistory ? dailyEvidence(dailyHistory) : []), [dailyHistory]);
+  const profile = useMemo(() => buildProfile({ attempts: learning, completed, inProgress, goal, daily }), [learning, completed, inProgress, goal, daily]);
+  const summary = useMemo(() => summariseProfile(profile, completed), [profile, completed]);
+
+  return { hydrated, profile, summary, attempts: learning, completed, goal };
+}

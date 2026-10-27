@@ -8,6 +8,8 @@ The app keeps a small **learning record**: one entry per submitted answer, from 
 |---|---|
 | `src/features/learning/records.ts` | Record types, the lesson prediction catalogue (`PREDICTIONS`), attempt numbering, validation and upgrade, deduplication, goal, export format. |
 | `src/features/learning/profile.ts` | Every profile rule: skills, insights, confidence, first tries, practice, transfer, next step. |
+| `src/features/learning/evidence-policy.ts` | Every profile threshold, and the evidence levels (`none` / `activity` / `tentative` / `established`). |
+| `src/features/learning/summary.ts` | What the profile screens show, chosen from the profile: snapshot, one observation, explored areas, which report sections appear, one area in detail. |
 | `src/features/challenges/content.ts` | Types and accessors for the 15 practice challenges and the per-lesson concept reviews. The challenges themselves are content in Supabase (`content_challenges`, `content_challenge_options`, `content_concept_reviews`). |
 | `src/features/challenges/progress.ts` | Challenge drafts, the atomic submit, retry, resume and summary rules. |
 | `src/features/learning/shareFile.ts` / `.web.ts` | Writing and sharing the export file (native share sheet / browser download). |
@@ -74,6 +76,36 @@ There are three challenges per lesson, 15 in all. Each has a short scenario, one
 |---|---|---|
 | `calculable` | The answer follows from the information given: all lesson predictions except the two below, and 14 of the 15 challenges | Yes |
 | `uncertain` | It depends on something unknowable: `l2.crowd`, `l3.round1`, and the challenge `l2.c1.crowded-cafe` | No. Recorded and exported, never counted as evidence of good or poor reasoning |
+
+## Profile screens
+
+The profile has three layers:
+
+1. **The glance** (`app/(tabs)/profile.tsx`) has three parts:
+   - a learning snapshot: the learner's curriculum position, the areas explored and lessons completed, plus "N of M first attempts matched" once there are 4 or more;
+   - at most one observation;
+   - one next step, with the optional goal as an inline control.
+2. **What you're exploring** lists only the areas with activity. Each row shows a raw count and its evidence level in words, and opens `app/report/[skill].tsx`. That screen lists the first attempts behind the area, the retries (which are not counted), and the lessons that practise it.
+3. **View detailed report** (`app/report.tsx`) has these sections:
+   - learning activity;
+   - first attempts;
+   - learning after feedback;
+   - applying ideas to new situations;
+   - confidence and outcomes;
+   - over time;
+   - areas and their lessons.
+
+   A section appears only when its threshold below is met. It is left out, not shown empty. The existing insights appear inside the section they are about.
+
+**Evidence levels for a skill area:**
+
+| Level | First attempts | What it shows |
+|---|---|---|
+| `activity` | 0–1 | Raw counts only |
+| `tentative` | 2–4 | One cautious observation ("An encouraging start" / "Still exploring …"), with its sample size |
+| `established` | 5+ | A plainer description. From 5, one different answer moves the rate by 20 points or less. |
+
+The observation prefers an encouraging pattern (the existing `isStrong` rule). It also prefers an area other than the one the next step practises, so the two never repeat each other. The game record stays at the foot of the profile and never feeds any learning measure.
 
 ## Profile rules (summary)
 

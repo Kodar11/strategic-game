@@ -1,6 +1,7 @@
 import { allLessons, type LessonId } from '../../content/lessons.ts';
 import { allChallenges } from '../challenges/content.ts';
 import { allScenarios } from '../scenarios/index.ts';
+import { EVIDENCE } from './evidence-policy.ts';
 import { allGoals, type GoalId, type LearningAttempt, allPredictionMeta, allSkills, type SkillArea, firstAttempts } from './records.ts';
 
 /**
@@ -14,22 +15,23 @@ import { allGoals, type GoalId, type LearningAttempt, allPredictionMeta, allSkil
  * - There is no overall score.
  */
 
+// The thresholds live in evidence-policy.ts; these names are kept for the rules below and existing callers.
 /** First answers needed in an area before saying anything about it. */
-export const MIN_AREA_EVIDENCE = 2;
+export const MIN_AREA_EVIDENCE = EVIDENCE.area.tentative;
 /** First answers needed in a confidence group before comparing it with results. */
-export const MIN_CONFIDENCE_GROUP = 3;
+export const MIN_CONFIDENCE_GROUP = EVIDENCE.confidence.group;
 /** Calculable first answers needed before the confidence section appears at all. */
-export const MIN_CONFIDENCE_TOTAL = 4;
+export const MIN_CONFIDENCE_TOTAL = EVIDENCE.confidence.total;
 /** Calculable first answers needed before summarising first tries. */
-export const MIN_FIRST_ATTEMPTS = 4;
+export const MIN_FIRST_ATTEMPTS = EVIDENCE.firstAttempts.tentative;
 /** Retried questions (first answer not matching, same content version) needed before summarising practice. */
-export const MIN_RETRIED = 2;
+export const MIN_RETRIED = EVIDENCE.retried;
 /** Different challenges for one concept needed before saying anything about transfer. */
-export const MIN_TRANSFER_SCENARIOS = 2;
+export const MIN_TRANSFER_SCENARIOS = EVIDENCE.transfer;
 /** Length of each period the trend compares (the latest one and the one before it). */
-export const TREND_WINDOW_DAYS = 28;
+export const TREND_WINDOW_DAYS = EVIDENCE.trend.windowDays;
 /** Calculable first answers needed in *each* period before comparing them. */
-export const MIN_TREND_PERIOD = 5;
+export const MIN_TREND_PERIOD = EVIDENCE.trend.perPeriod;
 
 export interface ProfileInput {
   attempts: readonly LearningAttempt[];
@@ -151,6 +153,10 @@ export interface Profile {
   skills: SkillSummary[];
   primary: Insight | null;
   secondary: Insight | null;
+  /** Every insight that applies: goal-related first, then the fixed priority order (`primary` is the first). */
+  insights: Insight[];
+  /** What every measure is derived from: first attempts plus qualifying daily answers, oldest first. */
+  evidence: LearningAttempt[];
   confidence: ConfidenceSummary;
   practice: PracticeSummary;
   next: NextStep;
@@ -159,7 +165,7 @@ export interface Profile {
 
 const lessonTitle = (id: LessonId) => allLessons().find((l) => l.id === id)!.title;
 /** How each area reads inside a sentence. */
-const TOPIC: Record<SkillArea, string> = {
+export const TOPIC: Record<SkillArea, string> = {
   anticipating: 'anticipating others',
   incentives: 'incentives',
   coordination: 'coordination',
@@ -179,8 +185,8 @@ export function latestAttempts(attempts: readonly LearningAttempt[]): LearningAt
 
 const judgedOf = (attempts: readonly LearningAttempt[]) => attempts.filter((a) => a.basis === 'calculable');
 const matchedOf = (attempts: readonly LearningAttempt[]) => attempts.filter((a) => a.evaluation === 'correct').length;
-const isWeak = (s: SkillSummary) => s.judged >= MIN_AREA_EVIDENCE && s.matched * 2 <= s.judged;
-const isStrong = (s: SkillSummary, min = MIN_AREA_EVIDENCE) => s.judged >= min && s.matched * 4 >= s.judged * 3;
+export const isWeak = (s: SkillSummary) => s.judged >= MIN_AREA_EVIDENCE && s.matched * 2 <= s.judged;
+export const isStrong = (s: SkillSummary, min: number = MIN_AREA_EVIDENCE) => s.judged >= min && s.matched * 4 >= s.judged * 3;
 
 const challengesOf = (lesson: LessonId) => allChallenges().filter((c) => c.lesson === lesson);
 const untriedChallenges = (lesson: LessonId, attempts: readonly LearningAttempt[]) =>
@@ -396,8 +402,11 @@ function mainSkill(lesson: LessonId): SkillArea {
 }
 
 /** Insights about the learner's chosen goal come first; otherwise the fixed priority order above holds. */
+const orderInsights = (candidates: readonly Insight[], goal: GoalId | null) =>
+  goal && goal !== 'none' ? [...candidates.filter((c) => c.skill === goal), ...candidates.filter((c) => c.skill !== goal)] : [...candidates];
+
 export function pickInsights(candidates: readonly Insight[], goal: GoalId | null): { primary: Insight | null; secondary: Insight | null } {
-  const ordered = goal && goal !== 'none' ? [...candidates.filter((c) => c.skill === goal), ...candidates.filter((c) => c.skill !== goal)] : [...candidates];
+  const ordered = orderInsights(candidates, goal);
   const primary = ordered[0] ?? null;
   // A secondary insight must add something: a different kind of observation about areas the primary didn't mention.
   const secondary = primary
@@ -515,7 +524,8 @@ export function buildProfile(input: ProfileInput): Profile {
   const evidence = input.daily?.length ? [...first, ...input.daily].sort((a, b) => a.lockedAt - b.lockedAt) : first;
   const skills = summariseSkills(evidence);
   const practice = summarisePractice(input.attempts, first);
-  const { primary, secondary } = pickInsights(candidateInsights(evidence, skills, practice), input.goal);
+  const candidates = candidateInsights(evidence, skills, practice);
+  const { primary, secondary } = pickInsights(candidates, input.goal);
   const tried = new Set(input.attempts.filter((a) => a.kind === 'challenge').map((a) => a.prediction));
   return {
     progress: {
@@ -532,6 +542,8 @@ export function buildProfile(input: ProfileInput): Profile {
     skills,
     primary,
     secondary,
+    insights: orderInsights(candidates, input.goal),
+    evidence,
     confidence: summariseConfidence(evidence),
     practice,
     next: nextStep(input, skills),
