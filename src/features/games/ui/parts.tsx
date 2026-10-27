@@ -84,10 +84,11 @@ export function trackDescription(marks: TrackMark[]): string {
   return `Rounds so far: ${w} won, ${l} lost, ${d} even.`;
 }
 
-export function OpponentBadges({ game, bot, difficulty, mode }: { game: GameId; bot: string; difficulty: Difficulty; mode?: 'practice' | 'competition' | 'challenge' }) {
+/** `hidden`: a mystery opponent, not yet revealed — its name is never shown or read out. */
+export function OpponentBadges({ game, bot, difficulty, mode, hidden }: { game: GameId; bot: string; difficulty: Difficulty; mode?: 'practice' | 'competition' | 'challenge'; hidden?: boolean }) {
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}>
-      <Badge label={personality(game, bot)?.name ?? bot} tone="orange" />
+      <Badge label={hidden ? 'Mystery opponent' : (personality(game, bot)?.name ?? bot)} tone="orange" />
       <Badge label={DIFFICULTY_LABEL[difficulty]} />
       {mode === 'competition' ? <Badge label="Game of the Week" tone="amber" /> : mode === 'challenge' ? <Badge label="Friend challenge" tone="cyan" /> : <Badge label="Practice" tone="blue" />}
     </View>

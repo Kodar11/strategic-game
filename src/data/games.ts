@@ -184,7 +184,21 @@ const myGamesSchema = z.object({
   nickname,
   standing: z.object({ rank: z.number().int(), points: z.number().int(), wins: z.number().int(), weeks: z.number().int(), players: z.number().int() }).nullable(),
   weeks: z.array(z.object({ competitionId: z.string(), game: gameId, endsAt: z.number(), rank: z.number().int(), field: z.number().int(), score: z.number().int(), points: z.number().int(), isWinner: z.boolean() })),
-  practice: z.array(z.object({ game: gameId, bot: z.string(), difficulty, playerScore: z.number().int(), botScore: z.number().int(), outcome, playedAt: z.number() })),
+  // opponent / prediction / insightPoints: Rock, Paper, Scissors reads (…_rps_opponent_reads.sql); absent on older servers.
+  practice: z.array(
+    z.object({
+      game: gameId,
+      bot: z.string(),
+      difficulty,
+      playerScore: z.number().int(),
+      botScore: z.number().int(),
+      outcome,
+      playedAt: z.number(),
+      opponent: z.enum(['mystery', 'chosen']).nullable().optional(),
+      prediction: z.string().nullable().optional(),
+      insightPoints: z.number().int().nullable().optional(),
+    }),
+  ),
   matches: z.array(z.object({ id: z.string(), kind: z.enum(['competition', 'challenge']), game: gameId, bot: z.string(), difficulty, playerScore: z.number().int(), botScore: z.number().int(), outcome: outcome.nullable(), competitionId: z.string().nullable(), completedAt: z.number().nullable() })),
 });
 export type MyGames = z.infer<typeof myGamesSchema>;
@@ -197,6 +211,10 @@ export interface PracticeRecord {
   playerScore: number;
   botScore: number;
   outcome: 'win' | 'loss' | 'draw';
+  /** Rock, Paper, Scissors: a hidden (mystery) or chosen opponent, the player's locked read of it, and the Insight Points it earned. */
+  opponent?: 'mystery' | 'chosen';
+  prediction?: string | null;
+  insightPoints?: number | null;
 }
 
 // ── Repository ───────────────────────────────────────────────────────────────

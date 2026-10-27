@@ -8,13 +8,16 @@ import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
-import { ArrowLeft, ChevronDown, Play, UserPlus } from '@/src/components/ui/icons';
+import { ArrowLeft, ChevronDown, CircleCheck, CircleX, Play, Target, UserPlus } from '@/src/components/ui/icons';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { Segmented } from '@/src/components/ui/Segmented';
 import { gamesRepo, useGames } from '@/src/data/games-session';
 import { DIFFICULTY_HINT, DIFFICULTY_LABEL, GAMES, personality } from '@/src/games/catalog';
 import { DIFFICULTIES, type Difficulty, GAME_IDS, isGameId } from '@/src/games/core';
 import { inviteText } from '@/src/games/share-text';
+import { RPS_BOTS } from '@/src/games/rps';
+import { MYSTERY_NAME } from '@/src/games/rps-insight';
+import { type HistoryItem, ago, opponentHistory } from '@/src/features/games/history';
 import { useSeenRules } from '@/src/features/games/seen';
 import { challengeLink, inviteFailure, shareResultMessage, shareText } from '@/src/features/games/share';
 import { GameArt } from '@/src/features/games/ui/GameArt';
@@ -40,7 +43,9 @@ export default function GameScreen() {
   const mine = useGames((s) => s.mine);
   const loadMine = useGames((s) => s.loadMine);
   const valid = isGameId(gameId);
-  const [bot, setBot] = useState<string>(valid ? GAMES[gameId].personalities[0].id : '');
+  // Rock, Paper, Scissors starts with a mystery opponent (null); the other games with their first personality.
+  const [bot, setBot] = useState<string | null>(valid && gameId !== 'rps' ? GAMES[gameId].personalities[0].id : null);
+  const [chooseOpen, setChooseOpen] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [rulesOpen, setRulesOpen] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -61,18 +66,25 @@ export default function GameScreen() {
   const showRules = firstTime || rulesOpen;
   const close = () => (router.canGoBack() ? router.back() : router.replace('/games'));
 
+  const mystery = bot === null;
   const play = () => {
     markSeen(gameId);
-    router.push({ pathname: '/games/play', params: { game: gameId, bot, difficulty } });
+    router.push({ pathname: '/games/play', params: mystery ? { game: gameId, opponent: 'mystery', difficulty } : { game: gameId, bot, difficulty } });
+  };
+  const practise = (h: HistoryItem) => {
+    markSeen(gameId);
+    router.push({ pathname: '/games/play', params: { game: gameId, bot: h.bot, difficulty: h.difficulty } });
   };
 
   const invite = async () => {
     setInviting(true);
     setNote(null);
     try {
-      const c = await gamesRepo.createChallenge(gameId, bot, difficulty);
+      // A friend challenge always names its opponent; from the mystery setting it gets a random one.
+      const opponent = bot ?? RPS_BOTS[Math.floor(Math.random() * RPS_BOTS.length)];
+      const c = await gamesRepo.createChallenge(gameId, opponent, difficulty);
       const link = challengeLink(c.token);
-      const message = inviteText(gameId, bot, difficulty, null);
+      const message = inviteText(gameId, opponent, difficulty, null);
       setNote(shareResultMessage(await shareText(message, link), 'invite', `${message}\n${link}`) ?? 'Each of you plays your own match on the same draws; compare when you’re both done. Play it yourself from the link too.');
     } catch (e) {
       setNote(inviteFailure(e));
@@ -81,8 +93,9 @@ export default function GameScreen() {
     }
   };
 
+  const opponents = gameId === 'rps' && mine.status === 'ready' ? opponentHistory(mine.data, gameId) : [];
   const history =
-    mine.status === 'ready'
+    gameId !== 'rps' && mine.status === 'ready'
       ? [...mine.data.practice.map((p) => ({ ...p, at: p.playedAt, kind: 'practice' as const })), ...mine.data.matches.map((m) => ({ ...m, at: m.completedAt ?? 0 }))]
           .filter((r) => r.game === gameId)
           .sort((a, b) => b.at - a.at)
@@ -140,12 +153,46 @@ export default function GameScreen() {
             )}
           </Card>
 
-          <View style={{ gap: space.sm }}>
-            <SectionLabel>{gameId === 'two-thirds' ? 'Who’s in the crowd' : 'Your opponent'}</SectionLabel>
-            {g.personalities.map((p) => (
-              <ChoiceCard key={p.id} compact title={p.name} description={p.summary} selected={bot === p.id} onSelect={() => setBot(p.id)} tone="orange" />
-            ))}
-          </View>
+          {gameId === 'rps' ? (
+            <View style={{ gap: space.sm }}>
+              <SectionLabel>Your opponent</SectionLabel>
+              <ChoiceCard
+                compact
+                title={MYSTERY_NAME}
+                description="One of the four personalities, hidden until the match ends. Spot its habit — and name it for Insight Points."
+                selected={mystery}
+                onSelect={() => setBot(null)}
+                tone="orange"
+              />
+              <Pressable
+                onPress={() => setChooseOpen((v) => !v)}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: chooseOpen }}
+                style={{ flexDirection: 'row', alignItems: 'center', minHeight: 36 }}>
+                <AppText variant="small" weight="semibold" color={colors.primaryText} style={{ flex: 1 }}>
+                  Choose a specific opponent
+                </AppText>
+                <ChevronDown size={18} color={colors.textMuted} style={{ transform: [{ rotate: chooseOpen ? '180deg' : '0deg' }] }} />
+              </Pressable>
+              {chooseOpen ? (
+                <>
+                  <AppText variant="caption" color={colors.textMuted}>
+                    Deliberate practice: you know who you face, so there’s no read to make.
+                  </AppText>
+                  {g.personalities.map((p) => (
+                    <ChoiceCard key={p.id} compact title={p.name} description={p.summary} selected={bot === p.id} onSelect={() => setBot(p.id)} tone="orange" />
+                  ))}
+                </>
+              ) : null}
+            </View>
+          ) : (
+            <View style={{ gap: space.sm }}>
+              <SectionLabel>{gameId === 'two-thirds' ? 'Who’s in the crowd' : 'Your opponent'}</SectionLabel>
+              {g.personalities.map((p) => (
+                <ChoiceCard key={p.id} compact title={p.name} description={p.summary} selected={bot === p.id} onSelect={() => setBot(p.id)} tone="orange" />
+              ))}
+            </View>
+          )}
 
           <View style={{ gap: space.xs }}>
             <Segmented label="Difficulty" options={DIFFICULTIES.map((d) => ({ value: d, label: DIFFICULTY_LABEL[d] }))} value={difficulty} onChange={setDifficulty} tone="orange" />
@@ -154,13 +201,15 @@ export default function GameScreen() {
             </AppText>
           </View>
 
-          <Button label={`Play vs ${personality(gameId, bot)?.name ?? bot}`} icon={Play} onPress={play} />
+          <Button label={bot === null ? `Play vs a ${MYSTERY_NAME.toLowerCase()}` : `Play vs ${personality(gameId, bot)?.name ?? bot}`} icon={Play} onPress={play} />
           <Button label={inviting ? 'Creating link…' : 'Challenge a friend to this'} variant="secondary" icon={UserPlus} iconPosition="left" disabled={inviting} onPress={() => void invite()} />
           {note ? (
             <AppText variant="small" color={colors.textMuted} selectable accessibilityLiveRegion="polite">
               {note}
             </AppText>
           ) : null}
+
+          {opponents.length ? <OpponentHistory items={opponents} onPractise={practise} /> : null}
 
           {history.length ? (
             <Card style={{ gap: space.xs }}>
@@ -184,6 +233,62 @@ export default function GameScreen() {
         </View>
       </ScrollView>
     </View>
+  );
+}
+
+/** Rock, Paper, Scissors: recent opponents — revealed, since these games are over — with a quick rematch. */
+function OpponentHistory({ items, onPractise }: { items: HistoryItem[]; onPractise: (h: HistoryItem) => void }) {
+  const [now] = useState(() => Date.now());
+  return (
+    <Card style={{ gap: space.xs }}>
+      <SectionLabel>Opponent history</SectionLabel>
+      {items.map((h, i) => {
+        const name = personality('rps', h.bot)?.name ?? h.bot;
+        const tag = { mystery: 'Mystery', chosen: 'Chosen', practice: 'Practice', competition: 'Weekly', challenge: 'Challenge' }[h.kind];
+        return (
+          <View key={i} style={[styles.hist, { flexWrap: 'wrap' }]}>
+            <View style={{ flex: 1, minWidth: 180, gap: 2 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
+                <AppText variant="small" weight="semibold" color={h.outcome === 'win' ? colors.success : h.outcome === 'loss' ? colors.rivalText : colors.textBody}>
+                  {h.outcome ? OUTCOME[h.outcome] : '—'} {h.playerScore}–{h.botScore}
+                </AppText>
+                <AppText variant="small" color={colors.textBody} numberOfLines={1} style={{ flexShrink: 1 }}>
+                  vs {name}
+                </AppText>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
+                <AppText variant="caption" color={colors.textMuted}>
+                  {DIFFICULTY_LABEL[h.difficulty]} · {tag} · {ago(h.at, now)}
+                </AppText>
+                {h.read ? (
+                  h.read.correct ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }} accessible accessibilityLabel={`Read right, plus ${h.read.points} Insight Points`}>
+                      <CircleCheck size={12} color={colors.success} />
+                      <AppText variant="caption" color={colors.success}>
+                        +{h.read.points}
+                      </AppText>
+                    </View>
+                  ) : (
+                    <View accessible accessibilityLabel="Read missed">
+                      <CircleX size={12} color={colors.textMuted} />
+                    </View>
+                  )
+                ) : null}
+              </View>
+            </View>
+            <Button
+              label="Practise again"
+              variant="ghost"
+              compact
+              icon={Target}
+              iconPosition="left"
+              onPress={() => onPractise(h)}
+              accessibilityHint={`A practice match against ${name}, ${DIFFICULTY_LABEL[h.difficulty]}`}
+            />
+          </View>
+        );
+      })}
+    </Card>
   );
 }
 

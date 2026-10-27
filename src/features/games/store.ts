@@ -91,7 +91,7 @@ export function createGamesStore(repo: GamesRepository, now: () => number = Date
             await repo.recordPractice(r);
             const mine = get().mine;
             if (mine.status === 'ready') {
-              const entry = { game: r.game, bot: r.bot, difficulty: r.difficulty, playerScore: r.playerScore, botScore: r.botScore, outcome: r.outcome, playedAt: now() };
+              const entry = { game: r.game, bot: r.bot, difficulty: r.difficulty, playerScore: r.playerScore, botScore: r.botScore, outcome: r.outcome, playedAt: now(), opponent: r.opponent ?? null, prediction: r.prediction ?? null, insightPoints: r.insightPoints ?? null };
               set({ mine: { ...mine, data: { ...mine.data, practice: [entry, ...mine.data.practice].slice(0, 30) } } });
             }
             return;

@@ -26,6 +26,11 @@ export interface RpsRound {
 
 export const RPS_ROUNDS = 12;
 export const RPS_POINTS = { win: 3, tie: 1, loss: 0 } as const;
+/**
+ * "Read your opponent" (mystery practice only): one prediction of the hidden personality, allowed once `minRounds`
+ * rounds are played. A correct read earns `points` Insight Points — kept apart from match points, never deducted.
+ */
+export const RPS_INSIGHT = { points: 3, minRounds: 4 } as const;
 
 const idx = (m: RpsMove) => RPS_MOVES.indexOf(m);
 /** The move that beats `m`. */
@@ -54,10 +59,15 @@ export const RPS_CONFIG = {
   randomizer: { easy: { noise: 0 }, medium: { noise: 0 }, hard: { noise: 0 } },
 } as const;
 
+/** Every move with the highest count in [rock, paper, scissors]. */
+function tiedBest(counts: readonly number[]): RpsMove[] {
+  const best = Math.max(...counts);
+  return RPS_MOVES.filter((_, i) => counts[i] === best);
+}
+
 /** The most likely move from weighted counts [rock, paper, scissors]; ties broken at random with draw k = 2. */
 function argmax(counts: readonly number[], seed: number, round: number): RpsMove {
-  const best = Math.max(...counts);
-  const tied = RPS_MOVES.filter((_, i) => counts[i] === best);
+  const tied = tiedBest(counts);
   return tied.length === 1 ? tied[0] : tied[Math.floor(draw(seed, round, 2) * tied.length)];
 }
 
@@ -139,6 +149,38 @@ export function rpsBotMove(spec: MatchSpec<RpsBot>, history: readonly RpsRound[]
       }
       return randomMove(u);
     }
+  }
+}
+
+/**
+ * What the bot's rule — without noise — throws for round `history.length`: every move it could pick (more than one
+ * when its counts tie), or null when the rule makes no prediction (a predictor's warm-up, or a Randomizer). Mirrors
+ * rpsBotMove; the result screen uses it to show evidence from the recorded throws.
+ */
+export function rpsRuleMoves(bot: RpsBot, difficulty: MatchSpec['difficulty'], history: readonly RpsRound[]): RpsMove[] | null {
+  const round = history.length;
+  const last = history[round - 1];
+  switch (bot) {
+    case 'repeater': {
+      if (!last) return ['rock'];
+      if (difficulty === 'easy') return [last.b];
+      const prev = history[round - 2];
+      if (difficulty === 'hard' && last.r === 1 && prev?.r === 1) return [last.p];
+      return [last.r === 1 ? beats(last.p) : last.b];
+    }
+    case 'counter': {
+      const c = RPS_CONFIG.counter[difficulty];
+      if (round < c.minHistory) return null;
+      return tiedBest(frequency(history, c.window, c.weighted)).map(beats);
+    }
+    case 'mind-reader': {
+      const c = RPS_CONFIG['mind-reader'][difficulty];
+      if (round < c.minHistory) return null;
+      const counts = (c.order2 ? transitions(history, 2) : null) ?? transitions(history, 1) ?? frequency(history, 0, false);
+      return tiedBest(counts).map(beats);
+    }
+    case 'randomizer':
+      return null;
   }
 }
 

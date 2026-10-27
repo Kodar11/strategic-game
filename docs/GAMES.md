@@ -53,6 +53,26 @@ Each bot's exact policy per difficulty is documented on its function (`rpsBotMov
 - **No guaranteed outcomes.** Tests check no RPS difficulty wins every match, and that the best Split or Steal reply
   depends on the opponent.
 
+## Rock, Paper, Scissors: reading the opponent
+
+Pure logic in `src/games/rps-insight.ts`; the bot policies in `rps.ts` are unchanged (rules version 1, SQL parity).
+
+- **Mystery opponent by default.** Practice from the game screen starts with `opponent=mystery`: the device picks one of
+  the four personalities and hides it (name, badges, score bar, accessibility labels) until round 12 is played. "Choose
+  a specific opponent" expands the four personalities for deliberate practice. Difficulty is chosen separately.
+- **Repeat this throw.** Under the throw buttons: throws the last move once per remaining round after a short reveal
+  pause (`useRepeatThrow`, `RepeatThrow`), through the match's own `play`. "Change" or any throw cancels it.
+- **Read your opponent.** In a mystery match, after `RPS_INSIGHT.minRounds` rounds, one prediction that locks on submit.
+  If none was made by round 12, the match pauses before the reveal (`awaitingRead`): predict now, or see the results.
+  A right read earns `RPS_INSIGHT.points` Insight Points; a wrong one costs nothing. Match points never change. The
+  options describe each personality at the match's difficulty (`RPS_READS`) and must stay true to `rpsBotMove`.
+- **Reveal.** The result screen shows match performance (score, round-by-round) apart from insight: the read, Insight
+  Points, the revealed personality and difficulty, evidence counted from the recorded throws (`ruleFit`, via
+  `rpsRuleMoves`, the noise-free rule) and one takeaway.
+- **Opponent history** on the game screen is derived from `get_my_games` (practice + server matches,
+  `src/features/games/history.ts`). Practice logs carry `opponent` (mystery | chosen), `prediction` and
+  `insightPoints` (migration `20261028120000_rps_opponent_reads.sql`); they're null for other games and older rows.
+
 ## Where a match runs
 
 | Mode | Runs | Seed | Counts for |

@@ -17,8 +17,23 @@ import type { MatchView } from '../useMatch';
 /**
  * The end of a match: outcome, score, opponent, a takeaway for this game, and Share / Play again / Invite. Inviting
  * creates a friend challenge on the server (same game, opponent and random draws) and shares its link.
+ * `detail` goes in the score card (match performance); `insight`, when given, replaces the generic takeaway.
  */
-export function ResultPanel({ view, onPlayAgain, playAgainLabel = 'Play again', children }: { view: MatchView; onPlayAgain?: () => void; playAgainLabel?: string; children?: React.ReactNode }) {
+export function ResultPanel({
+  view,
+  onPlayAgain,
+  playAgainLabel = 'Play again',
+  detail,
+  insight,
+  children,
+}: {
+  view: MatchView;
+  onPlayAgain?: () => void;
+  playAgainLabel?: string;
+  detail?: React.ReactNode;
+  insight?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
   const enter = useEnter();
   const [note, setNote] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -74,14 +89,17 @@ export function ResultPanel({ view, onPlayAgain, playAgainLabel = 'Play again', 
             You {view.totals.player} · {bot} {view.totals.bot}
           </AppText>
         ) : null}
+        {detail}
       </View>
 
-      <View style={{ flexDirection: 'row', gap: space.sm, padding: space.lg, borderRadius: radius.lg, backgroundColor: colors.insightSoft, borderWidth: 1, borderColor: 'rgba(253,186,116,0.35)' }}>
-        <Lightbulb size={18} color={colors.insight} strokeWidth={2.2} />
-        <AppText variant="small" color={colors.textBody} style={{ flex: 1 }}>
-          {takeaway(view.game, outcome, view.totals, view.totalRounds)}
-        </AppText>
-      </View>
+      {insight ?? (
+        <View style={{ flexDirection: 'row', gap: space.sm, padding: space.lg, borderRadius: radius.lg, backgroundColor: colors.insightSoft, borderWidth: 1, borderColor: 'rgba(253,186,116,0.35)' }}>
+          <Lightbulb size={18} color={colors.insight} strokeWidth={2.2} />
+          <AppText variant="small" color={colors.textBody} style={{ flex: 1 }}>
+            {takeaway(view.game, outcome, view.totals, view.totalRounds)}
+          </AppText>
+        </View>
+      )}
 
       {children}
 

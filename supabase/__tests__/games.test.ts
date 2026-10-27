@@ -539,6 +539,27 @@ describe('practice history', () => {
     assert.match((await rpcError(BOB, 'record_practice_game', { ...game, bot: undefined }))!, /games:invalid_request/);
     const g = await rpc(BOB, 'get_leaderboard', { scope: 'global' });
     assert.equal(g.me, null);
+    assert.equal(mine.practice[0].opponent, null);
+    assert.equal(mine.practice[0].prediction, null);
+  });
+
+  it('keeps Rock, Paper, Scissors mystery and chosen games apart, with the read and its Insight Points', async () => {
+    const base = { game: 'rps', bot: 'counter', difficulty: 'hard', playerScore: 18, botScore: 15, outcome: 'win' };
+    await rpc(CAROL, 'record_practice_game', { ...base, id: '6ec0bd7f-11c0-43da-975e-2a8ad9ebae0b', opponent: 'mystery', prediction: 'counter', insightPoints: 3 });
+    await rpc(CAROL, 'record_practice_game', { ...base, id: '7ec0bd7f-11c0-43da-975e-2a8ad9ebae0b', opponent: 'chosen' });
+    const practice = (await rpc(CAROL, 'get_my_games')).practice as { opponent: string; prediction: string | null; insightPoints: number | null }[];
+    assert.deepEqual(
+      practice.map((p) => [p.opponent, p.prediction, p.insightPoints]).sort(),
+      [
+        ['chosen', null, null],
+        ['mystery', 'counter', 3],
+      ],
+    );
+    const id = '8ec0bd7f-11c0-43da-975e-2a8ad9ebae0b';
+    assert.match((await rpcError(CAROL, 'record_practice_game', { ...base, id, opponent: 'secret' }))!, /games:invalid_request/);
+    assert.match((await rpcError(CAROL, 'record_practice_game', { ...base, id, opponent: 'chosen', prediction: 'counter' }))!, /games:invalid_request/);
+    assert.match((await rpcError(CAROL, 'record_practice_game', { ...base, id, opponent: 'mystery', prediction: 'fair' }))!, /games:invalid_request/);
+    assert.match((await rpcError(CAROL, 'record_practice_game', { ...base, id, opponent: 'mystery', insightPoints: 500 }))!, /games:invalid_request/);
   });
 });
 
@@ -567,10 +588,11 @@ describe('gamesRepository (src/data/games.ts) parses every server response', () 
     assert.deepEqual(cm.prompt, null);
     const u = await repo.startChallengeMatch((await repo.createChallenge('ultimatum', 'fair', 'easy')).token);
     assert.deepEqual(u.prompt, { role: 'propose' });
-    await repo.recordPractice({ id: '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed', game: 'rps', bot: 'counter', difficulty: 'easy', playerScore: 20, botScore: 14, outcome: 'win' });
+    await repo.recordPractice({ id: '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed', game: 'rps', bot: 'counter', difficulty: 'easy', playerScore: 20, botScore: 14, outcome: 'win', opponent: 'mystery', prediction: 'repeater', insightPoints: 0 });
     const mine = await repo.myGames();
     assert.equal(mine.nickname, 'Dave');
     assert.equal(mine.practice.length, 1);
+    assert.deepEqual([mine.practice[0].opponent, mine.practice[0].prediction, mine.practice[0].insightPoints], ['mystery', 'repeater', 0]);
   });
 
   it('turns server refusals into GameErrors the screens can explain', async () => {

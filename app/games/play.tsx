@@ -14,37 +14,58 @@ import { gamesRepo, useGames } from '@/src/data/games-session';
 import { GAMES, personality } from '@/src/games/catalog';
 import { type GameId, isDifficulty, isGameId } from '@/src/games/core';
 import { ENGINES } from '@/src/games/registry';
+import { MYSTERY_NAME } from '@/src/games/rps-insight';
+import type { RpsRound } from '@/src/games/rps';
 import { type MatchView, usePracticeMatch, useServerMatch } from '@/src/features/games/useMatch';
 import { Board } from '@/src/features/games/ui/Board';
 import { ordinal } from '@/src/games/competition';
 import { OpponentBadges, Panel, ScoreBar } from '@/src/features/games/ui/parts';
 import { ResultPanel } from '@/src/features/games/ui/ResultPanel';
+import { RpsReveal, RpsRounds } from '@/src/features/games/ui/RpsReveal';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
-type Params = { game?: string; bot?: string; difficulty?: string; mode?: string; competitionId?: string; token?: string; n?: string };
+type Params = { game?: string; bot?: string; difficulty?: string; opponent?: string; mode?: string; competitionId?: string; token?: string; n?: string };
 
 /**
- * Playing a match. Practice (`game`, `bot`, `difficulty`) runs on the device. `mode=competition` and
+ * Playing a match. Practice (`game`, `bot`, `difficulty`) runs on the device; Rock, Paper, Scissors with
+ * `opponent=mystery` instead of a bot picks a hidden opponent on the device, so it never appears in the URL. `mode=competition` and
  * `mode=challenge` start — or resume — a match on the server, which decides the bot's moves and the score.
  */
 export default function PlayScreen() {
   const p = useLocalSearchParams<Params>();
   if (p.mode === 'competition' && p.competitionId) return <ServerLoader key={`c:${p.competitionId}:${p.n ?? ""}`} start={() => gamesRepo.startCompetitionMatch(p.competitionId!)} />;
   if (p.mode === 'challenge' && p.token) return <ServerLoader key={`t:${p.token}`} start={() => gamesRepo.startChallengeMatch(p.token!)} />;
-  if (!isGameId(p.game) || !isDifficulty(p.difficulty) || !p.bot || !ENGINES[p.game].bots.includes(p.bot)) {
+  const mystery = p.game === 'rps' && p.opponent === 'mystery';
+  if (!isGameId(p.game) || !isDifficulty(p.difficulty) || (!mystery && (!p.bot || !ENGINES[p.game].bots.includes(p.bot)))) {
     return <MessageScreen title="Game not found" body="That game, opponent or difficulty isn’t available." />;
   }
-  return <Practice game={p.game} bot={p.bot} difficulty={p.difficulty} />;
+  const bot = mystery ? null : p.bot!;
+  return <Practice key={`${p.game}:${bot ?? 'mystery'}:${p.difficulty}`} game={p.game} bot={bot} difficulty={p.difficulty} />;
 }
 
-function Practice({ game, bot, difficulty }: { game: GameId; bot: string; difficulty: 'easy' | 'medium' | 'hard' }) {
+/** `bot` null: a mystery opponent (Rock, Paper, Scissors). */
+function Practice({ game, bot, difficulty }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard' }) {
   const [round, setRound] = useState(0);
   return <PracticeSession key={round} game={game} bot={bot} difficulty={difficulty} onPlayAgain={() => setRound((n) => n + 1)} />;
 }
 
-function PracticeSession({ game, bot, difficulty, onPlayAgain }: { game: GameId; bot: string; difficulty: 'easy' | 'medium' | 'hard'; onPlayAgain: () => void }) {
+function PracticeSession({ game, bot, difficulty, onPlayAgain }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; onPlayAgain: () => void }) {
   const view = usePracticeMatch(game, bot, difficulty);
-  return <MatchLayout view={view} result={<ResultPanel view={view} onPlayAgain={onPlayAgain} />} />;
+  const practise = (b: string) => (bot === b ? onPlayAgain() : router.replace({ pathname: '/games/play', params: { game, bot: b, difficulty } }));
+  return (
+    <MatchLayout
+      view={view}
+      result={
+        <ResultPanel
+          view={view}
+          onPlayAgain={onPlayAgain}
+          playAgainLabel={view.opponent === 'mystery' ? 'Play again · new mystery bot' : 'Play again'}
+          detail={game === 'rps' ? <RpsRounds rounds={view.rounds as RpsRound[]} /> : undefined}
+          insight={game === 'rps' ? <RpsReveal view={view} onPractise={practise} /> : undefined}
+        />
+      }
+    />
+  );
 }
 
 function ServerLoader({ start }: { start: () => Promise<ServerMatch> }) {
@@ -100,7 +121,12 @@ function ServerSession({ match }: { match: ServerMatch }) {
     <MatchLayout
       view={view}
       result={
-        <ResultPanel view={view} onPlayAgain={again} playAgainLabel={view.mode === 'competition' ? 'Play again (uses an attempt)' : 'Practise against this bot'}>
+        <ResultPanel
+          view={view}
+          onPlayAgain={again}
+          playAgainLabel={view.mode === 'competition' ? 'Play again (uses an attempt)' : 'Practise against this bot'}
+          detail={view.game === 'rps' ? <RpsRounds rounds={view.rounds as RpsRound[]} /> : undefined}
+          insight={view.game === 'rps' ? <RpsReveal view={view} /> : undefined}>
           {extra}
         </ResultPanel>
       }
@@ -165,7 +191,8 @@ function ChallengeResult({ view, token }: { view: MatchView; token: string }) {
 function MatchLayout({ view, result }: { view: MatchView; result: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   const g = GAMES[view.game];
-  const botName = view.game === 'two-thirds' ? 'Bot rounds' : (personality(view.game, view.bot)?.name ?? view.bot);
+  const hidden = view.opponent === 'mystery' && !view.done;
+  const botName = view.game === 'two-thirds' ? 'Bot rounds' : hidden ? MYSTERY_NAME : (personality(view.game, view.bot)?.name ?? view.bot);
   const close = () => (router.canGoBack() ? router.back() : router.replace('/games'));
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -178,7 +205,7 @@ function MatchLayout({ view, result }: { view: MatchView; result: React.ReactNod
               {g.title}
             </AppText>
           </View>
-          <OpponentBadges game={view.game} bot={view.bot} difficulty={view.difficulty} mode={view.mode} />
+          <OpponentBadges game={view.game} bot={view.bot} difficulty={view.difficulty} mode={view.mode} hidden={hidden} />
           <ScoreBar you={view.totals.player} bot={view.totals.bot} botName={botName} round={view.rounds.length + (view.done ? 0 : 1)} total={view.totalRounds} />
           {view.mode !== 'practice' && !view.done ? (
             <AppText variant="caption" color={colors.textMuted}>

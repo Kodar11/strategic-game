@@ -1,12 +1,15 @@
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { AppText } from '@/src/components/ui/AppText';
-import { Hand, HandFist, type LucideIcon, Scissors } from '@/src/components/ui/icons';
+import { Button } from '@/src/components/ui/Button';
+import { Hand, HandFist, type LucideIcon, Repeat, Scissors } from '@/src/components/ui/icons';
 import { RPS_MOVES, type RpsMove, type RpsRound } from '@/src/games/rps';
 import { colors, space } from '@/src/theme/tokens';
 import type { MatchView } from '../useMatch';
+import { useRepeatThrow } from '../useRepeatThrow';
 import { FadeInView, MoveTile, RevealChip } from './common';
 import { Panel, RoundTrack, trackDescription } from './parts';
+import { ReadOpponentPanel } from './ReadOpponentPanel';
 
 const ICON: Record<RpsMove, LucideIcon> = { rock: HandFist, paper: Hand, scissors: Scissors };
 const LABEL: Record<RpsMove, string> = { rock: 'Rock', paper: 'Paper', scissors: 'Scissors' };
@@ -22,6 +25,7 @@ function verdict(r: RpsRound): string {
 export function RpsBoard({ view }: { view: MatchView }) {
   const rounds = view.rounds as RpsRound[];
   const last = rounds[rounds.length - 1];
+  const repeat = useRepeatThrow(view);
   const marks = Array.from({ length: view.totalRounds }, (_, i) => (rounds[i] ? (rounds[i].r === 1 ? 'win' : rounds[i].r === -1 ? 'loss' : 'draw') : 'pending') as 'win' | 'loss' | 'draw' | 'pending');
 
   return (
@@ -48,18 +52,50 @@ export function RpsBoard({ view }: { view: MatchView }) {
         </Panel>
       )}
 
-      {!view.done ? (
+      {!view.done && !view.read?.awaiting ? (
         <View style={{ gap: space.sm }}>
           <AppText variant="overline" color={colors.textMuted} align="center">
             Your throw
           </AppText>
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             {RPS_MOVES.map((m) => (
-              <MoveTile key={m} label={LABEL[m]} icon={iconOf(m, colors.primaryText, 34)} tint={colors.primary} bg={colors.primarySoft} disabled={view.busy} onPress={() => view.play(m)} />
+              <MoveTile key={m} label={LABEL[m]} icon={iconOf(m, colors.primaryText, 34)} tint={colors.primary} bg={colors.primarySoft} disabled={view.busy} onPress={() => {
+                  // A throw of your own ends any repeat first, so a round never gets two moves.
+                  repeat.cancel();
+                  view.play(m);
+                }}
+              />
             ))}
           </View>
+          {repeat.move ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.xs }} accessibilityLiveRegion="polite">
+              <Repeat size={14} color={colors.textMuted} />
+              <AppText variant="small" color={colors.textMuted}>
+                Repeating {LABEL[repeat.move]} ·
+              </AppText>
+              <Pressable onPress={repeat.cancel} accessibilityRole="button" accessibilityLabel={`Stop repeating ${LABEL[repeat.move]}`} hitSlop={12}>
+                <AppText variant="small" weight="semibold" color={colors.primaryText}>
+                  Change
+                </AppText>
+              </Pressable>
+            </View>
+          ) : last ? (
+            <Button
+              label="Repeat this throw"
+              variant="ghost"
+              compact
+              icon={Repeat}
+              iconPosition="left"
+              disabled={view.busy}
+              accessibilityHint={`Throws ${LABEL[last.p]} in each remaining round until you change it`}
+              onPress={() => repeat.start(last.p)}
+              style={{ alignSelf: 'center' }}
+            />
+          ) : null}
         </View>
       ) : null}
+
+      <ReadOpponentPanel view={view} />
 
       {rounds.length > 1 ? (
         <View style={{ gap: space.xs }} accessible accessibilityLabel={`The bot's throws so far: ${rounds.map((r) => LABEL[r.b]).join(', ')}.`}>
