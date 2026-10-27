@@ -162,7 +162,7 @@ describe('Strategic Thinking Profile', () => {
 
   it('a new user gets honest empty states and a first lesson to try', () => {
     const p = buildProfile(empty);
-    assert.deepEqual(p.progress, { completed: 0, total: 5, inProgress: 0, predictions: 0, challengesTried: 0, challengesTotal: 15 });
+    assert.deepEqual(p.progress, { completed: 0, total: 22, inProgress: 0, predictions: 0, challengesTried: 0, challengesTotal: 15 });
     assert.equal(p.primary, null);
     assert.ok(p.skills.every((s) => s.status === 'not-started'));
     assert.equal(p.confidence.ready, false);
@@ -180,7 +180,8 @@ describe('Strategic Thinking Profile', () => {
     const p = buildProfile({ ...empty, completed: ['cooperation-trap'], attempts: [rec('l1.rival', 'correct', 5, 1)] });
     assert.equal(p.primary, null);
     assert.equal(p.skills.find((s) => s.id === 'anticipating')?.status, 'exploring');
-    assert.equal(p.next.lesson, 'strategy-detective');
+    // The next lesson in curriculum order (Lesson 2).
+    assert.equal(p.next.lesson, 'iterated-dominance');
   });
 
   it('uncertain predictions are never used to judge skills or calibration', () => {
@@ -263,21 +264,26 @@ describe('Learning data export', () => {
     const attempts = [rec('l2.crowd', 'reasonable-miss', 2, Date.UTC(2025, 9, 25))];
     const data = buildLearningExport({ attempts, completed: ['cooperation-trap'], inProgress: ['strategy-detective'], goal: 'coordination', now });
     const parsed = JSON.parse(JSON.stringify(data));
-    assert.deepEqual(Object.keys(parsed).sort(), ['attempts', 'exportedAt', 'format', 'goal', 'lessons', 'schemaVersion']);
+    assert.deepEqual(Object.keys(parsed).sort(), ['assessments', 'attempts', 'exportedAt', 'format', 'goal', 'lessons', 'schemaVersion']);
     assert.equal(parsed.format, EXPORT_FORMAT);
-    assert.equal(parsed.schemaVersion, 2);
+    assert.equal(parsed.schemaVersion, 3);
     assert.equal(parsed.exportedAt, '2026-10-26T12:00:00.000Z');
-    assert.equal(parsed.lessons.length, 5);
+    assert.equal(parsed.lessons.length, 22);
     assert.deepEqual(parsed.lessons[0], {
       id: 'cooperation-trap',
       number: 1,
+      module: 'm1',
       title: 'The Cooperation Trap',
       completed: true,
       inProgress: false,
       challengesTried: 0,
       challengesTotal: 3,
+      scenariosPlayed: 0,
+      scenariosTotal: 3,
     });
-    assert.equal(parsed.lessons[1].inProgress, true);
+    assert.equal(parsed.lessons.find((l: { id: string }) => l.id === 'strategy-detective').inProgress, true);
+    assert.equal(parsed.assessments.length, 7);
+    assert.deepEqual(parsed.assessments[0], { id: 'm1', title: 'Checkpoint 1 · Foundations', attempts: 0, firstScore: null, bestScore: null, lastScore: null, maxScore: 4 });
     assert.deepEqual(parsed.attempts[0], {
       id: 'l2.crowd@1761350400000',
       lesson: 'strategy-detective',

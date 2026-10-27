@@ -1,5 +1,6 @@
 import { LESSONS, type LessonId } from '../../content/lessons.ts';
 import { CHALLENGES } from '../challenges/content.ts';
+import { SCENARIOS } from '../scenarios/index.ts';
 import { GOALS, type GoalId, type LearningAttempt, PREDICTIONS, SKILLS, type SkillArea, firstAttempts } from './records.ts';
 
 /**
@@ -417,7 +418,7 @@ export function buildProfile(input: ProfileInput): Profile {
       completed: input.completed.length,
       total: LESSONS.length,
       inProgress: input.inProgress.length,
-      predictions: input.attempts.filter((a) => a.kind === 'lesson').length,
+      predictions: input.attempts.filter((a) => a.kind === 'lesson' || a.kind === 'scenario').length,
       challengesTried: tried.size,
       challengesTotal: CHALLENGES.length,
     },
@@ -434,6 +435,6 @@ export function buildProfile(input: ProfileInput): Profile {
 /** The lessons whose predictions or challenges inform an area — for "where does this come from?" copy. */
 export function lessonsForSkill(skill: SkillArea): LessonId[] {
   const fromLessons = Object.values(PREDICTIONS).filter((p) => p.skill === skill).map((p) => p.lesson);
-  const fromChallenges = CHALLENGES.filter((c) => c.skill === skill).map((c) => c.lesson);
-  return LESSONS.map((l) => l.id).filter((id) => fromLessons.includes(id) || fromChallenges.includes(id));
+  const from = new Set<LessonId>([...fromLessons, ...CHALLENGES.filter((c) => c.skill === skill).map((c) => c.lesson), ...SCENARIOS.filter((s) => s.skill === skill).map((s) => s.lesson)]);
+  return LESSONS.map((l) => l.id).filter((id) => from.has(id));
 }

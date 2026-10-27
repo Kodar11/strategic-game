@@ -46,7 +46,7 @@ export interface Challenge {
 }
 
 /** A one-paragraph refresher per lesson, shown after feedback without replaying the lesson. */
-export const CONCEPT_REVIEW: Record<LessonId, { concept: string; summary: string }> = {
+export const CONCEPT_REVIEW: Partial<Record<LessonId, { concept: string; summary: string }>> = {
   'cooperation-trap': {
     concept: 'Dominant strategies and the cooperation trap',
     summary: 'If one choice pays you more whatever the other side does, you will take it — even when both sides holding back would leave everyone better off. Changing the payoffs, not promises, is what moves people out of the trap.',

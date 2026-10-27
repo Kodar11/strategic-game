@@ -25,6 +25,8 @@ import {
 import { TransferQuestion, type TransferOption } from '@/src/components/lesson/TransferQuestion';
 import { useEnter } from '@/src/components/lesson/motion';
 import { useLessonFlow } from '@/src/components/lesson/useLessonFlow';
+import { useProgress } from '@/src/store/progress';
+import { pairedScenarioSteps, scenarioRecap } from '../curriculum/scenarioSteps';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
@@ -113,8 +115,11 @@ const TRANSFER_ANALOGY = {
 };
 
 export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) {
-  const TOTAL = 11;
+  // The three paired scenarios sit just before completion, so steps saved before they existed keep their meaning.
+  const TOTAL = 14;
   const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL, coordinationRecords);
+  const scenarioDone = useProgress((s) => s.scenarioDone);
+  const learning = useProgress((s) => s.learning);
   const enter = useEnter();
   const equilibria = equilibriumSummary();
 
@@ -135,7 +140,7 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
           <Animated.View entering={enter(0, 'fade')} style={{ borderRadius: 20, overflow: 'hidden' }}>
             <SceneArt scene="meetup" height={180} />
           </Animated.View>
-          <StepHeading kicker="Lesson 3" title="Two dead phones" body="You and Nina agreed to meet in the old town at six. Then both your phones died. You never said where." clip="l3.intro.heading" />
+          <StepHeading kicker={`Lesson ${lesson.number}`} title="Two dead phones" body="You and Nina agreed to meet in the old town at six. Then both your phones died. You never said where." clip="l3.intro.heading" />
           <Dialogue character="aarav" expression="concerned" clip="l3.intro.aarav">
             There are only two places we&apos;d ever go: the Clocktower Café or Riverside Park.
           </Dialogue>
@@ -389,6 +394,7 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
         </>
       ),
     },
+    ...pairedScenarioSteps(lesson.id, scenarioDone),
     {
       key: 'done',
       render: () => (
@@ -401,7 +407,7 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
             'Look for what stands out to both of you: history, convention, prominence.',
             'A clear signal in advance is often worth more than a clever guess later.',
           ]}
-          recap={coordinationRecap({ predict1, r1, predict2, r2, message: data.message })}
+          recap={[...coordinationRecap({ predict1, r1, predict2, r2, message: data.message }), ...scenarioRecap(lesson.id, learning)]}
           reflection="Think of a group you belong to — friends, a team, a household. Which unwritten conventions let you coordinate without discussing it? Where did one come from?"
           nextHook="Here, being easy to predict helped you find Nina. Next, being predictable is exactly what your opponent wants."
           onReplay={restart}

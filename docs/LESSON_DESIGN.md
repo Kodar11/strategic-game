@@ -89,3 +89,16 @@ Whether the learner's rule works is always computed from the **current** sliders
 ### Shared scenario data
 - **Lesson 2:** the round-1 crowd (population and seed) is exported from `strategy-detective/copy.ts`. The crowd lab reuses that seed, so its "Round 1 mix" is exactly the crowd the learner played.
 - **Lesson 3:** `meetupAnalysis` reports two pure-strategy equilibria and the mixed equilibrium (café 8/15 and 3/7, meeting about 50% of the time).
+
+## The 22-lesson curriculum (architecture)
+
+The full lesson list, scenarios and sources are in [CURRICULUM.md](CURRICULUM.md) (generated from the data).
+
+- **Registry:** `src/content/lessons.ts` — 22 lessons in 6 modules. Lesson IDs are stable and never change meaning, so the five original lessons keep theirs even where the curriculum moved them. Notably `strategy-detective` is the Two-Thirds lesson, now **Lesson 14 · Reasoning from Beliefs**; the curriculum's Lesson 2 "Strategy Detective" (dominance) is `iterated-dominance`. `incentive-shift` is now Lesson 10 · Incentives and Hidden Actions.
+- **Paired scenarios (66):** `src/features/scenarios/`. Each spec in `content/moduleN.ts` holds the rules shown on screen, a formal specification (players, actions, timing, information, payoffs, simulated players, chance, ties, solution concept, source status) and a `play` state machine that *is* those rules. Results and their explanations are computed from `play`. Calculable predictions carry `solve()`, computed from the engine; tests require it to equal the option marked `match`, and every scenario is played to the end along random legal paths.
+- **Engines:** `src/game/` — matrix games (dominance, iterated deletion, best responses, Nash, mixed 2×2, never-best-responses), game trees (backward induction), markets, evolution, repeated games, bargaining and optimal stopping, Bayesian information and signalling, auctions, coalitions and voting, escalation. Pure and tested.
+- **Runner:** `ScenarioPlayer` renders any spec: brief and rules → locked prediction with confidence → moves → result → prediction vs model → reasoning → takeaway → play again. Runs are stored as prediction + inputs + seed (`scenarioRuns` in the progress store) and rebuilt by replaying the inputs, so a saved run can't disagree with the engine. Finishing records the prediction (`kind: 'scenario'`) in the learning record; replays add attempts, never overwrite the first.
+- **Original five lessons:** unchanged teaching flow; their three scenario steps sit *just before* completion, so saved step indices keep their meaning.
+- **New seventeen lessons:** `src/features/lessons/curriculum/` — `CurriculumLesson` (intro and strategic question → scenario A → lab that names the concept → B → C → transfer check → completion), driven by `specs.ts` (text) and `labs.ts` (pure, engine-computed lab outputs).
+- **Assessments:** `src/features/assessments/` — six checkpoints and a separate final assessment, scored ½ for defensible answers; multi-select items accept every valid answer. `/checkpoint/[assessmentId]`. The final opens after all six checkpoints are submitted once.
+- **Narration:** only the original five lessons have recorded audio. New lessons render dialogue without audio (supported by `Dialogue`).

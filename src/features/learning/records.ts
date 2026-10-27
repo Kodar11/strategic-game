@@ -3,7 +3,10 @@ import { z } from 'zod';
 import { type Confidence, type PredictionAttempt, confidenceSchema } from '../../components/lesson/prediction-state.ts';
 import type { Verdict } from '../../components/lesson/verdict.ts';
 import { LESSONS, type LessonId, lessonIdSchema } from '../../content/lessons.ts';
+import { ASSESSMENTS } from '../assessments/content.ts';
+import type { AssessmentRuns } from '../assessments/scoring.ts';
 import { CHALLENGES, type Challenge, getChallenge } from '../challenges/content.ts';
+import { SCENARIOS, getScenario } from '../scenarios/index.ts';
 import type { EvaluationBasis, SkillArea } from './types.ts';
 
 export type { EvaluationBasis, SkillArea } from './types.ts';
@@ -49,7 +52,8 @@ export const PREDICTIONS = {
 
 export type PredictionKey = keyof typeof PREDICTIONS;
 
-export type ItemKind = 'lesson' | 'challenge';
+/** `scenario`: a prediction made in a paired scenario. */
+export type ItemKind = 'lesson' | 'challenge' | 'scenario';
 
 export interface ItemMeta {
   kind: ItemKind;
@@ -63,7 +67,9 @@ export interface ItemMeta {
 export function itemMeta(id: string): ItemMeta | undefined {
   if (id in PREDICTIONS) return { kind: 'lesson', ...PREDICTIONS[id as PredictionKey] };
   const c = getChallenge(id);
-  return c ? { kind: 'challenge', lesson: c.lesson, skill: c.skill, basis: c.basis, question: c.title } : undefined;
+  if (c) return { kind: 'challenge', lesson: c.lesson, skill: c.skill, basis: c.basis, question: c.title };
+  const s = getScenario(id);
+  return s ? { kind: 'scenario', lesson: s.lesson, skill: s.skill, basis: s.predict.basis, question: s.predict.question } : undefined;
 }
 
 /**
@@ -125,7 +131,7 @@ const evaluationSchema = z.enum(['correct', 'partial', 'reasonable-miss', 'reaso
 export const learningAttemptSchema = z.object({
   id: z.string().min(1).max(80),
   schemaVersion: z.number().int().positive(),
-  kind: z.enum(['lesson', 'challenge']).optional(),
+  kind: z.enum(['lesson', 'challenge', 'scenario']).optional(),
   lesson: lessonIdSchema,
   prediction: z.string().refine((id) => itemMeta(id) !== undefined, 'Unknown item'),
   skill: z.enum(['anticipating', 'incentives', 'coordination', 'uncertainty']),
@@ -284,15 +290,28 @@ export function sanitizeGoal(saved: unknown): GoalId | null {
 // ── Export ───────────────────────────────────────────────────────────────────
 
 export const EXPORT_FORMAT = 'strategic-thinking-learning-data';
-/** v2 adds challenge records and first-attempt / retry history. */
-export const EXPORT_SCHEMA_VERSION = 2;
+/** v2 adds challenge records and first-attempt / retry history. v3: the 22-lesson curriculum, scenarios and assessments. */
+export const EXPORT_SCHEMA_VERSION = 3;
 
 export interface LearningExport {
   format: typeof EXPORT_FORMAT;
   schemaVersion: number;
   exportedAt: string;
   goal: GoalId | null;
-  lessons: { id: LessonId; number: number; title: string; completed: boolean; inProgress: boolean; challengesTried: number; challengesTotal: number }[];
+  lessons: {
+    id: LessonId;
+    number: number;
+    module: string;
+    title: string;
+    completed: boolean;
+    inProgress: boolean;
+    challengesTried: number;
+    challengesTotal: number;
+    scenariosPlayed: number;
+    scenariosTotal: number;
+  }[];
+  /** Module checkpoints and the final assessment: scores out of `maxScore`; null when never submitted. */
+  assessments: { id: string; title: string; attempts: number; firstScore: number | null; bestScore: number | null; lastScore: number | null; maxScore: number }[];
   attempts: (Omit<LearningAttempt, 'lockedAt' | 'schemaVersion'> & { recordSchemaVersion: number; lockedAt: string; question: string; isFirstAttempt: boolean })[];
 }
 
@@ -303,6 +322,8 @@ export function buildLearningExport(input: {
   inProgress: readonly LessonId[];
   goal: GoalId | null;
   now: Date;
+  scenarioDone?: readonly string[];
+  assessments?: AssessmentRuns;
 }): LearningExport {
   const tried = new Set(input.attempts.filter((a) => a.kind === 'challenge').map((a) => a.prediction));
   return {
@@ -312,15 +333,23 @@ export function buildLearningExport(input: {
     goal: input.goal,
     lessons: LESSONS.map((l) => {
       const challenges = CHALLENGES.filter((c) => c.lesson === l.id);
+      const scenarios = SCENARIOS.filter((s) => s.lesson === l.id);
       return {
         id: l.id,
         number: l.number,
+        module: l.module,
         title: l.title,
         completed: input.completed.includes(l.id),
         inProgress: input.inProgress.includes(l.id),
         challengesTried: challenges.filter((c) => tried.has(c.id)).length,
         challengesTotal: challenges.length,
+        scenariosPlayed: scenarios.filter((s) => input.scenarioDone?.includes(s.id)).length,
+        scenariosTotal: scenarios.length,
       };
+    }),
+    assessments: ASSESSMENTS.map((a) => {
+      const r = input.assessments?.[a.id];
+      return { id: a.id, title: a.title, attempts: r?.attempts ?? 0, firstScore: r?.firstScore ?? null, bestScore: r?.bestScore ?? null, lastScore: r?.lastScore ?? null, maxScore: a.items.length };
     }),
     attempts: input.attempts.map(({ lockedAt, schemaVersion, ...a }) => ({
       ...a,

@@ -107,9 +107,9 @@ function LearningDataCard() {
     const fileName = exportFileName(now);
     let outcome: ShareOutcome;
     try {
-      const { learning: attempts, completed, runtime, goal } = useProgress.getState();
+      const { learning: attempts, completed, runtime, goal, scenarioDone, assessmentRuns } = useProgress.getState();
       const inProgress = LESSONS.filter((l) => (runtime[l.id]?.step ?? 0) > 0).map((l) => l.id);
-      const json = JSON.stringify(buildLearningExport({ attempts, completed, inProgress, goal, now }), null, 2);
+      const json = JSON.stringify(buildLearningExport({ attempts, completed, inProgress, goal, now, scenarioDone, assessments: assessmentRuns }), null, 2);
       outcome = await shareJsonFile(json, fileName);
     } catch (error) {
       // shareJsonFile reports its own failures; anything thrown here happened while preparing the data.

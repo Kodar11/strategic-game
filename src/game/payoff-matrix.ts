@@ -147,3 +147,108 @@ export function mapPayoffs<R extends string, C extends string>(
     payoffs: game.rows.map((row, r) => game.cols.map((col, c) => fn(game.payoffs[r][c], row, col))),
   };
 }
+
+/** Restrict a game to a subset of rows and columns, keeping the original order. */
+export function subGame<R extends string, C extends string>(game: MatrixGame<R, C>, rows: readonly R[], cols: readonly C[]): MatrixGame<R, C> {
+  const keepR = game.rows.filter((r) => rows.includes(r));
+  const keepC = game.cols.filter((c) => cols.includes(c));
+  return {
+    rows: keepR,
+    cols: keepC,
+    payoffs: keepR.map((r) => keepC.map((c) => payoffAt(game, r, c))),
+  };
+}
+
+/** Rows strictly dominated by another *pure* row (worse against every column). */
+export function strictlyDominatedRows<R extends string, C extends string>(game: MatrixGame<R, C>): R[] {
+  return game.rows.filter((r, ri) =>
+    game.rows.some((_, oi) => oi !== ri && game.cols.every((_, c) => game.payoffs[oi][c][0] > game.payoffs[ri][c][0] + EPSILON)),
+  );
+}
+
+/** Columns strictly dominated by another pure column. */
+export function strictlyDominatedCols<R extends string, C extends string>(game: MatrixGame<R, C>): C[] {
+  return game.cols.filter((c, ci) =>
+    game.cols.some((_, oi) => oi !== ci && game.rows.every((_, r) => game.payoffs[r][oi][1] > game.payoffs[r][ci][1] + EPSILON)),
+  );
+}
+
+export interface EliminationStep<R extends string, C extends string> {
+  removedRows: R[];
+  removedCols: C[];
+  rows: R[];
+  cols: C[];
+}
+
+/**
+ * Iterated deletion of strictly dominated (pure) strategies. Each round removes every currently dominated row and
+ * column at once. For strict dominance the surviving set doesn't depend on the order of deletion.
+ */
+export function iteratedStrictDominance<R extends string, C extends string>(game: MatrixGame<R, C>): { steps: EliminationStep<R, C>[]; rows: R[]; cols: C[] } {
+  let rows = [...game.rows];
+  let cols = [...game.cols];
+  const steps: EliminationStep<R, C>[] = [];
+  for (;;) {
+    const g = subGame(game, rows, cols);
+    const removedRows = strictlyDominatedRows(g);
+    const removedCols = strictlyDominatedCols(g);
+    if (!removedRows.length && !removedCols.length) break;
+    rows = rows.filter((r) => !removedRows.includes(r));
+    cols = cols.filter((c) => !removedCols.includes(c));
+    steps.push({ removedRows, removedCols, rows: [...rows], cols: [...cols] });
+  }
+  return { steps, rows, cols };
+}
+
+/** Is row `a` weakly dominated by row `b` (never better, sometimes worse)? */
+export function rowWeaklyDominatedBy<R extends string, C extends string>(game: MatrixGame<R, C>, a: R, b: R): boolean {
+  const ai = game.rows.indexOf(a);
+  const bi = game.rows.indexOf(b);
+  let someStrict = false;
+  for (let c = 0; c < game.cols.length; c++) {
+    const d = game.payoffs[bi][c][0] - game.payoffs[ai][c][0];
+    if (d < -EPSILON) return false;
+    if (d > EPSILON) someStrict = true;
+  }
+  return someStrict;
+}
+
+export function colWeaklyDominatedBy<R extends string, C extends string>(game: MatrixGame<R, C>, a: C, b: C): boolean {
+  const ai = game.cols.indexOf(a);
+  const bi = game.cols.indexOf(b);
+  let someStrict = false;
+  for (let r = 0; r < game.rows.length; r++) {
+    const d = game.payoffs[r][bi][1] - game.payoffs[r][ai][1];
+    if (d < -EPSILON) return false;
+    if (d > EPSILON) someStrict = true;
+  }
+  return someStrict;
+}
+
+/**
+ * Rows that are a best response to *some* belief about a two-column opponent (probability p on cols[0]),
+ * checked on a fine grid of beliefs. A row that is never a best response cannot be chosen by a rational player,
+ * even if no single pure row dominates it.
+ */
+export function rowsEverBestResponse<R extends string, C extends string>(game: MatrixGame<R, C>, steps = 1000): R[] {
+  if (game.cols.length !== 2) throw new Error('rowsEverBestResponse expects two columns');
+  const found = new Set<R>();
+  for (let i = 0; i <= steps; i++) {
+    const p = i / steps;
+    const ev = game.rows.map((_, r) => p * game.payoffs[r][0][0] + (1 - p) * game.payoffs[r][1][0]);
+    const best = Math.max(...ev);
+    game.rows.forEach((row, r) => {
+      if (ev[r] >= best - EPSILON) found.add(row);
+    });
+  }
+  return game.rows.filter((r) => found.has(r));
+}
+
+/** Row player's expected payoff from each row against a mixed column strategy (probabilities by column). */
+export function rowExpected<R extends string, C extends string>(game: MatrixGame<R, C>, colProbs: readonly number[]): Record<R, number> {
+  const out = {} as Record<R, number>;
+  game.rows.forEach((row, r) => {
+    out[row] = game.cols.reduce<number>((sum, _, c) => sum + colProbs[c] * game.payoffs[r][c][0], 0);
+  });
+  return out;
+}

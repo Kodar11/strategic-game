@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ArrowRight, CircleCheck, Clock, Play, RotateCcw, Settings, Target, UserRound } from '@/src/components/ui/icons';
+import { ArrowRight, CircleCheck, Clock, Lock, Play, RotateCcw, Settings, Target, Trophy, UserRound } from '@/src/components/ui/icons';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,14 +12,19 @@ import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Card';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
-import { LESSONS, type LessonId, type LessonMeta } from '@/src/content/lessons';
-import { CHALLENGES } from '@/src/features/challenges/content';
-import { triedCount } from '@/src/features/challenges/progress';
+import { LESSONS, type LessonId, type LessonMeta, MODULES, type ModuleMeta } from '@/src/content/lessons';
+import { type Assessment, getAssessment, moduleCheckpoint } from '@/src/features/assessments/content';
+import { type AssessmentRun, finalUnlocked } from '@/src/features/assessments/scoring';
+import { SCENARIOS } from '@/src/features/scenarios';
 import { type LessonRuntime, useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, shadow, space } from '@/src/theme/tokens';
 
 function openLesson(id: LessonId) {
   router.push({ pathname: '/lesson/[lessonId]', params: { lessonId: id } });
+}
+
+function openAssessment(id: string) {
+  router.push({ pathname: '/checkpoint/[assessmentId]', params: { assessmentId: id } });
 }
 
 export default function Home() {
@@ -28,7 +33,8 @@ export default function Home() {
   const hydrated = useProgress((s) => s.hydrated);
   const completed = useProgress((s) => s.completed);
   const runtime = useProgress((s) => s.runtime);
-  const learning = useProgress((s) => s.learning);
+  const played = useProgress((s) => s.scenarioDone.length);
+  const assessmentRuns = useProgress((s) => s.assessmentRuns);
 
   if (!hydrated) return <MessageScreen loading />;
 
@@ -80,7 +86,7 @@ export default function Home() {
               Think in Strategies.
             </AppText>
             <AppText color={colors.textMuted}>
-              Five short games. Make a call, watch what happens, then find out why — and where else the idea shows up.
+              Twenty-two short games in six modules. Make a call, watch what happens, then find out why — and where else the idea shows up.
             </AppText>
           </Animated.View>
 
@@ -111,7 +117,7 @@ export default function Home() {
             <Pressable
               onPress={() => router.push('/challenges')}
               accessibilityRole="button"
-              accessibilityLabel={`Practice in new situations. ${triedCount(learning)} of ${CHALLENGES.length} challenges tried. No lesson required.`}
+              accessibilityLabel={`Practice in new situations. ${played} of ${SCENARIOS.length} scenarios played. No lesson required.`}
               style={({ pressed }) => [styles.practice, pressed && { backgroundColor: colors.surfaceHigh }]}>
               <View style={styles.practiceIcon}>
                 <Target size={20} color={colors.primaryText} strokeWidth={2.2} />
@@ -119,7 +125,7 @@ export default function Home() {
               <View style={{ flex: 1, gap: 2 }}>
                 <AppText variant="bodyStrong">Practice in new situations</AppText>
                 <AppText variant="caption" color={colors.textMuted}>
-                  {triedCount(learning)} of {CHALLENGES.length} challenges tried · open any time
+                  {played} of {SCENARIOS.length} scenarios played · open any time
                 </AppText>
               </View>
               <ArrowRight size={18} color={colors.textMuted} />
@@ -133,12 +139,17 @@ export default function Home() {
             </AppText>
           </View>
 
-          <View style={{ gap: space.lg }}>
-            {LESSONS.map((lesson, i) => (
-              <Animated.View key={lesson.id} entering={enter(120 + i * 60)}>
-                <LessonCard lesson={lesson} done={completed.includes(lesson.id)} run={runtime[lesson.id]} />
+          <View style={{ gap: space.xxl }}>
+            {MODULES.map((m, mi) => (
+              <Animated.View key={m.id} entering={enter(120 + mi * 60)} style={{ gap: space.lg }}>
+                <ModuleHeader module={m} done={LESSONS.filter((l) => l.module === m.id && completed.includes(l.id)).length} total={LESSONS.filter((l) => l.module === m.id).length} />
+                {LESSONS.filter((l) => l.module === m.id).map((lesson) => (
+                  <LessonCard key={lesson.id} lesson={lesson} done={completed.includes(lesson.id)} run={runtime[lesson.id]} />
+                ))}
+                <AssessmentCard a={moduleCheckpoint(m.id)} run={assessmentRuns[m.id]} />
               </Animated.View>
             ))}
+            <AssessmentCard a={getAssessment('final')!} run={assessmentRuns.final} locked={!finalUnlocked(assessmentRuns)} final />
           </View>
 
           <AppText variant="caption" color={colors.textFaint} align="center" style={{ marginTop: space.xxl }}>
@@ -147,6 +158,43 @@ export default function Home() {
         </View>
       </ScrollView>
     </View>
+  );
+}
+
+function ModuleHeader({ module, done, total }: { module: ModuleMeta; done: number; total: number }) {
+  return (
+    <View style={{ gap: 2 }} accessibilityRole="header">
+      <AppText variant="overline" color={colors.primaryText}>
+        Module {module.number} · {done}/{total} complete
+      </AppText>
+      <AppText variant="heading">{module.title}</AppText>
+      <AppText variant="small" color={colors.textMuted}>
+        {module.objective}
+      </AppText>
+    </View>
+  );
+}
+
+function AssessmentCard({ a, run, locked, final }: { a: Assessment; run?: AssessmentRun; locked?: boolean; final?: boolean }) {
+  const score = run?.bestScore ?? null;
+  const status = locked ? 'Opens after all six checkpoints' : score !== null ? `Best ${Number.isInteger(score) ? score : score.toFixed(1)} / ${a.items.length}` : `${a.items.length} questions`;
+  return (
+    <Pressable
+      onPress={() => openAssessment(a.id)}
+      accessibilityRole="button"
+      accessibilityLabel={`${a.title}. ${status}.`}
+      style={({ pressed }) => [styles.assessment, final && styles.final, pressed && { backgroundColor: colors.surfaceHigh }]}>
+      <View style={[styles.practiceIcon, final && { backgroundColor: colors.insightSoft }]}>
+        {locked ? <Lock size={18} color={colors.textMuted} /> : final ? <Trophy size={18} color={colors.insight} /> : <Target size={18} color={colors.primaryText} />}
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <AppText variant="bodyStrong">{a.title}</AppText>
+        <AppText variant="caption" color={colors.textMuted}>
+          {status}
+        </AppText>
+      </View>
+      {run?.attempts ? <CircleCheck size={16} color={colors.success} strokeWidth={2.4} /> : <ArrowRight size={18} color={colors.textMuted} />}
+    </Pressable>
   );
 }
 
@@ -256,6 +304,18 @@ const styles = StyleSheet.create({
     padding: space.lg,
     marginBottom: space.xxl,
   },
+  assessment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    backgroundColor: colors.bgRaised,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.borderStrong,
+    padding: space.md,
+  },
+  final: { borderStyle: 'solid', borderColor: 'rgba(253,186,116,0.4)', padding: space.lg },
   practiceIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: space.md },
   card: { backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },

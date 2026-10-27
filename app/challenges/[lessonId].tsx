@@ -30,7 +30,7 @@ import { haptic, useMotionReduced } from '@/src/utils/feedback';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
 export function generateStaticParams() {
-  return LESSONS.map((l) => ({ lessonId: l.id }));
+  return LESSONS.filter((l) => challengesFor(l.id).length).map((l) => ({ lessonId: l.id }));
 }
 
 /** Practice challenges for one lesson. Every challenge is open, whether or not the lesson has been taken. */
@@ -38,7 +38,8 @@ export default function LessonChallengesScreen() {
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
   const hydrated = useProgress((s) => s.hydrated);
   const lesson = getLesson(lessonId);
-  if (!lesson) return <MessageScreen title="Challenges not found" body="This link doesn't match any lesson. Pick one from the practice list." />;
+  // Only the five original lessons have multiple-choice challenges; every lesson has playable scenarios instead.
+  if (!lesson || !challengesFor(lesson.id).length) return <MessageScreen title="Challenges not found" body="This link doesn't match any lesson with challenges. Pick one from the practice list." />;
   // Wait for saved answers, so resuming lands on the right challenge and never re-submits one.
   if (!hydrated) return <MessageScreen loading />;
   return <ChallengeRunner key={lesson.id} lesson={lesson} />;
@@ -121,7 +122,7 @@ function ChallengeView({ challenge, index, total, lesson }: { challenge: Challen
   const strongest = strongestOptions(challenge);
   const first = history[0];
   const firstLabel = first ? challenge.options.find((o) => o.id === first.answer)?.label : null;
-  const review = CONCEPT_REVIEW[lesson.id];
+  const review = CONCEPT_REVIEW[lesson.id]!;
   // Shown on any attempt after the first: the first answer is kept and this one is recorded separately.
   const isRetry = !!first && first.lockedAt !== attempt.lockedAt;
 
@@ -248,7 +249,7 @@ function Summary({ lesson, onOpen }: { lesson: LessonMeta; onOpen: (i: number) =
               : 'No challenges answered yet.'}
         </AppText>
         <AppText variant="small" color={colors.textMuted} align="center">
-          {CONCEPT_REVIEW[lesson.id].concept}
+          {CONCEPT_REVIEW[lesson.id]!.concept}
         </AppText>
       </Animated.View>
 

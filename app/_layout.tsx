@@ -52,6 +52,8 @@ export default function RootLayout() {
           <Stack.Screen name="profile" />
           <Stack.Screen name="challenges/index" />
           <Stack.Screen name="challenges/[lessonId]" />
+          <Stack.Screen name="scenario/[scenarioId]" />
+          <Stack.Screen name="checkpoint/[assessmentId]" />
           <Stack.Screen name="settings" options={{ presentation: 'modal', animation: reduced ? 'fade' : 'slide_from_bottom' }} />
         </Stack>
       </ThemeProvider>

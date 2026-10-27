@@ -227,15 +227,17 @@ describe('Lesson structure', () => {
   };
   const read = (id: string, f: string) => readFileSync(path.join(ROOT, 'src/features/lessons', id, f), 'utf8').replace(/\r\n/g, '\n');
 
-  it('every lesson declares as many steps as it renders, and Lesson 1 keeps 12', () => {
+  it('every lesson declares as many steps as it renders (plus its three paired scenarios), and Lesson 1 keeps 12 core steps', () => {
     for (const [id, f] of Object.entries(LESSONS)) {
       const src = read(id, f);
       const total = Number(/const TOTAL = (\d+);/.exec(src)?.[1]);
       const keys = src.match(/^ {6}key: '[a-z0-9-]+',$/gm) ?? [];
-      assert.equal(keys.length, total, `${id}: ${keys.length} step keys vs TOTAL ${total}`);
+      const scenarios = src.includes('...pairedScenarioSteps(lesson.id, scenarioDone),') ? 3 : 0;
+      assert.equal(scenarios, 3, `${id}: paired scenarios are part of the lesson`);
+      assert.equal(keys.length + scenarios, total, `${id}: ${keys.length} step keys + ${scenarios} scenarios vs TOTAL ${total}`);
       assert.equal(new Set(keys).size, keys.length, `${id}: duplicate step keys`);
     }
-    assert.equal(Number(/const TOTAL = (\d+);/.exec(read('cooperation-trap', LESSONS['cooperation-trap']))?.[1]), 12);
+    assert.equal(Number(/const TOTAL = (\d+);/.exec(read('cooperation-trap', LESSONS['cooperation-trap']))?.[1]), 12 + 3);
   });
 
   it('each transfer question has exactly one strongest answer', () => {

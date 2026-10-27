@@ -24,6 +24,8 @@ import {
 import { TransferQuestion, type TransferOption } from '@/src/components/lesson/TransferQuestion';
 import { useEnter } from '@/src/components/lesson/motion';
 import { useLessonFlow } from '@/src/components/lesson/useLessonFlow';
+import { useProgress } from '@/src/store/progress';
+import { pairedScenarioSteps, scenarioRecap } from '../curriculum/scenarioSteps';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
@@ -156,8 +158,11 @@ const TRANSFER_ANALOGY = {
 };
 
 export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
-  const TOTAL = 11;
+  // The three paired scenarios sit just before completion, so steps saved before they existed keep their meaning.
+  const TOTAL = 14;
   const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL, incentiveRecords);
+  const scenarioDone = useProgress((s) => s.scenarioDone);
+  const learning = useProgress((s) => s.learning);
   const enter = useEnter();
 
   const rules: IncentiveRules = { cutPenalty: data.penalty, maintainReward: data.reward };
@@ -179,7 +184,7 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
           <Animated.View entering={enter(0, 'fade')} style={{ borderRadius: 20, overflow: 'hidden' }}>
             <SceneArt scene="policy" height={180} />
           </Animated.View>
-          <StepHeading kicker="Lesson 5" title="Change the rules, change the game" body="QuickEats and FoodKart are back in the same market. This time you'll also get to rewrite its rules." clip="l5.intro.heading" />
+          <StepHeading kicker={`Lesson ${lesson.number}`} title="Change the rules, change the game" body="QuickEats and FoodKart are back in the same market. This time you'll also get to rewrite its rules." clip="l5.intro.heading" />
           <Dialogue character="arjun" expression="thinking" clip="l5.intro.arjun">
             I advise the city&apos;s delivery council. Before anyone writes a rule, I want to see what it actually does to each company&apos;s choices.
           </Dialogue>
@@ -505,6 +510,7 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
         </>
       ),
     },
+    ...pairedScenarioSteps(lesson.id, scenarioDone),
     {
       key: 'done',
       render: () => (
@@ -517,7 +523,8 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
             'Penalties and rewards can flip the same choice at very different costs.',
             'Every rule has side effects outside the model. Look for them before you celebrate.',
           ]}
-          recap={incentiveRecap({ proposalPick, rules, detectionPick })}
+          nextHook="Next module: bargaining — what decides who gets what when two sides must agree."
+          recap={[...incentiveRecap({ proposalPick, rules, detectionPick }), ...scenarioRecap(lesson.id, learning)]}
           reflection="Prediction challenge: a city starts charging for every bag of household rubbish. What do you expect most people to do — and what unwanted behaviour might the charge also create?"
           onReplay={restart}
         />

@@ -37,11 +37,14 @@ describe('Challenge content', () => {
   it('has fifteen challenges: exactly three per lesson, ordered 1–3, with unique ids', () => {
     assert.equal(CHALLENGES.length, 15);
     assert.equal(new Set(CHALLENGES.map((c) => c.id)).size, 15);
-    for (const l of LESSONS) {
+    // The five original lessons have multiple-choice challenges; the other seventeen have only playable scenarios.
+    const withChallenges = LESSONS.filter((l) => challengesFor(l.id).length);
+    assert.deepEqual(withChallenges.map((l) => l.id).sort(), ['cooperation-trap', 'coordination-problem', 'incentive-shift', 'predictability-trap', 'strategy-detective']);
+    for (const l of withChallenges) {
       const list = challengesFor(l.id);
       assert.equal(list.length, 3, l.id);
       assert.deepEqual(list.map((c) => c.order), [1, 2, 3], l.id);
-      assert.ok(CONCEPT_REVIEW[l.id].summary.length > 0, l.id);
+      assert.ok(CONCEPT_REVIEW[l.id]!.summary.length > 0, l.id);
     }
   });
 
@@ -300,7 +303,7 @@ describe('Export v2', () => {
     s = { ...s, challengeDrafts: retryChallenge(s.challengeDrafts, id) };
     s = answer(s, id, 'yes', 4, Date.UTC(2026, 9, 2));
     const data = JSON.parse(JSON.stringify(buildLearningExport({ attempts: s.learning, completed: [], inProgress: [], goal: null, now: new Date(0) })));
-    assert.equal(data.schemaVersion, 2);
+    assert.equal(data.schemaVersion, 3);
     assert.deepEqual(
       data.attempts.map((a: Record<string, unknown>) => [a.kind, a.prediction, a.question, a.attempt, a.isFirstAttempt, a.answer, a.lessonCompleted, a.contentVersion]),
       [

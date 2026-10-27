@@ -6,6 +6,10 @@ import { createJSONStorage, persist, type StateStorage } from 'zustand/middlewar
 import { LESSON_IDS, type LessonId, lessonIdSchema } from '@/src/content/lessons';
 import { type ChallengeDrafts, retryChallenge, sanitizeChallengeDrafts, submitChallenge } from '@/src/features/challenges/progress';
 import type { PredictionAttempt } from '@/src/components/lesson/prediction-state';
+import { type AssessmentId, getAssessment } from '@/src/features/assessments/content';
+import { type AssessmentRuns, answerItem, currentAssessmentRun, retakeAssessment, sanitizeAssessmentRuns, submitAssessment } from '@/src/features/assessments/scoring';
+import { type ScenarioRuns, applyScenarioInput, lockScenarioPrediction, restartScenario, sanitizeScenarioDone, sanitizeScenarioRuns, setScenarioPrediction } from '@/src/features/scenarios/runtime';
+import type { Input } from '@/src/features/scenarios/types';
 import { type GoalId, type LearningAttempt, type NewAttempt, mergeAttempts, sanitizeAttempts, sanitizeGoal } from '@/src/features/learning/records';
 import { DEFAULT_SETTINGS, type Settings, sanitizeSettings } from './settings';
 
@@ -30,6 +34,12 @@ interface ProgressState {
   goal: GoalId | null;
   /** The current attempt at each practice challenge (draft or submitted). Submissions themselves live in `learning`. */
   challengeDrafts: ChallengeDrafts;
+  /** The current run of each paired scenario (prediction, inputs, seed). Finished predictions also go to `learning`. */
+  scenarioRuns: ScenarioRuns;
+  /** Scenarios finished at least once; replays never remove one. */
+  scenarioDone: string[];
+  /** Module checkpoints and the final assessment: answers and first / best / latest scores. */
+  assessmentRuns: AssessmentRuns;
   hydrated: boolean;
   saveRuntime: (id: LessonId, step: number, total: number, data: unknown) => void;
   clearRuntime: (id: LessonId) => void;
@@ -41,6 +51,16 @@ interface ProgressState {
   submitChallenge: (id: string) => void;
   retryChallenge: (id: string) => void;
   setGoal: (goal: GoalId | null) => void;
+  setScenarioPrediction: (id: string, attempt: PredictionAttempt<string>) => void;
+  lockScenarioPrediction: (id: string) => void;
+  /** Apply one move. Finishing the game records the prediction and marks the scenario done, in one update. */
+  scenarioInput: (id: string, input: Input) => void;
+  restartScenario: (id: string) => void;
+  answerAssessment: (id: AssessmentId, itemId: string, optionId: string) => void;
+  submitAssessment: (id: AssessmentId) => void;
+  retakeAssessment: (id: AssessmentId) => void;
+  setAssessmentReflection: (id: AssessmentId, text: string) => void;
+  toggleAssessmentRubric: (id: AssessmentId, index: number) => void;
   resetProgress: () => void;
 }
 
@@ -57,6 +77,9 @@ export const useProgress = create<ProgressState>()(
       learning: [],
       goal: null,
       challengeDrafts: {},
+      scenarioRuns: {},
+      scenarioDone: [],
+      assessmentRuns: {},
       hydrated: false,
       saveRuntime: (id, step, total, data) =>
         set((s) => ({ runtime: { ...s.runtime, [id]: { step, total, data, updatedAt: Date.now() } } })),
@@ -88,14 +111,75 @@ export const useProgress = create<ProgressState>()(
           return challengeDrafts === s.challengeDrafts ? s : { challengeDrafts };
         }),
       setGoal: (goal) => set({ goal }),
+      setScenarioPrediction: (id, attempt) =>
+        set((s) => {
+          const scenarioRuns = setScenarioPrediction(s, id, attempt);
+          return scenarioRuns ? { scenarioRuns } : s;
+        }),
+      lockScenarioPrediction: (id) =>
+        set((s) => {
+          const scenarioRuns = lockScenarioPrediction(s, id);
+          return scenarioRuns ? { scenarioRuns } : s;
+        }),
+      scenarioInput: (id, input) => set((s) => applyScenarioInput(s, id, input) ?? s),
+      restartScenario: (id) =>
+        set((s) => {
+          const scenarioRuns = restartScenario(s, id);
+          return scenarioRuns ? { scenarioRuns } : s;
+        }),
+      answerAssessment: (id, itemId, optionId) =>
+        set((s) => {
+          const a = getAssessment(id);
+          const item = a?.items.find((i) => i.id === itemId);
+          if (!a || !item) return s;
+          const run = currentAssessmentRun(s.assessmentRuns, a);
+          const next = answerItem(run, item, optionId);
+          return next === run ? s : { assessmentRuns: { ...s.assessmentRuns, [id]: next } };
+        }),
+      submitAssessment: (id) =>
+        set((s) => {
+          const a = getAssessment(id);
+          const next = a ? submitAssessment(currentAssessmentRun(s.assessmentRuns, a), a) : null;
+          return next ? { assessmentRuns: { ...s.assessmentRuns, [id]: next } } : s;
+        }),
+      retakeAssessment: (id) =>
+        set((s) => {
+          const a = getAssessment(id);
+          return a ? { assessmentRuns: { ...s.assessmentRuns, [id]: retakeAssessment(currentAssessmentRun(s.assessmentRuns, a)) } } : s;
+        }),
+      setAssessmentReflection: (id, text) =>
+        set((s) => {
+          const a = getAssessment(id);
+          if (!a) return s;
+          const run = currentAssessmentRun(s.assessmentRuns, a);
+          return run.submitted ? s : { assessmentRuns: { ...s.assessmentRuns, [id]: { ...run, reflection: text.slice(0, 4000) } } };
+        }),
+      toggleAssessmentRubric: (id, index) =>
+        set((s) => {
+          const a = getAssessment(id);
+          if (!a?.reflection || index < 0 || index >= a.reflection.rubric.length) return s;
+          const run = currentAssessmentRun(s.assessmentRuns, a);
+          const rubric = run.rubric.includes(index) ? run.rubric.filter((i) => i !== index) : [...run.rubric, index];
+          return { assessmentRuns: { ...s.assessmentRuns, [id]: { ...run, rubric } } };
+        }),
       // Resetting progress also clears the learning history built from it; the goal is a preference and stays.
-      resetProgress: () => set({ completed: [], runtime: {}, learning: [], challengeDrafts: {} }),
+      resetProgress: () => set({ completed: [], runtime: {}, learning: [], challengeDrafts: {}, scenarioRuns: {}, scenarioDone: [], assessmentRuns: {} }),
     }),
     {
       name: 'strategic-game/progress',
       version: 1,
       storage: createJSONStorage(() => storage),
-      partialize: ({ completed, runtime, settings, learning, goal, challengeDrafts }) => ({ completed, runtime, settings, learning, goal, challengeDrafts }),
+      partialize: ({ completed, runtime, settings, learning, goal, challengeDrafts, scenarioRuns, scenarioDone, assessmentRuns }) => ({
+        completed,
+        runtime,
+        settings,
+        learning,
+        goal,
+        challengeDrafts,
+        scenarioRuns,
+        scenarioDone,
+        assessmentRuns,
+      }),
       // Drop anything unrecognised so a corrupted or older save can never break the app.
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<ProgressState>;
@@ -115,7 +199,11 @@ export const useProgress = create<ProgressState>()(
         const goal = sanitizeGoal(p.goal);
         // Saves from before practice challenges existed have no drafts.
         const challengeDrafts = sanitizeChallengeDrafts(p.challengeDrafts);
-        return { ...current, completed, runtime, settings, learning, goal, challengeDrafts };
+        // Saves from before the 22-lesson curriculum simply have no scenario or assessment state yet.
+        const scenarioRuns = sanitizeScenarioRuns(p.scenarioRuns);
+        const scenarioDone = sanitizeScenarioDone(p.scenarioDone);
+        const assessmentRuns = sanitizeAssessmentRuns(p.assessmentRuns);
+        return { ...current, completed, runtime, settings, learning, goal, challengeDrafts, scenarioRuns, scenarioDone, assessmentRuns };
       },
       onRehydrateStorage: () => () => {
         useProgress.setState({ hydrated: true });

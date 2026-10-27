@@ -21,6 +21,8 @@ import {
 import { TransferQuestion, type TransferOption } from '@/src/components/lesson/TransferQuestion';
 import { useEnter } from '@/src/components/lesson/motion';
 import { useLessonFlow } from '@/src/components/lesson/useLessonFlow';
+import { useProgress } from '@/src/store/progress';
+import { pairedScenarioSteps, scenarioRecap } from '../curriculum/scenarioSteps';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
@@ -151,8 +153,11 @@ const TRANSFER_ANALOGY = {
 };
 
 export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
-  const TOTAL = 10;
+  // The three paired scenarios sit just before completion, so steps saved before they existed keep their meaning.
+  const TOTAL = 13;
   const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL, predictabilityRecords);
+  const scenarioDone = useProgress((s) => s.scenarioDone);
+  const learning = useProgress((s) => s.learning);
   const enter = useEnter();
 
   // The updater stays pure; the keeper only ever sees shots already in history.
@@ -176,7 +181,7 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
           <Animated.View entering={enter(0, 'fade')} style={{ borderRadius: 20, overflow: 'hidden' }}>
             <SceneArt scene="shootout" height={180} />
           </Animated.View>
-          <StepHeading kicker="Lesson 4" title="The penalty shootout" body="You shoot left or right. Maya, in goal, dives left or right at the same moment." clip="l4.intro.heading" />
+          <StepHeading kicker={`Lesson ${lesson.number}`} title="The penalty shootout" body="You shoot left or right. Maya, in goal, dives left or right at the same moment." clip="l4.intro.heading" />
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             <Stat label="She dives the other way" value="Goal" tone="blue" caption="you score 1" />
             <Stat label="She guesses your side" value="Save" tone="orange" caption="you score 0" />
@@ -476,7 +481,7 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
           <Card style={{ gap: space.xs }}>
             <SectionLabel>When consistency wins</SectionLabel>
             <AppText variant="small">
-              If the other person is on your side — like Nina trying to find you in Lesson 3 — being predictable is exactly what helps. Unpredictability pays only against someone who gains by reading you.
+              If the other person is on your side — like Nina trying to find you in Lesson 4 — being predictable is exactly what helps. Unpredictability pays only against someone who gains by reading you.
             </AppText>
           </Card>
         </>
@@ -505,6 +510,7 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
         </>
       ),
     },
+    ...pairedScenarioSteps(lesson.id, scenarioDone),
     {
       key: 'done',
       render: () => (
@@ -517,9 +523,9 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
             'A mixed strategy can make your result independent of the opponent’s choice.',
             'Short-run results are noisy; judge a strategy by its expected value.',
           ]}
-          recap={predictabilityRecap({ shots: data.shots, comparePick: lockedAnswer(data.comparePrediction), labPick: lockedAnswer(data.labPrediction) })}
+          recap={[...predictabilityRecap({ shots: data.shots, comparePick: lockedAnswer(data.comparePrediction), labPick: lockedAnswer(data.labPrediction) }), ...scenarioRecap(lesson.id, learning)]}
           reflection="Where could someone exploit a routine of yours — and where does the same routine help the people on your side?"
-          nextHook="So far you have played inside the rules. Next, you get to rewrite them."
+          nextHook="So far you have faced one opponent's guesses. Next, compete in a market, where every move you make shifts your rival's best reply."
           onReplay={restart}
         />
       ),

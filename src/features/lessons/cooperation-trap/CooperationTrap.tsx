@@ -24,6 +24,8 @@ import {
 import { TransferQuestion, type TransferOption } from '@/src/components/lesson/TransferQuestion';
 import { useEnter } from '@/src/components/lesson/motion';
 import { useLessonFlow } from '@/src/components/lesson/useLessonFlow';
+import { useProgress } from '@/src/store/progress';
+import { pairedScenarioSteps, scenarioRecap } from '../curriculum/scenarioSteps';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
@@ -141,8 +143,11 @@ const TRANSFER_ANALOGY = {
 };
 
 export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
-  const TOTAL = 12;
+  // The three paired scenarios sit just before completion, so steps saved before they existed keep their meaning.
+  const TOTAL = 15;
   const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL, cooperationRecords);
+  const scenarioDone = useProgress((s) => s.scenarioDone);
+  const learning = useProgress((s) => s.learning);
   const enter = useEnter();
 
   const outcome = data.choice && data.rival ? { row: data.choice, col: data.rival } : null;
@@ -161,7 +166,7 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
           <Animated.View entering={enter(0, 'fade')} style={{ borderRadius: 20, overflow: 'hidden' }}>
             <SceneArt scene="market" height={180} />
           </Animated.View>
-          <StepHeading kicker="Lesson 1" title="Two apps. One city." body="Food delivery here comes down to two companies. You run one of them." clip="l1.intro.heading" />
+          <StepHeading kicker={`Lesson ${lesson.number}`} title="Two apps. One city." body="Food delivery here comes down to two companies. You run one of them." clip="l1.intro.heading" />
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             <Card style={{ flex: 1, gap: space.sm, borderTopWidth: 3, borderTopColor: colors.primary }}>
               <CompanyBadge side="you" />
@@ -590,6 +595,7 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
         </>
       ),
     },
+    ...pairedScenarioSteps(lesson.id, scenarioDone),
     {
       // Reflection: the insight, this learner's path, and a question to carry forward.
       key: 'done',
@@ -603,16 +609,16 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
             'Compare the predicted outcome with what both would prefer.',
             'Lasting cooperation usually needs changed incentives, not just promises.',
           ]}
-          recap={cooperationRecap({
+          recap={[...cooperationRecap({
             predicted,
             reason: predicted ? data.predictReason : null,
             choice: data.choice,
             rival: data.rival,
             promise: data.promise,
             penaltyGuess,
-          })}
+          }), ...scenarioRecap(lesson.id, learning)]}
           reflection="Think of a place where everyone would be better off holding back — but each person gains by not holding back. What would have to change in the payoffs to make holding back the better choice?"
-          nextHook="Here, your best move didn't depend on Rohan. Next, the right answer depends entirely on how deeply everyone else thinks."
+          nextHook="Here, one move was best whatever Rohan did. Next, learn to spot moves like that — and rule out the ones nobody should make — in any payoff table."
           onReplay={restart}
         />
       ),

@@ -22,6 +22,8 @@ import {
 import { TransferQuestion, type TransferOption } from '@/src/components/lesson/TransferQuestion';
 import { useEnter } from '@/src/components/lesson/motion';
 import { useLessonFlow } from '@/src/components/lesson/useLessonFlow';
+import { useProgress } from '@/src/store/progress';
+import { pairedScenarioSteps, scenarioRecap } from '../curriculum/scenarioSteps';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
@@ -151,8 +153,11 @@ const ordinal = (n: number) => {
 };
 
 export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
-  const TOTAL = 11;
+  // The three paired scenarios sit just before completion, so steps saved before they existed keep their meaning.
+  const TOTAL = 14;
   const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL, detectiveRecords);
+  const scenarioDone = useProgress((s) => s.scenarioDone);
+  const learning = useProgress((s) => s.learning);
   const enter = useEnter();
 
   const round1 = data.committed1 ? playRound(data.guess1, ROUND1_POP, ROUND1_SEED) : null;
@@ -169,7 +174,7 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
           <Animated.View entering={enter(0, 'fade')} style={{ borderRadius: 20, overflow: 'hidden' }}>
             <SceneArt scene="crowd" height={170} />
           </Animated.View>
-          <StepHeading kicker="Lesson 2" title="Guess two-thirds of the average" body="You and ten other players each secretly pick a whole number from 0 to 100." clip="l2.intro.heading" />
+          <StepHeading kicker={`Lesson ${lesson.number}`} title="Guess two-thirds of the average" body="You and ten other players each secretly pick a whole number from 0 to 100." clip="l2.intro.heading" />
           <Dialogue character="sen" expression="explaining" clip="l2.intro.sen">
             The target is two-thirds of everyone&apos;s average pick — yours included. Closest to the target wins.
           </Dialogue>
@@ -390,6 +395,9 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
               <Panel tone="insight" title="Theory predicts 0. Real crowds don't play 0.">
                 Repeating the elimination forever leaves only 0. But that requires everyone to reason all the way down and to trust that everyone else does too. In the rounds you played, the winning number came from modelling the actual crowd.
               </Panel>
+              <AppText variant="caption" color={colors.textMuted}>
+                Strictly, that is for any number from 0 to 100. With whole-number guesses only, everyone picking 1 is stable too: a lone 0 would land further from the target.
+              </AppText>
               <Card style={{ gap: space.xs }}>
                 <SectionLabel>With real people</SectionLabel>
                 <AppText variant="small">
@@ -425,6 +433,7 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
         </>
       ),
     },
+    ...pairedScenarioSteps(lesson.id, scenarioDone),
     {
       key: 'done',
       render: () => (
@@ -437,9 +446,9 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
             'Theory tells you where perfect reasoning leads; real players often stop earlier.',
             'Thinking one step beyond the crowd usually beats thinking ten steps beyond it.',
           ]}
-          recap={detectiveRecap({ averageGuess, round1, round2 })}
+          recap={[...detectiveRecap({ averageGuess, round1, round2 }), ...scenarioRecap(lesson.id, learning)]}
           reflection="Think of a recent choice that depended on what other people would do — a queue, a sale, a deadline. Did you assume they'd think one step ahead, or several? What would have told you which?"
-          nextHook="Here, everyone wanted to out-think each other. Next, two people want the same thing — to find each other — and still might fail."
+          nextHook="Here, you reasoned about how others think. Next, reason about who they are — when their type is hidden from you."
           onReplay={restart}
         />
       ),

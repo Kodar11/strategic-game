@@ -8,7 +8,8 @@ import { Portrait } from '@/src/components/characters/Portrait';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Badge, Card } from '@/src/components/ui/Card';
-import { type LessonMeta, nextLesson } from '@/src/content/lessons';
+import { type LessonMeta, LESSONS, nextLesson } from '@/src/content/lessons';
+import { moduleCheckpoint } from '@/src/features/assessments/content';
 import { challengesFor } from '@/src/features/challenges/content';
 import { isTried } from '@/src/features/challenges/progress';
 import { useProgress } from '@/src/store/progress';
@@ -54,6 +55,9 @@ export function Completion({
   const learning = useProgress((s) => s.learning);
   const challenges = challengesFor(lesson.id);
   const tried = challenges.filter((c) => isTried(learning, c.id)).length;
+  // The last lesson of a module leads into that module's checkpoint.
+  const endsModule = LESSONS.filter((l) => l.module === lesson.module).at(-1)?.id === lesson.id;
+  const checkpoint = endsModule ? moduleCheckpoint(lesson.module) : null;
 
   useEffect(() => {
     haptic.success();
@@ -120,7 +124,20 @@ export function Completion({
         </Animated.View>
       ) : null}
 
-      {practiceOpen ? (
+      {checkpoint ? (
+        <Animated.View entering={enter(205)} style={styles.practice}>
+          <AppText variant="overline" color={colors.primaryText}>
+            Module checkpoint
+          </AppText>
+          <AppText variant="heading">{checkpoint.title}</AppText>
+          <AppText variant="small" color={colors.textBody}>
+            {checkpoint.items.length} short questions that combine this module’s ideas. Your first score is kept; you can retake any time.
+          </AppText>
+          <Button label="Take the checkpoint" icon={ArrowRight} compact onPress={() => router.push({ pathname: '/checkpoint/[assessmentId]', params: { assessmentId: checkpoint.id } })} />
+        </Animated.View>
+      ) : null}
+
+      {practiceOpen && challenges.length ? (
         <Animated.View entering={enter(210)} style={styles.practice}>
           <AppText variant="overline" color={colors.primaryText}>
             Practice
