@@ -2,11 +2,12 @@ import { z } from 'zod';
 
 import { type Confidence, type PredictionAttempt, confidenceSchema } from '../../components/lesson/prediction-state.ts';
 import type { Verdict } from '../../components/lesson/verdict.ts';
-import { LESSONS, type LessonId, lessonIdSchema } from '../../content/lessons.ts';
-import { ASSESSMENTS } from '../assessments/content.ts';
+import { catalog } from '../../content/catalog.ts';
+import { type LessonId, allLessons, lessonIdSchema } from '../../content/lessons.ts';
+import { allAssessments } from '../assessments/content.ts';
 import type { AssessmentRuns } from '../assessments/scoring.ts';
-import { CHALLENGES, type Challenge, getChallenge } from '../challenges/content.ts';
-import { SCENARIOS, getScenario } from '../scenarios/index.ts';
+import { type Challenge, allChallenges, getChallenge } from '../challenges/content.ts';
+import { getScenario, allScenarios } from '../scenarios/index.ts';
 import type { EvaluationBasis, SkillArea } from './types.ts';
 
 export type { EvaluationBasis, SkillArea } from './types.ts';
@@ -29,28 +30,42 @@ export const LEARNING_SCHEMA_VERSION = 2;
 /** Retries beyond this are trimmed (oldest first) so storage stays small. First attempts are always kept. */
 export const MAX_ATTEMPTS = 500;
 
-export const SKILLS: readonly { id: SkillArea; label: string; description: string; lesson: LessonId }[] = [
-  { id: 'anticipating', label: 'Anticipating others', description: 'Reasoning about what other players will choose.', lesson: 'strategy-detective' },
-  { id: 'incentives', label: 'Understanding incentives', description: 'Seeing how penalties, rewards and payoffs change choices.', lesson: 'incentive-shift' },
-  { id: 'coordination', label: 'Coordination', description: 'Recognising when success depends on aligning choices.', lesson: 'coordination-problem' },
-  { id: 'uncertainty', label: 'Reasoning under uncertainty', description: 'Telling probabilities, predictions and outcomes apart.', lesson: 'predictability-trap' },
-];
+export interface SkillMeta {
+  id: SkillArea;
+  label: string;
+  description: string;
+  lesson: LessonId;
+}
 
-/** Every prediction the lessons ask for. Keys are stable: they appear in exported data. */
-export const PREDICTIONS = {
-  'l1.rival': { lesson: 'cooperation-trap', skill: 'anticipating', basis: 'calculable', question: 'What will Rohan do?' },
-  'l1.penalty': { lesson: 'cooperation-trap', skill: 'incentives', basis: 'calculable', question: 'Smallest penalty that makes maintaining better' },
-  'l2.crowd': { lesson: 'strategy-detective', skill: 'anticipating', basis: 'uncertain', question: 'What will the other ten average?' },
-  'l2.lab': { lesson: 'strategy-detective', skill: 'anticipating', basis: 'calculable', question: 'Against ten Theorists, what happens to your best pick?' },
-  'l3.round1': { lesson: 'coordination-problem', skill: 'coordination', basis: 'uncertain', question: 'Where will Nina go (no clue)?' },
-  'l3.round2': { lesson: 'coordination-problem', skill: 'coordination', basis: 'calculable', question: 'Where will Nina go (shared clue)?' },
-  'l4.compare': { lesson: 'predictability-trap', skill: 'uncertainty', basis: 'calculable', question: 'Which striker will score the most?' },
-  'l4.lab': { lesson: 'predictability-trap', skill: 'uncertainty', basis: 'calculable', question: 'What can an 80/20 mix count on?' },
-  'l5.proposal': { lesson: 'incentive-shift', skill: 'incentives', basis: 'calculable', question: 'Will a 1.5 reward end the price war?' },
-  'l5.detection': { lesson: 'incentive-shift', skill: 'incentives', basis: 'calculable', question: 'Does your rule hold if half of cuts are caught?' },
-} as const satisfies Record<string, { lesson: LessonId; skill: SkillArea; basis: EvaluationBasis; question: string }>;
+/** The four skill areas the profile reports on, in display order. Content: labels and descriptions are editable. */
+export function allSkills(): readonly SkillMeta[] {
+  return catalog().skills;
+}
 
-export type PredictionKey = keyof typeof PREDICTIONS;
+/**
+ * Every prediction the five original lessons ask for. Each key is recorded by its lesson's code, so the list is
+ * part of the app; what the record and profile say about each one (lesson, skill, basis, question) is content.
+ * Keys are stable: they appear in exported data.
+ */
+export const PREDICTION_KEYS = ['l1.rival', 'l1.penalty', 'l2.crowd', 'l2.lab', 'l3.round1', 'l3.round2', 'l4.compare', 'l4.lab', 'l5.proposal', 'l5.detection'] as const;
+
+export interface PredictionMeta {
+  lesson: LessonId;
+  skill: SkillArea;
+  basis: EvaluationBasis;
+  question: string;
+}
+
+export function predictionMeta(key: string): PredictionMeta | undefined {
+  return catalog().lessonPredictions.get(key);
+}
+
+/** Every lesson prediction's metadata, in catalog order. */
+export function allPredictionMeta(): PredictionMeta[] {
+  return [...catalog().lessonPredictions.values()];
+}
+
+export type PredictionKey = (typeof PREDICTION_KEYS)[number];
 
 /** `scenario`: a prediction made in a paired scenario. */
 export type ItemKind = 'lesson' | 'challenge' | 'scenario';
@@ -65,7 +80,8 @@ export interface ItemMeta {
 
 /** What an item is about — a lesson prediction or a challenge. Undefined for ids this version doesn't know. */
 export function itemMeta(id: string): ItemMeta | undefined {
-  if (id in PREDICTIONS) return { kind: 'lesson', ...PREDICTIONS[id as PredictionKey] };
+  const p = predictionMeta(id);
+  if (p) return { kind: 'lesson', ...p };
   const c = getChallenge(id);
   if (c) return { kind: 'challenge', lesson: c.lesson, skill: c.skill, basis: c.basis, question: c.title };
   const s = getScenario(id);
@@ -153,7 +169,8 @@ export const learningAttemptSchema = z.object({
  */
 export function recordAttempt(prediction: PredictionKey, attempt: PredictionAttempt<string>, verdict: Verdict, outcome: string): NewAttempt | null {
   if (!attempt.locked || attempt.answer === null || attempt.confidence === null || attempt.lockedAt === undefined) return null;
-  const meta = PREDICTIONS[prediction];
+  const meta = predictionMeta(prediction);
+  if (!meta) return null;
   return {
     id: `${prediction}@${attempt.lockedAt}`,
     schemaVersion: LEARNING_SCHEMA_VERSION,
@@ -272,13 +289,10 @@ export function firstAttempts(attempts: readonly LearningAttempt[]): LearningAtt
 
 export type GoalId = SkillArea | 'none';
 
-export const GOALS: readonly { id: GoalId; label: string }[] = [
-  { id: 'anticipating', label: 'Anticipating other people’s decisions' },
-  { id: 'incentives', label: 'Understanding incentives and trade-offs' },
-  { id: 'coordination', label: 'Coordinating with others' },
-  { id: 'uncertainty', label: 'Making decisions under uncertainty' },
-  { id: 'none', label: 'No specific goal yet' },
-];
+/** The goal choices, in display order. Content: the labels are editable. */
+export function allGoals(): readonly { id: GoalId; label: string }[] {
+  return catalog().goals;
+}
 
 export const goalSchema = z.enum(['anticipating', 'incentives', 'coordination', 'uncertainty', 'none']);
 
@@ -326,14 +340,16 @@ export function buildLearningExport(input: {
   assessments?: AssessmentRuns;
 }): LearningExport {
   const tried = new Set(input.attempts.filter((a) => a.kind === 'challenge').map((a) => a.prediction));
+  const challenges = allChallenges();
+  const scenarios = allScenarios();
   return {
     format: EXPORT_FORMAT,
     schemaVersion: EXPORT_SCHEMA_VERSION,
     exportedAt: input.now.toISOString(),
     goal: input.goal,
-    lessons: LESSONS.map((l) => {
-      const challenges = CHALLENGES.filter((c) => c.lesson === l.id);
-      const scenarios = SCENARIOS.filter((s) => s.lesson === l.id);
+    lessons: allLessons().map((l) => {
+      const lessonChallenges = challenges.filter((c) => c.lesson === l.id);
+      const lessonScenarios = scenarios.filter((s) => s.lesson === l.id);
       return {
         id: l.id,
         number: l.number,
@@ -341,13 +357,13 @@ export function buildLearningExport(input: {
         title: l.title,
         completed: input.completed.includes(l.id),
         inProgress: input.inProgress.includes(l.id),
-        challengesTried: challenges.filter((c) => tried.has(c.id)).length,
-        challengesTotal: challenges.length,
-        scenariosPlayed: scenarios.filter((s) => input.scenarioDone?.includes(s.id)).length,
-        scenariosTotal: scenarios.length,
+        challengesTried: lessonChallenges.filter((c) => tried.has(c.id)).length,
+        challengesTotal: lessonChallenges.length,
+        scenariosPlayed: lessonScenarios.filter((s) => input.scenarioDone?.includes(s.id)).length,
+        scenariosTotal: lessonScenarios.length,
       };
     }),
-    assessments: ASSESSMENTS.map((a) => {
+    assessments: allAssessments().map((a) => {
       const r = input.assessments?.[a.id];
       return { id: a.id, title: a.title, attempts: r?.attempts ?? 0, firstScore: r?.firstScore ?? null, bestScore: r?.bestScore ?? null, lastScore: r?.lastScore ?? null, maxScore: a.items.length };
     }),

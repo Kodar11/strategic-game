@@ -148,7 +148,27 @@ export interface ScenarioSpec<S = unknown> {
   testSeed?: number;
 }
 
-/** Erase a spec's state type so specs with different state can share one list. */
-export function defineScenario<S>(spec: ScenarioSpec<S>): ScenarioSpec<unknown> {
-  return spec as unknown as ScenarioSpec<unknown>;
+/**
+ * The executable half of a scenario, registered in code (`engines/`): its rules as a state machine and, for
+ * calculable predictions, the solver tests check against the option marked `match`. Everything the learner reads —
+ * setup, rules text, options, feedback, explanations — is content from the database, joined to the engine by `id`
+ * and `version` when the catalog is built (src/content/build.ts). A content row whose version has no engine is
+ * refused, so text can be edited freely but a change of meaning needs a matching engine release.
+ */
+export interface ScenarioEngine<S = unknown> {
+  id: string;
+  version: number;
+  play: ScenarioPlay<S>;
+  solve?: () => string;
+  /** The payoff matrix the engine plays. Content showing a matrix must show exactly this one. */
+  visualGame?: MatrixGame;
+  /** The game tree the engine plays. Content showing a tree must show exactly this one. */
+  visualTree?: GameTree;
+  /** Fixed seed for tests; play-throughs use a fresh seed. */
+  testSeed?: number;
+}
+
+/** Erase an engine's state type so engines with different state can share one list. */
+export function defineEngine<S>(engine: ScenarioEngine<S>): ScenarioEngine<unknown> {
+  return engine as unknown as ScenarioEngine<unknown>;
 }

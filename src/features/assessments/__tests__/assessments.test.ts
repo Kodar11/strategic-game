@@ -1,20 +1,24 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { LESSONS, MODULES } from '../../../content/lessons.ts';
-import { ASSESSMENTS, getAssessment, hilltopInvests, riverbendValue } from '../content.ts';
+import { allLessons, allModules } from '../../../content/lessons.ts';
+import { allAssessments, getAssessment } from '../content.ts';
+import { hilltopInvests, riverbendValue } from '../solvers.ts';
 import { answerItem, assessmentScore, emptyRun, finalUnlocked, itemScore, retakeAssessment, sanitizeAssessmentRuns, submitAssessment } from '../scoring.ts';
+import { installSeedCatalog } from '../../../content/seed.ts';
+
+installSeedCatalog();
 
 describe('Assessments — structure', () => {
   it('has one checkpoint per module plus a separate final assessment', () => {
-    assert.deepEqual(ASSESSMENTS.map((a) => a.id), [...MODULES.map((m) => m.id), 'final']);
+    assert.deepEqual(allAssessments().map((a) => a.id), [...allModules().map((m) => m.id), 'final']);
     assert.ok(getAssessment('final')!.case, 'the final assessment presents its own case');
     assert.ok(getAssessment('final')!.reflection, 'the final assessment asks for a written explanation');
   });
 
   it('every item has unique options, at least one matching answer and a real lesson', () => {
-    const lessonIds = new Set(LESSONS.map((l) => l.id));
-    for (const a of ASSESSMENTS) {
+    const lessonIds = new Set(allLessons().map((l) => l.id));
+    for (const a of allAssessments()) {
       assert.equal(new Set(a.items.map((i) => i.id)).size, a.items.length, a.id);
       for (const i of a.items) {
         assert.ok(lessonIds.has(i.lesson), i.id);
@@ -28,7 +32,7 @@ describe('Assessments — structure', () => {
   });
 
   it('every engine-solved item agrees with the option marked as matching', () => {
-    for (const a of ASSESSMENTS) {
+    for (const a of allAssessments()) {
       for (const i of a.items.filter((x) => x.solve)) {
         assert.equal(i.solve!(), i.options.find((o) => o.verdict === 'match')!.id, i.id);
       }
@@ -36,9 +40,9 @@ describe('Assessments — structure', () => {
   });
 
   it('checkpoint items cover the module’s own lessons', () => {
-    for (const m of MODULES) {
+    for (const m of allModules()) {
       const a = getAssessment(m.id)!;
-      for (const i of a.items) assert.equal(LESSONS.find((l) => l.id === i.lesson)!.module, m.id, i.id);
+      for (const i of a.items) assert.equal(allLessons().find((l) => l.id === i.lesson)!.module, m.id, i.id);
     }
   });
 });
@@ -102,7 +106,7 @@ describe('Assessments — scoring', () => {
   it('opens the final assessment only after every checkpoint was submitted once', () => {
     const runs: Record<string, ReturnType<typeof emptyRun>> = {};
     assert.equal(finalUnlocked(runs), false);
-    for (const m of MODULES) runs[m.id] = { ...emptyRun(getAssessment(m.id)!), attempts: 1 };
+    for (const m of allModules()) runs[m.id] = { ...emptyRun(getAssessment(m.id)!), attempts: 1 };
     assert.equal(finalUnlocked(runs), true);
   });
 

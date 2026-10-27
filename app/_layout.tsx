@@ -10,6 +10,8 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { FontsReadyContext } from '@/src/components/ui/AppText';
+import { MessageScreen } from '@/src/components/ui/MessageScreen';
+import { startAppData, useAppData } from '@/src/data/session';
 import { useMotionReduced } from '@/src/utils/feedback';
 import { colors } from '@/src/theme/tokens';
 
@@ -29,6 +31,12 @@ export default function RootLayout() {
   const [loaded, error] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold });
   const reduced = useMotionReduced();
   const ready = loaded || !!error;
+  const data = useAppData();
+
+  // Content and progress come from Supabase; nothing renders until both have loaded (or failed with a retry).
+  useEffect(() => {
+    void startAppData();
+  }, []);
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => undefined);
@@ -41,22 +49,37 @@ export default function RootLayout() {
     <FontsReadyContext.Provider value={loaded && !error}>
       <ThemeProvider value={theme}>
         <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.bg },
-            animation: reduced ? 'fade' : 'slide_from_right',
-          }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="lesson/[lessonId]" />
-          <Stack.Screen name="profile" />
-          <Stack.Screen name="challenges/index" />
-          <Stack.Screen name="challenges/[lessonId]" />
-          <Stack.Screen name="scenario/[scenarioId]" />
-          <Stack.Screen name="checkpoint/[assessmentId]" />
-          <Stack.Screen name="settings" options={{ presentation: 'modal', animation: reduced ? 'fade' : 'slide_from_bottom' }} />
-        </Stack>
+        {data.status === 'ready' ? (
+          <AppStack reduced={reduced} />
+        ) : (
+          <MessageScreen
+            loading={data.status === 'loading'}
+            title="Couldn’t load the lessons"
+            body={data.status === 'error' ? data.error.message : undefined}
+            onRetry={() => void startAppData()}
+          />
+        )}
       </ThemeProvider>
     </FontsReadyContext.Provider>
+  );
+}
+
+function AppStack({ reduced }: { reduced: boolean }) {
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.bg },
+        animation: reduced ? 'fade' : 'slide_from_right',
+      }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="lesson/[lessonId]" />
+      <Stack.Screen name="profile" />
+      <Stack.Screen name="challenges/index" />
+      <Stack.Screen name="challenges/[lessonId]" />
+      <Stack.Screen name="scenario/[scenarioId]" />
+      <Stack.Screen name="checkpoint/[assessmentId]" />
+      <Stack.Screen name="settings" options={{ presentation: 'modal', animation: reduced ? 'fade' : 'slide_from_bottom' }} />
+    </Stack>
   );
 }

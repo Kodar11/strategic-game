@@ -15,10 +15,10 @@ import type { LessonMeta } from '@/src/content/lessons';
 import { scenariosFor } from '@/src/features/scenarios';
 import { useProgress } from '@/src/store/progress';
 import { colors, space } from '@/src/theme/tokens';
-import { LABS } from './labs';
+import { labFor } from './labs';
 import { LabView } from './LabView';
 import { scenarioRecap, scenarioStep } from './scenarioSteps';
-import { CURRICULUM_LESSONS } from './specs';
+import { curriculumSpec } from './specs';
 
 const schema = z.object({ labDone: z.boolean(), transferPick: z.string().nullable(), transferChecked: z.boolean() });
 type Data = z.infer<typeof schema>;
@@ -31,8 +31,8 @@ const TOTAL = 7;
  * scenario C (transfer) → transfer check → completion. Every gated step needs its interaction finished first.
  */
 export default function CurriculumLesson({ lesson }: { lesson: LessonMeta }) {
-  const spec = CURRICULUM_LESSONS[lesson.id]!;
-  const lab = LABS[lesson.id]!;
+  const spec = curriculumSpec(lesson.id)!;
+  const lab = labFor(lesson.id)!;
   const [a, b, c] = scenariosFor(lesson.id);
   const { step, data, update, goTo, restart } = useLessonFlow(lesson.id, schema, INITIAL, TOTAL);
   const done = useProgress((s) => s.scenarioDone);

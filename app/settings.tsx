@@ -8,7 +8,8 @@ import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
-import { LESSONS } from '@/src/content/lessons';
+import { allLessons } from '@/src/content/lessons';
+import { useSyncStatus } from '@/src/data/session';
 import { buildLearningExport, exportFileName } from '@/src/features/learning/records';
 import { shareJsonFile } from '@/src/features/learning/shareFile';
 import { type ShareOutcome, isShareFailure, shareOutcomeMessage } from '@/src/features/learning/shareOutcome';
@@ -64,8 +65,9 @@ export default function SettingsScreen() {
           <Card style={{ gap: space.md }}>
             <AppText variant="bodyStrong">Progress</AppText>
             <AppText variant="small" color={colors.textMuted}>
-              Progress is saved on this device only. Resetting clears completed lessons, any lesson in progress, your recorded predictions and challenge answers. Your goal is kept.
+              Progress is saved to the app’s server under an anonymous ID kept on this device. Resetting clears completed lessons, any lesson in progress, your recorded predictions and challenge answers. Your goal is kept.
             </AppText>
+            <SyncLine />
             {confirmReset ? (
               <View style={{ flexDirection: 'row', gap: space.sm }}>
                 <Button label="Cancel" variant="secondary" compact onPress={() => setConfirmReset(false)} style={{ flex: 1 }} />
@@ -91,7 +93,7 @@ export default function SettingsScreen() {
 }
 
 /**
- * Export the learning record as JSON. Only on request; the app never sends it anywhere by itself.
+ * Export the learning record as JSON, on request.
  * Uses the same records as the profile (see docs/LEARNING_DATA.md for the format).
  */
 function LearningDataCard() {
@@ -108,7 +110,7 @@ function LearningDataCard() {
     let outcome: ShareOutcome;
     try {
       const { learning: attempts, completed, runtime, goal, scenarioDone, assessmentRuns } = useProgress.getState();
-      const inProgress = LESSONS.filter((l) => (runtime[l.id]?.step ?? 0) > 0).map((l) => l.id);
+      const inProgress = allLessons().filter((l) => (runtime[l.id]?.step ?? 0) > 0).map((l) => l.id);
       const json = JSON.stringify(buildLearningExport({ attempts, completed, inProgress, goal, now, scenarioDone, assessments: assessmentRuns }), null, 2);
       outcome = await shareJsonFile(json, fileName);
     } catch (error) {
@@ -123,7 +125,7 @@ function LearningDataCard() {
     <Card style={{ gap: space.md }}>
       <AppText variant="bodyStrong">Learning data</AppText>
       <AppText variant="small" color={colors.textMuted}>
-        Your predictions and challenge answers — first tries and retries — with confidence ratings and how each was evaluated are kept only on this device. They power your profile. Export a copy as a JSON file to keep, inspect or share — no names or account details are included.
+        Your predictions and challenge answers — first tries and retries — with confidence ratings and how each was evaluated are saved with your progress. They power your profile. Export a copy as a JSON file to keep, inspect or share — no names or account details are included.
       </AppText>
       <AppText variant="caption" color={colors.textMuted}>
         {learning.length === 0
@@ -137,6 +139,24 @@ function LearningDataCard() {
         </AppText>
       ) : null}
     </Card>
+  );
+}
+
+/** Whether recent changes have reached the server. Saving happens in the background; this only reports it. */
+function SyncLine() {
+  const sync = useSyncStatus();
+  const text =
+    sync.state === 'error'
+      ? (sync.message ?? 'A change couldn’t be saved.')
+      : sync.state === 'retrying'
+        ? `Not saved yet — ${sync.pending} ${sync.pending === 1 ? 'change' : 'changes'} waiting. ${sync.message ?? ''} It will retry automatically.`
+        : sync.pending > 0
+          ? 'Saving…'
+          : 'All changes saved.';
+  return (
+    <AppText variant="caption" color={sync.state === 'error' ? colors.danger : colors.textMuted} accessibilityLiveRegion="polite">
+      {text}
+    </AppText>
   );
 }
 

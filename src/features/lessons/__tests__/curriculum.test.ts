@@ -3,17 +3,21 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
-import { LESSONS, LESSON_IDS, MODULES } from '../../../content/lessons.ts';
+import { allLessons, LESSON_IDS, allModules } from '../../../content/lessons.ts';
 import { blockingCoalitions, majorityWinner, shapley, sincereAgenda, sophisticatedAgenda } from '../../../game/collective.ts';
 import { iteratedStrictDominance, rowWeaklyDominatedBy, colWeaklyDominatedBy, subGame, type MatrixGame } from '../../../game/payoff-matrix.ts';
 import { backwardInduction, equilibriumPath } from '../../../game/sequential.ts';
 import { posterior } from '../../../game/information.ts';
 import { shrinkingPieShare } from '../../../game/bargaining.ts';
-import { attritionLab, auctionLab, bayesLab, bargainingLab, coreLab, cournotLab, hawkDoveLab, LABS, lemonsLab, repeatedLab, signalingLab, brinkLab } from '../curriculum/labs.ts';
-import { CURRICULUM_LESSONS } from '../curriculum/specs.ts';
-import { CAPACITY, CENTIPEDE, STACKELBERG } from '../../scenarios/content/module3.ts';
-import { AGENDAS, COMMITTEE, PROJECT } from '../../scenarios/content/module6.ts';
-import { VALUE_WITH_REPORT, VALUE_WITHOUT_REPORT } from '../../scenarios/content/module5.ts';
+import { attritionLab, auctionLab, bayesLab, bargainingLab, coreLab, cournotLab, hawkDoveLab, labFor, lemonsLab, repeatedLab, signalingLab, brinkLab } from '../curriculum/labs.ts';
+import { curriculumSpec } from '../curriculum/specs.ts';
+import { CAPACITY, CENTIPEDE, STACKELBERG } from '../../scenarios/engines/module3.ts';
+import { AGENDAS, COMMITTEE, PROJECT } from '../../scenarios/engines/module6.ts';
+import { VALUE_WITH_REPORT, VALUE_WITHOUT_REPORT } from '../../scenarios/engines/module5.ts';
+import { installSeedCatalog } from '../../../content/seed.ts';
+import { catalog } from '../../../content/catalog.ts';
+
+installSeedCatalog();
 
 const ORIGINAL = ['cooperation-trap', 'coordination-problem', 'predictability-trap', 'incentive-shift', 'strategy-detective'];
 const ROOT = path.resolve(import.meta.dirname, '../../../..');
@@ -21,7 +25,7 @@ const ROOT = path.resolve(import.meta.dirname, '../../../..');
 describe('Curriculum — the approved 22 lessons', () => {
   it('lists exactly the approved titles, in order, in six modules', () => {
     assert.deepEqual(
-      LESSONS.map((l) => `${l.number}. ${l.title}`),
+      allLessons().map((l) => `${l.number}. ${l.title}`),
       [
         '1. The Cooperation Trap',
         '2. Strategy Detective',
@@ -47,9 +51,9 @@ describe('Curriculum — the approved 22 lessons', () => {
         '22. Strategic Thinking in Practice',
       ],
     );
-    assert.deepEqual(LESSONS.map((l) => l.module), ['m1', 'm1', 'm1', 'm2', 'm2', 'm2', 'm2', 'm3', 'm3', 'm3', 'm4', 'm4', 'm4', 'm5', 'm5', 'm5', 'm5', 'm5', 'm6', 'm6', 'm6', 'm6']);
-    assert.equal(MODULES.length, 6);
-    assert.deepEqual([...LESSON_IDS], LESSONS.map((l) => l.id));
+    assert.deepEqual(allLessons().map((l) => l.module), ['m1', 'm1', 'm1', 'm2', 'm2', 'm2', 'm2', 'm3', 'm3', 'm3', 'm4', 'm4', 'm4', 'm5', 'm5', 'm5', 'm5', 'm5', 'm6', 'm6', 'm6', 'm6']);
+    assert.equal(allModules().length, 6);
+    assert.deepEqual([...LESSON_IDS], allLessons().map((l) => l.id));
   });
 
   it('keeps the original lesson IDs, so saved progress and exported records keep their meaning', () => {
@@ -57,16 +61,16 @@ describe('Curriculum — the approved 22 lessons', () => {
   });
 
   it('every new lesson has its content, its lab and a valid transfer check', () => {
-    for (const l of LESSONS.filter((x) => !ORIGINAL.includes(x.id))) {
-      const spec = CURRICULUM_LESSONS[l.id];
+    for (const l of allLessons().filter((x) => !ORIGINAL.includes(x.id))) {
+      const spec = curriculumSpec(l.id)!;
       assert.ok(spec, `${l.id} spec`);
-      assert.ok(LABS[l.id], `${l.id} lab`);
+      assert.ok(labFor(l.id), `${l.id} lab`);
       assert.equal(spec!.objectives.length, 3, l.id);
       assert.equal(spec!.transfer.options.filter((o) => o.verdict === 'strong').length, 1, `${l.id}: one strongest answer`);
       assert.ok(spec!.transfer.options.filter((o) => o.verdict !== 'strong').length >= 2, `${l.id}: real alternatives`);
       assert.ok(spec!.completion.remember.length >= 3, l.id);
     }
-    assert.equal(Object.keys(CURRICULUM_LESSONS).length, 17);
+    assert.equal(catalog().curriculum.size, 17);
   });
 
   it('the shared runner declares as many steps as it renders', () => {

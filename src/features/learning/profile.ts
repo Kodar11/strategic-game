@@ -1,7 +1,7 @@
-import { LESSONS, type LessonId } from '../../content/lessons.ts';
-import { CHALLENGES } from '../challenges/content.ts';
-import { SCENARIOS } from '../scenarios/index.ts';
-import { GOALS, type GoalId, type LearningAttempt, PREDICTIONS, SKILLS, type SkillArea, firstAttempts } from './records.ts';
+import { allLessons, type LessonId } from '../../content/lessons.ts';
+import { allChallenges } from '../challenges/content.ts';
+import { allScenarios } from '../scenarios/index.ts';
+import { allGoals, type GoalId, type LearningAttempt, allPredictionMeta, allSkills, type SkillArea, firstAttempts } from './records.ts';
 
 /**
  * The Strategic Thinking Profile, derived only from the learning record and lesson progress. Deterministic and
@@ -109,7 +109,7 @@ export interface Profile {
   goal: GoalId | null;
 }
 
-const lessonTitle = (id: LessonId) => LESSONS.find((l) => l.id === id)!.title;
+const lessonTitle = (id: LessonId) => allLessons().find((l) => l.id === id)!.title;
 /** How each area reads inside a sentence. */
 const TOPIC: Record<SkillArea, string> = {
   anticipating: 'anticipating others',
@@ -134,12 +134,12 @@ const matchedOf = (attempts: readonly LearningAttempt[]) => attempts.filter((a) 
 const isWeak = (s: SkillSummary) => s.judged >= MIN_AREA_EVIDENCE && s.matched * 2 <= s.judged;
 const isStrong = (s: SkillSummary, min = MIN_AREA_EVIDENCE) => s.judged >= min && s.matched * 4 >= s.judged * 3;
 
-const challengesOf = (lesson: LessonId) => CHALLENGES.filter((c) => c.lesson === lesson);
+const challengesOf = (lesson: LessonId) => allChallenges().filter((c) => c.lesson === lesson);
 const untriedChallenges = (lesson: LessonId, attempts: readonly LearningAttempt[]) =>
   challengesOf(lesson).filter((c) => !attempts.some((a) => a.prediction === c.id)).length;
 
 export function summariseSkills(first: readonly LearningAttempt[]): SkillSummary[] {
-  return SKILLS.map((s) => {
+  return allSkills().map((s) => {
     const inArea = first.filter((a) => a.skill === s.id);
     const judged = judgedOf(inArea);
     const matched = matchedOf(judged);
@@ -210,7 +210,7 @@ export function summarisePractice(attempts: readonly LearningAttempt[], first: r
     : 'Not enough evidence yet — retry a question you first missed to see what changes.';
 
   // Transfer: first tries at different challenges, per lesson concept.
-  const lines: TransferLine[] = LESSONS.flatMap((l) => {
+  const lines: TransferLine[] = allLessons().flatMap((l) => {
     const tries = judged.filter((a) => a.kind === 'challenge' && a.lesson === l.id);
     if (tries.length < MIN_TRANSFER_SCENARIOS) return [];
     const m = matchedOf(tries);
@@ -381,8 +381,8 @@ export function nextStep(input: ProfileInput, skills: readonly SkillSummary[]): 
   };
 
   if (input.goal && input.goal !== 'none') {
-    const skill = SKILLS.find((s) => s.id === input.goal)!;
-    const goalLabel = GOALS.find((g) => g.id === input.goal)!.label.toLowerCase();
+    const skill = allSkills().find((s) => s.id === input.goal)!;
+    const goalLabel = allGoals().find((g) => g.id === input.goal)!.label.toLowerCase();
     return practiceOrLesson(
       skill.lesson,
       'goal',
@@ -395,11 +395,11 @@ export function nextStep(input: ProfileInput, skills: readonly SkillSummary[]): 
   if (weakest) {
     return practiceOrLesson(weakest.lesson, 'gap', `Practise ${TOPIC[weakest.id]}: ${weakest.description.toLowerCase()}`);
   }
-  const resume = LESSONS.find((l) => input.inProgress.includes(l.id)) ?? LESSONS.find((l) => !done(l.id));
+  const resume = allLessons().find((l) => input.inProgress.includes(l.id)) ?? allLessons().find((l) => !done(l.id));
   if (resume) {
     return lessonStep(resume.id, 'next-lesson', resume.description);
   }
-  const practise = LESSONS.find((l) => untriedChallenges(l.id, input.attempts) > 0);
+  const practise = allLessons().find((l) => untriedChallenges(l.id, input.attempts) > 0);
   if (practise) {
     return challengeStep(practise.id, 'practice', `${plural(untriedChallenges(practise.id, input.attempts), 'short challenge')} apply this idea to new situations.`);
   }
@@ -416,11 +416,11 @@ export function buildProfile(input: ProfileInput): Profile {
   return {
     progress: {
       completed: input.completed.length,
-      total: LESSONS.length,
+      total: allLessons().length,
       inProgress: input.inProgress.length,
       predictions: input.attempts.filter((a) => a.kind === 'lesson' || a.kind === 'scenario').length,
       challengesTried: tried.size,
-      challengesTotal: CHALLENGES.length,
+      challengesTotal: allChallenges().length,
     },
     skills,
     primary,
@@ -434,7 +434,7 @@ export function buildProfile(input: ProfileInput): Profile {
 
 /** The lessons whose predictions or challenges inform an area — for "where does this come from?" copy. */
 export function lessonsForSkill(skill: SkillArea): LessonId[] {
-  const fromLessons = Object.values(PREDICTIONS).filter((p) => p.skill === skill).map((p) => p.lesson);
-  const from = new Set<LessonId>([...fromLessons, ...CHALLENGES.filter((c) => c.skill === skill).map((c) => c.lesson), ...SCENARIOS.filter((s) => s.skill === skill).map((s) => s.lesson)]);
-  return LESSONS.map((l) => l.id).filter((id) => from.has(id));
+  const fromLessons = allPredictionMeta().filter((p) => p.skill === skill).map((p) => p.lesson);
+  const from = new Set<LessonId>([...fromLessons, ...allChallenges().filter((c) => c.skill === skill).map((c) => c.lesson), ...allScenarios().filter((s) => s.skill === skill).map((s) => s.lesson)]);
+  return allLessons().map((l) => l.id).filter((id) => from.has(id));
 }

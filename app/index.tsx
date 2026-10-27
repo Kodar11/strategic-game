@@ -12,10 +12,10 @@ import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Card';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
-import { LESSONS, type LessonId, type LessonMeta, MODULES, type ModuleMeta } from '@/src/content/lessons';
-import { ASSESSMENTS, type Assessment, getAssessment, moduleCheckpoint, splitAssessmentTitle } from '@/src/features/assessments/content';
+import { allLessons, type LessonId, type LessonMeta, allModules, type ModuleMeta } from '@/src/content/lessons';
+import { allAssessments, type Assessment, getAssessment, moduleCheckpoint, splitAssessmentTitle } from '@/src/features/assessments/content';
 import { type AssessmentRun, finalUnlocked } from '@/src/features/assessments/scoring';
-import { SCENARIOS } from '@/src/features/scenarios';
+import { allScenarios } from '@/src/features/scenarios';
 import { type LessonRuntime, useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, shadow, space } from '@/src/theme/tokens';
 
@@ -39,10 +39,10 @@ export default function Home() {
   if (!hydrated) return <MessageScreen loading />;
 
   // Resume the most recently touched unfinished lesson; otherwise suggest the first lesson not yet completed.
-  const resume = LESSONS.filter((l) => runtime[l.id] && runtime[l.id]!.step > 0).sort(
+  const resume = allLessons().filter((l) => runtime[l.id] && runtime[l.id]!.step > 0).sort(
     (a, b) => runtime[b.id]!.updatedAt - runtime[a.id]!.updatedAt,
   )[0];
-  const suggested = resume ?? LESSONS.find((l) => !completed.includes(l.id));
+  const suggested = resume ?? allLessons().find((l) => !completed.includes(l.id));
   const doneCount = completed.length;
 
   return (
@@ -117,7 +117,7 @@ export default function Home() {
             <Pressable
               onPress={() => router.push('/challenges')}
               accessibilityRole="button"
-              accessibilityLabel={`Practice in new situations. ${played} of ${SCENARIOS.length} scenarios played. No lesson required.`}
+              accessibilityLabel={`Practice in new situations. ${played} of ${allScenarios().length} scenarios played. No lesson required.`}
               style={({ pressed }) => [styles.practice, pressed && { backgroundColor: colors.surfaceHigh }]}>
               <View style={styles.practiceIcon}>
                 <Target size={20} color={colors.primaryText} strokeWidth={2.2} />
@@ -125,7 +125,7 @@ export default function Home() {
               <View style={{ flex: 1, gap: 2 }}>
                 <AppText variant="bodyStrong">Practice in new situations</AppText>
                 <AppText variant="caption" color={colors.textMuted}>
-                  {played} of {SCENARIOS.length} scenarios played · open any time
+                  {played} of {allScenarios().length} scenarios played · open any time
                 </AppText>
               </View>
               <ArrowRight size={18} color={colors.textMuted} />
@@ -135,21 +135,21 @@ export default function Home() {
           <View style={styles.sectionHead}>
             <AppText variant="heading">Lessons</AppText>
             <AppText variant="small" color={colors.textMuted} tabular>
-              {doneCount} of {LESSONS.length} complete
+              {doneCount} of {allLessons().length} complete
             </AppText>
           </View>
 
           <View style={{ gap: space.xxl }}>
-            {MODULES.map((m, mi) => (
+            {allModules().map((m, mi) => (
               <Animated.View key={m.id} entering={enter(120 + mi * 60)} style={{ gap: space.lg }}>
-                <ModuleHeader module={m} done={LESSONS.filter((l) => l.module === m.id && completed.includes(l.id)).length} total={LESSONS.filter((l) => l.module === m.id).length} />
-                {LESSONS.filter((l) => l.module === m.id).map((lesson) => (
+                <ModuleHeader module={m} done={allLessons().filter((l) => l.module === m.id && completed.includes(l.id)).length} total={allLessons().filter((l) => l.module === m.id).length} />
+                {allLessons().filter((l) => l.module === m.id).map((lesson) => (
                   <LessonCard key={lesson.id} lesson={lesson} done={completed.includes(lesson.id)} run={runtime[lesson.id]} />
                 ))}
                 <AssessmentCard a={moduleCheckpoint(m.id)} run={assessmentRuns[m.id]} />
               </Animated.View>
             ))}
-            <AssessmentCard a={getAssessment('final')!} run={assessmentRuns.final} locked={!finalUnlocked(assessmentRuns)} unlockedCount={ASSESSMENTS.filter((x) => x.id !== 'final' && (assessmentRuns[x.id]?.attempts ?? 0) > 0).length} final />
+            <AssessmentCard a={getAssessment('final')!} run={assessmentRuns.final} locked={!finalUnlocked(assessmentRuns)} unlockedCount={allAssessments().filter((x) => x.id !== 'final' && (assessmentRuns[x.id]?.attempts ?? 0) > 0).length} final />
           </View>
 
           <AppText variant="caption" color={colors.textFaint} align="center" style={{ marginTop: space.xxl }}>

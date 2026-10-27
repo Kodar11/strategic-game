@@ -9,7 +9,7 @@ import {
 import type { Feedback } from '../../components/lesson/verdict.ts';
 import type { LessonId } from '../../content/lessons.ts';
 import { type LearningAttempt, mergeAttempts, recordChallengeAttempt } from '../learning/records.ts';
-import { type Challenge, CHALLENGES, challengesFor, getChallenge } from './content.ts';
+import { type Challenge, allChallenges, challengesFor, getChallenge } from './content.ts';
 
 /**
  * Challenge progress, as pure functions over two pieces of persisted state:
@@ -82,7 +82,7 @@ export function isTried(learning: readonly LearningAttempt[], id: string): boole
 }
 
 export function triedCount(learning: readonly LearningAttempt[], lesson?: LessonId): number {
-  return CHALLENGES.filter((c) => (!lesson || c.lesson === lesson) && isTried(learning, c.id)).length;
+  return allChallenges().filter((c) => (!lesson || c.lesson === lesson) && isTried(learning, c.id)).length;
 }
 
 /** Where to open a lesson's challenges: a draft in progress first, then the first untried, else the summary. */

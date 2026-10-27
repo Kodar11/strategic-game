@@ -15,8 +15,8 @@ import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
-import { LESSONS, type LessonMeta, getLesson } from '@/src/content/lessons';
-import { CONCEPT_REVIEW, type Challenge, challengesFor } from '@/src/features/challenges/content';
+import { LESSON_IDS, type LessonMeta, getLesson } from '@/src/content/lessons';
+import { conceptReview, type Challenge, challengesFor } from '@/src/features/challenges/content';
 import {
   attemptsAt,
   challengeFeedback,
@@ -29,8 +29,9 @@ import { useProgress } from '@/src/store/progress';
 import { haptic, useMotionReduced } from '@/src/utils/feedback';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
+// Static web export renders every page the app can show; content (loaded at run time) decides what each page holds.
 export function generateStaticParams() {
-  return LESSONS.filter((l) => challengesFor(l.id).length).map((l) => ({ lessonId: l.id }));
+  return LESSON_IDS.map((lessonId) => ({ lessonId }));
 }
 
 /** Practice challenges for one lesson. Every challenge is open, whether or not the lesson has been taken. */
@@ -122,7 +123,7 @@ function ChallengeView({ challenge, index, total, lesson }: { challenge: Challen
   const strongest = strongestOptions(challenge);
   const first = history[0];
   const firstLabel = first ? challenge.options.find((o) => o.id === first.answer)?.label : null;
-  const review = CONCEPT_REVIEW[lesson.id]!;
+  const review = conceptReview(lesson.id)!;
   // Shown on any attempt after the first: the first answer is kept and this one is recorded separately.
   const isRetry = !!first && first.lockedAt !== attempt.lockedAt;
 
@@ -249,7 +250,7 @@ function Summary({ lesson, onOpen }: { lesson: LessonMeta; onOpen: (i: number) =
               : 'No challenges answered yet.'}
         </AppText>
         <AppText variant="small" color={colors.textMuted} align="center">
-          {CONCEPT_REVIEW[lesson.id]!.concept}
+          {conceptReview(lesson.id)!.concept}
         </AppText>
       </Animated.View>
 

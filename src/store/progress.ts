@@ -3,44 +3,33 @@ import { Platform } from 'react-native';
 import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 
-import { LESSON_IDS, type LessonId, lessonIdSchema } from '@/src/content/lessons';
-import { type ChallengeDrafts, retryChallenge, sanitizeChallengeDrafts, submitChallenge } from '@/src/features/challenges/progress';
+import type { LessonId } from '@/src/content/lessons';
+import { retryChallenge, submitChallenge } from '@/src/features/challenges/progress';
 import type { PredictionAttempt } from '@/src/components/lesson/prediction-state';
 import { type AssessmentId, getAssessment } from '@/src/features/assessments/content';
-import { type AssessmentRuns, answerItem, currentAssessmentRun, retakeAssessment, sanitizeAssessmentRuns, submitAssessment } from '@/src/features/assessments/scoring';
-import { type ScenarioRuns, applyScenarioInput, lockScenarioPrediction, restartScenario, sanitizeScenarioDone, sanitizeScenarioRuns, setScenarioPrediction } from '@/src/features/scenarios/runtime';
+import { answerItem, currentAssessmentRun, retakeAssessment, submitAssessment } from '@/src/features/assessments/scoring';
+import { applyScenarioInput, lockScenarioPrediction, restartScenario, setScenarioPrediction } from '@/src/features/scenarios/runtime';
 import type { Input } from '@/src/features/scenarios/types';
-import { type GoalId, type LearningAttempt, type NewAttempt, mergeAttempts, sanitizeAttempts, sanitizeGoal } from '@/src/features/learning/records';
+import { type GoalId, type NewAttempt, mergeAttempts } from '@/src/features/learning/records';
+import { EMPTY_PROGRESS, type ProgressData, sanitizeProgress } from './progress-state';
 import { DEFAULT_SETTINGS, type Settings, sanitizeSettings } from './settings';
 
 export type { Settings } from './settings';
+export type { LessonRuntime } from './progress-state';
 
-export interface LessonRuntime {
-  /** Total steps in the lesson when saved, for progress display. */
-  total: number;
-  step: number;
-  /** Lesson-specific state; each lesson validates it with its own schema on resume. */
-  data: unknown;
-  updatedAt: number;
-}
-
-interface ProgressState {
-  completed: LessonId[];
-  runtime: Partial<Record<LessonId, LessonRuntime>>;
+/**
+ * The app's progress state. Learner progress (`ProgressData`) is loaded from Supabase at start-up and every change
+ * is written back through the sync outbox (src/data/session.ts); the store itself stays synchronous, so screens
+ * behave exactly as before. Only `settings` — device preferences — is kept on the device.
+ */
+interface ProgressState extends ProgressData {
   settings: Settings;
-  /** Evaluated prediction attempts — the source of truth for the profile and the export. Survives completion. */
-  learning: LearningAttempt[];
-  /** Optional "what would you like to get better at?" answer. Null until the learner chooses. */
-  goal: GoalId | null;
-  /** The current attempt at each practice challenge (draft or submitted). Submissions themselves live in `learning`. */
-  challengeDrafts: ChallengeDrafts;
-  /** The current run of each paired scenario (prediction, inputs, seed). Finished predictions also go to `learning`. */
-  scenarioRuns: ScenarioRuns;
-  /** Scenarios finished at least once; replays never remove one. */
-  scenarioDone: string[];
-  /** Module checkpoints and the final assessment: answers and first / best / latest scores. */
-  assessmentRuns: AssessmentRuns;
+  /** True once the learner's progress has been loaded from the server. */
   hydrated: boolean;
+  /** Counts progress resets, so the sync layer can tell a reset from ordinary changes. */
+  resets: number;
+  /** Replace the learner's progress with what the server returned (validated as saved progress always was). */
+  hydrate: (saved: unknown) => void;
   saveRuntime: (id: LessonId, step: number, total: number, data: unknown) => void;
   clearRuntime: (id: LessonId) => void;
   markComplete: (id: LessonId) => void;
@@ -66,21 +55,27 @@ interface ProgressState {
 
 /** Static web rendering runs in Node where there is no localStorage; fall back to a no-op store there. */
 const noopStorage: StateStorage = { getItem: () => null, setItem: () => undefined, removeItem: () => undefined };
-const storage = Platform.OS === 'web' && typeof window === 'undefined' ? noopStorage : AsyncStorage;
+const deviceStorage = Platform.OS === 'web' && typeof window === 'undefined' ? noopStorage : AsyncStorage;
+
+/** Before the migration everything was saved under this key. Only its settings are read (once); then it is removed. */
+const LEGACY_KEY = 'strategic-game/progress';
+const storage: StateStorage = {
+  getItem: async (name) => (await deviceStorage.getItem(name)) ?? (await deviceStorage.getItem(LEGACY_KEY)),
+  setItem: async (name, value) => {
+    await deviceStorage.setItem(name, value);
+    await deviceStorage.removeItem(LEGACY_KEY);
+  },
+  removeItem: (name) => deviceStorage.removeItem(name),
+};
 
 export const useProgress = create<ProgressState>()(
   persist(
     (set) => ({
-      completed: [],
-      runtime: {},
+      ...EMPTY_PROGRESS,
       settings: DEFAULT_SETTINGS,
-      learning: [],
-      goal: null,
-      challengeDrafts: {},
-      scenarioRuns: {},
-      scenarioDone: [],
-      assessmentRuns: {},
       hydrated: false,
+      resets: 0,
+      hydrate: (saved) => set({ ...sanitizeProgress(saved), hydrated: true }),
       saveRuntime: (id, step, total, data) =>
         set((s) => ({ runtime: { ...s.runtime, [id]: { step, total, data, updatedAt: Date.now() } } })),
       clearRuntime: (id) =>
@@ -163,51 +158,15 @@ export const useProgress = create<ProgressState>()(
           return { assessmentRuns: { ...s.assessmentRuns, [id]: { ...run, rubric } } };
         }),
       // Resetting progress also clears the learning history built from it; the goal is a preference and stays.
-      resetProgress: () => set({ completed: [], runtime: {}, learning: [], challengeDrafts: {}, scenarioRuns: {}, scenarioDone: [], assessmentRuns: {} }),
+      resetProgress: () => set((s) => ({ completed: [], runtime: {}, learning: [], challengeDrafts: {}, scenarioRuns: {}, scenarioDone: [], assessmentRuns: {}, resets: s.resets + 1 })),
     }),
     {
-      name: 'strategic-game/progress',
+      // Device preferences only. Learner progress lives in Supabase.
+      name: 'strategic-game/settings',
       version: 1,
       storage: createJSONStorage(() => storage),
-      partialize: ({ completed, runtime, settings, learning, goal, challengeDrafts, scenarioRuns, scenarioDone, assessmentRuns }) => ({
-        completed,
-        runtime,
-        settings,
-        learning,
-        goal,
-        challengeDrafts,
-        scenarioRuns,
-        scenarioDone,
-        assessmentRuns,
-      }),
-      // Drop anything unrecognised so a corrupted or older save can never break the app.
-      merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<ProgressState>;
-        const completed = Array.isArray(p.completed)
-          ? p.completed.filter((id): id is LessonId => lessonIdSchema.safeParse(id).success)
-          : [];
-        const runtime: ProgressState['runtime'] = {};
-        if (p.runtime && typeof p.runtime === 'object') {
-          for (const id of LESSON_IDS) {
-            const r = p.runtime[id];
-            if (r && Number.isFinite(r.step) && Number.isFinite(r.total)) runtime[id] = r;
-          }
-        }
-        const settings = sanitizeSettings(p.settings);
-        // Saves from before the learning record existed simply start with an empty history.
-        const learning = sanitizeAttempts(p.learning);
-        const goal = sanitizeGoal(p.goal);
-        // Saves from before practice challenges existed have no drafts.
-        const challengeDrafts = sanitizeChallengeDrafts(p.challengeDrafts);
-        // Saves from before the 22-lesson curriculum simply have no scenario or assessment state yet.
-        const scenarioRuns = sanitizeScenarioRuns(p.scenarioRuns);
-        const scenarioDone = sanitizeScenarioDone(p.scenarioDone);
-        const assessmentRuns = sanitizeAssessmentRuns(p.assessmentRuns);
-        return { ...current, completed, runtime, settings, learning, goal, challengeDrafts, scenarioRuns, scenarioDone, assessmentRuns };
-      },
-      onRehydrateStorage: () => () => {
-        useProgress.setState({ hydrated: true });
-      },
+      partialize: ({ settings }) => ({ settings }),
+      merge: (persisted, current) => ({ ...current, settings: sanitizeSettings((persisted as { settings?: unknown } | null)?.settings) }),
     },
   ),
 );

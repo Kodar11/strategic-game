@@ -2,11 +2,14 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { backwardInduction, equilibriumPath } from '../../../game/sequential.ts';
-import { LABS } from '../../lessons/curriculum/labs.ts';
-import { WEEKEND_BONUS } from '../content/module3.ts';
-import { SCENARIOS, getScenario } from '../index.ts';
+import { WEEKEND_BONUS } from '../engines/module3.ts';
+import { allScenarios, getScenario } from '../index.ts';
 import { alternatives, compareValues, freshRun } from '../runtime.ts';
 import type { Input, ScenarioSpec } from '../types.ts';
+import { installSeedCatalog } from '../../../content/seed.ts';
+import { catalog } from '../../../content/catalog.ts';
+
+installSeedCatalog();
 
 /** A finished single-decision run with the given input. */
 function runWith(spec: ScenarioSpec, input: Input, seed = 7) {
@@ -22,7 +25,7 @@ function firstInput(spec: ScenarioSpec): Input | null {
 
 describe('Compare your options', () => {
   it('never compares one run’s luck: random scenarios need an expected-value stat', () => {
-    for (const s of SCENARIOS) {
+    for (const s of allScenarios()) {
       const input = firstInput(s);
       if (input === null) continue;
       const view = alternatives(s, runWith(s, input));
@@ -34,7 +37,7 @@ describe('Compare your options', () => {
   });
 
   it('is available for most single-decision scenarios', () => {
-    const n = SCENARIOS.filter((s) => {
+    const n = allScenarios().filter((s) => {
       const input = firstInput(s);
       return input !== null && alternatives(s, runWith(s, input)) !== null;
     }).length;
@@ -42,7 +45,7 @@ describe('Compare your options', () => {
   });
 
   it('every configured stat exists and every configured value is on the slider grid', () => {
-    for (const s of SCENARIOS) {
+    for (const s of allScenarios()) {
       if (!s.explore) continue;
       const p = s.play.prompt(s.play.init(1))!;
       if (s.explore.values) {
@@ -108,7 +111,7 @@ describe('L9.C · the weekend bonus (promise transfer)', () => {
 
 describe('Reveal labs ask before they tell', () => {
   it('every guess has its answer among the options', () => {
-    for (const [id, lab] of Object.entries(LABS)) {
+    for (const [id, lab] of [...catalog().labs]) {
       if (lab?.kind !== 'reveal') continue;
       for (const c of lab.cards) if (c.guess) assert.ok(c.guess.options.includes(c.guess.answer), `${id}: ${c.title}`);
       assert.ok(lab.cards.some((c) => c.guess), `${id} has no guesses`);

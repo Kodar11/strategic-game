@@ -1,8 +1,12 @@
-// Regenerates docs/CURRICULUM.md from the lesson, scenario and assessment data: node scripts/curriculum-doc.ts
+// Regenerates docs/CURRICULUM.md from the content snapshot (supabase/seed/content.json — run `npm run content:pull`
+// first to include edits made in the database): node scripts/curriculum-doc.ts
 import { writeFileSync } from 'node:fs';
-import { LESSONS, MODULES } from '../src/content/lessons.ts';
-import { ASSESSMENTS } from '../src/features/assessments/content.ts';
+import { allLessons, allModules } from '../src/content/lessons.ts';
+import { installSeedCatalog } from '../src/content/seed.ts';
+import { allAssessments } from '../src/features/assessments/content.ts';
 import { scenariosFor } from '../src/features/scenarios/index.ts';
+
+installSeedCatalog();
 
 const ORIGINAL = new Set(['cooperation-trap', 'coordination-problem', 'predictability-trap', 'incentive-shift', 'strategy-detective']);
 const out: string[] = [
@@ -13,9 +17,9 @@ const out: string[] = [
   'Every scenario lists its formal specification on screen (“Formal specification”); the solution concept and simulated players’ rules are revealed after play. Source status: **canonical** (a standard game, numbers may be illustrative), **adapted** (source-inspired, documented changes), **original** (designed for this app).',
   '',
 ];
-for (const m of MODULES) {
+for (const m of allModules()) {
   out.push(`## Module ${m.number} · ${m.title}`, '', m.objective, '');
-  for (const l of LESSONS.filter((x) => x.module === m.id)) {
+  for (const l of allLessons().filter((x) => x.module === m.id)) {
     out.push(`### Lesson ${l.number} · ${l.title} (\`${l.id}\`)`, '', `${l.description} Main experience: ${ORIGINAL.has(l.id) ? 'the original lesson component, with its three scenarios added before completion' : 'scenario A, then an interactive lab that names the concept, then B and C, then a transfer check'}.`, '');
     out.push('| Slot | Scenario | Source | Solution concept |', '|---|---|---|---|');
     for (const s of scenariosFor(l.id)) out.push(`| ${s.slot} | ${s.title} (\`${s.id}\`) | ${s.formal.source} — ${s.formal.sourceNote.replace(/\|/g, '/')} | ${s.formal.solution.replace(/\|/g, '/')} |`);
@@ -23,7 +27,7 @@ for (const m of MODULES) {
   }
 }
 out.push('## Assessments', '', '| Id | Title | Items | Pass mark |', '|---|---|---|---|');
-for (const a of ASSESSMENTS) out.push(`| \`${a.id}\` | ${a.title} | ${a.items.length} | ${Math.round(a.passMark * 100)}% |`);
+for (const a of allAssessments()) out.push(`| \`${a.id}\` | ${a.title} | ${a.items.length} | ${Math.round(a.passMark * 100)}% |`);
 out.push('', 'The final assessment opens once all six checkpoints have been submitted at least once. First, best and latest scores are kept; retakes never overwrite the first.', '');
 writeFileSync('docs/CURRICULUM.md', out.join('\n'));
 console.log('wrote docs/CURRICULUM.md');

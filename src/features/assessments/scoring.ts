@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import type { Verdict } from '../../components/lesson/verdict.ts';
-import { ASSESSMENTS, type Assessment, type AssessmentId, type AssessmentItem, getAssessment } from './content.ts';
+import { allAssessments, type Assessment, type AssessmentId, type AssessmentItem, getAssessment } from './content.ts';
 
 /**
  * Assessment progress and scoring, as pure functions. A run holds the current answers; submitting scores them and
@@ -91,7 +91,7 @@ export function retakeAssessment(run: AssessmentRun): AssessmentRun {
 
 /** The final assessment opens once every module checkpoint has been submitted at least once. */
 export function finalUnlocked(runs: AssessmentRuns): boolean {
-  return ASSESSMENTS.filter((a) => a.id !== 'final').every((a) => (runs[a.id]?.attempts ?? 0) > 0);
+  return allAssessments().filter((a) => a.id !== 'final').every((a) => (runs[a.id]?.attempts ?? 0) > 0);
 }
 
 const runSchema = z.object({

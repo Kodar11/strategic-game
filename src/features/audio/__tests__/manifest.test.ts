@@ -21,6 +21,9 @@ import {
   shotReactionClip,
 } from '../reactions.ts';
 import { AUDIO_FORMAT, VOICES } from '../voices.ts';
+import { installSeedCatalog } from '../../../content/seed.ts';
+
+installSeedCatalog();
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 const ALL = CLIPS as readonly ClipDef[];

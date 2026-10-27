@@ -12,14 +12,15 @@ import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
 import { ArrowRight, Check, CircleCheck, House, Lock, RotateCcw, X } from '@/src/components/ui/icons';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { getLesson, getModule } from '@/src/content/lessons';
-import { ASSESSMENTS, type Assessment, type AssessmentItem, getAssessment, splitAssessmentTitle } from '@/src/features/assessments/content';
+import { ASSESSMENT_IDS, allAssessments, type Assessment, type AssessmentItem, getAssessment, splitAssessmentTitle } from '@/src/features/assessments/content';
 import { type AssessmentRun, assessmentScore, currentAssessmentRun, finalUnlocked, isComplete, itemScore } from '@/src/features/assessments/scoring';
 import { DataTable } from '@/src/features/scenarios/visuals';
 import { useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
+// Static web export renders every page the app can show; content (loaded at run time) decides what each page holds.
 export function generateStaticParams() {
-  return ASSESSMENTS.map((a) => ({ assessmentId: a.id }));
+  return ASSESSMENT_IDS.map((assessmentId) => ({ assessmentId }));
 }
 
 /** A module checkpoint or the final assessment. Answers are drafts until submitted; the first score is kept forever. */
@@ -36,7 +37,7 @@ export default function CheckpointScreen() {
 
 function Locked() {
   const runs = useProgress((s) => s.assessmentRuns);
-  const checkpoints = ASSESSMENTS.filter((x) => x.id !== 'final');
+  const checkpoints = allAssessments().filter((x) => x.id !== 'final');
   const submitted = checkpoints.filter((x) => (runs[x.id]?.attempts ?? 0) > 0).length;
   return (
     <Frame title="Final assessment">

@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { LESSONS } from '../../../content/lessons.ts';
+import { allLessons } from '../../../content/lessons.ts';
 import { createRng } from '../../../game/rng.ts';
-import { SCENARIOS, getScenario, scenariosFor } from '../index.ts';
+import { allScenarios, getScenario, scenariosFor } from '../index.ts';
 import { applyScenarioInput, freshRun, lockScenarioPrediction, replay, restartScenario, runPhase, runResult, sanitizeScenarioRuns, setScenarioPrediction } from '../runtime.ts';
 import type { DecisionPrompt, Input, ScenarioSpec } from '../types.ts';
+import { installSeedCatalog } from '../../../content/seed.ts';
+
+installSeedCatalog();
 
 /** A random legal input for a prompt, from a seeded RNG. */
 function randomInput(p: DecisionPrompt, rng: () => number): Input {
@@ -36,13 +39,13 @@ function playThrough(spec: ScenarioSpec, seed: number): { inputs: Input[]; state
 
 describe('Paired scenarios — curriculum coverage', () => {
   it('has exactly 66 scenarios with unique ids', () => {
-    assert.equal(SCENARIOS.length, 66);
-    assert.equal(new Set(SCENARIOS.map((s) => s.id)).size, 66);
+    assert.equal(allScenarios().length, 66);
+    assert.equal(new Set(allScenarios().map((s) => s.id)).size, 66);
   });
 
   it('gives every one of the 22 lessons exactly one A, one B and one C', () => {
-    assert.equal(LESSONS.length, 22);
-    for (const l of LESSONS) {
+    assert.equal(allLessons().length, 22);
+    for (const l of allLessons()) {
       const list = scenariosFor(l.id);
       assert.deepEqual(
         list.map((s) => s.slot),
@@ -53,7 +56,7 @@ describe('Paired scenarios — curriculum coverage', () => {
   });
 
   it('documents every formal field and source status', () => {
-    for (const s of SCENARIOS) {
+    for (const s of allScenarios()) {
       for (const k of ['players', 'actions', 'timing', 'information', 'payoffs', 'solution', 'sourceNote'] as const) assert.ok(s.formal[k].length > 3, `${s.id}: formal.${k}`);
       assert.ok(['canonical', 'adapted', 'original'].includes(s.formal.source), s.id);
       assert.ok(s.rules.length > 0 && s.explain.length > 0 && s.takeaway.length > 10, s.id);
@@ -62,7 +65,7 @@ describe('Paired scenarios — curriculum coverage', () => {
 });
 
 describe('Paired scenarios — every prediction claim follows from the engine', () => {
-  for (const s of SCENARIOS) {
+  for (const s of allScenarios()) {
     it(`${s.id}: ${s.predict.basis}`, () => {
       const matches = s.predict.options.filter((o) => o.verdict === 'match');
       assert.equal(new Set(s.predict.options.map((o) => o.id)).size, s.predict.options.length, 'option ids unique');
@@ -78,7 +81,7 @@ describe('Paired scenarios — every prediction claim follows from the engine', 
 });
 
 describe('Paired scenarios — rules are playable to the end from any legal path', () => {
-  for (const s of SCENARIOS) {
+  for (const s of allScenarios()) {
     it(`${s.id} terminates with a well-formed result`, () => {
       for (let seed = 1; seed <= 25; seed++) {
         const { state } = playThrough(s, seed);
@@ -93,14 +96,14 @@ describe('Paired scenarios — rules are playable to the end from any legal path
   }
 
   it('rejects illegal inputs instead of silently accepting them', () => {
-    for (const s of SCENARIOS) {
+    for (const s of allScenarios()) {
       const st = s.play.init(1);
       assert.throws(() => s.play.apply(st, 'not-an-action-at-all'), `${s.id} accepted garbage`);
     }
   });
 
   it('is deterministic for a seed', () => {
-    for (const s of SCENARIOS) {
+    for (const s of allScenarios()) {
       const a = playThrough(s, 5);
       const b = playThrough(s, 5);
       assert.deepEqual(s.play.result(a.state), s.play.result(b.state), s.id);

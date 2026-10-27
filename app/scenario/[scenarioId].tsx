@@ -9,13 +9,14 @@ import { Button, IconButton } from '@/src/components/ui/Button';
 import { ArrowLeft, ArrowRight, X } from '@/src/components/ui/icons';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { getLesson } from '@/src/content/lessons';
-import { SCENARIOS, getScenario, scenariosFor } from '@/src/features/scenarios';
+import { SCENARIO_IDS, getScenario, scenariosFor } from '@/src/features/scenarios';
 import { ScenarioPlayer } from '@/src/features/scenarios/ScenarioPlayer';
 import { useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
+// Static web export renders every page the app can show; content (loaded at run time) decides what each page holds.
 export function generateStaticParams() {
-  return SCENARIOS.map((s) => ({ scenarioId: s.id }));
+  return SCENARIO_IDS.map((scenarioId) => ({ scenarioId }));
 }
 
 /** A paired scenario on its own, for practice and replay outside the lesson. Open whether or not the lesson is done. */

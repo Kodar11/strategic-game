@@ -8,7 +8,7 @@ import { Portrait } from '@/src/components/characters/Portrait';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Badge, Card } from '@/src/components/ui/Card';
-import { type LessonMeta, LESSONS, nextLesson } from '@/src/content/lessons';
+import { type LessonMeta, allLessons, nextLesson } from '@/src/content/lessons';
 import { moduleCheckpoint } from '@/src/features/assessments/content';
 import { challengesFor } from '@/src/features/challenges/content';
 import { isTried } from '@/src/features/challenges/progress';
@@ -56,7 +56,7 @@ export function Completion({
   const challenges = challengesFor(lesson.id);
   const tried = challenges.filter((c) => isTried(learning, c.id)).length;
   // The last lesson of a module leads into that module's checkpoint.
-  const endsModule = LESSONS.filter((l) => l.module === lesson.module).at(-1)?.id === lesson.id;
+  const endsModule = allLessons().filter((l) => l.module === lesson.module).at(-1)?.id === lesson.id;
   const checkpoint = endsModule ? moduleCheckpoint(lesson.module) : null;
 
   useEffect(() => {

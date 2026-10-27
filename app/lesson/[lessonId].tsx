@@ -1,12 +1,13 @@
 import { useLocalSearchParams } from 'expo-router';
 
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
-import { LESSONS, getLesson } from '@/src/content/lessons';
+import { LESSON_IDS, getLesson } from '@/src/content/lessons';
 import { LESSON_COMPONENTS } from '@/src/features/lessons';
 import { useProgress } from '@/src/store/progress';
 
+// Static web export renders every page the app can show; content (loaded at run time) decides what each page holds.
 export function generateStaticParams() {
-  return LESSONS.map((l) => ({ lessonId: l.id }));
+  return LESSON_IDS.map((lessonId) => ({ lessonId }));
 }
 
 export default function LessonScreen() {

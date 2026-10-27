@@ -1,30 +1,24 @@
+import { catalog } from '../../content/catalog.ts';
 import type { LessonId } from '../../content/lessons.ts';
-import { MODULE1_SCENARIOS } from './content/module1.ts';
-import { MODULE2_SCENARIOS } from './content/module2.ts';
-import { MODULE3_SCENARIOS } from './content/module3.ts';
-import { MODULE4_SCENARIOS } from './content/module4.ts';
-import { MODULE5_SCENARIOS } from './content/module5.ts';
-import { MODULE6_SCENARIOS } from './content/module6.ts';
+import { SCENARIO_ENGINES } from './engines/index.ts';
 import type { ScenarioSpec, Slot } from './types.ts';
 
-/** All 66 paired scenarios: three per lesson (A, B, C). IDs are stable and appear in exported data. */
-export const SCENARIOS: readonly ScenarioSpec[] = [
-  ...MODULE1_SCENARIOS,
-  ...MODULE2_SCENARIOS,
-  ...MODULE3_SCENARIOS,
-  ...MODULE4_SCENARIOS,
-  ...MODULE5_SCENARIOS,
-  ...MODULE6_SCENARIOS,
-];
+/** Every scenario the app can play (one per registered engine). For static routes; content decides what is shown. */
+export const SCENARIO_IDS: readonly string[] = SCENARIO_ENGINES.map((e) => e.id);
 
-const BY_ID = new Map(SCENARIOS.map((s) => [s.id, s]));
+/** The published paired scenarios: content joined with their engines. IDs are stable and appear in exported data. */
+export function allScenarios(): readonly ScenarioSpec[] {
+  return catalog().scenarios;
+}
 
 export function getScenario(id: string): ScenarioSpec | undefined {
-  return BY_ID.get(id);
+  return catalog().scenarioById.get(id);
 }
 
 const ORDER: Record<Slot, number> = { A: 0, B: 1, C: 2 };
 
 export function scenariosFor(lesson: LessonId): ScenarioSpec[] {
-  return SCENARIOS.filter((s) => s.lesson === lesson).sort((a, b) => ORDER[a.slot] - ORDER[b.slot]);
+  return allScenarios()
+    .filter((s) => s.lesson === lesson)
+    .sort((a, b) => ORDER[a.slot] - ORDER[b.slot]);
 }

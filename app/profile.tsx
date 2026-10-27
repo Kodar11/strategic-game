@@ -11,9 +11,9 @@ import { Button, IconButton } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
-import { LESSONS, type LessonId, MODULES, getLesson } from '@/src/content/lessons';
+import { allLessons, type LessonId, allModules, getLesson } from '@/src/content/lessons';
 import { type Insight, type SkillSummary, buildProfile, lessonsForSkill } from '@/src/features/learning/profile';
-import { GOALS, type GoalId } from '@/src/features/learning/records';
+import { allGoals, type GoalId } from '@/src/features/learning/records';
 import { useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
@@ -25,11 +25,11 @@ function openChallenges(id: LessonId) {
   router.push({ pathname: '/challenges/[lessonId]', params: { lessonId: id } });
 }
 
-const lessonNumber = (id: LessonId) => LESSONS.find((l) => l.id === id)!.number;
+const lessonNumber = (id: LessonId) => allLessons().find((l) => l.id === id)!.number;
 
 /**
  * Strategic Thinking Profile: progress, one grounded observation, confidence against results, and one next step —
- * all derived from the on-device learning record (see src/features/learning/profile.ts for every rule).
+ * all derived from the learner's learning record (see src/features/learning/profile.ts for every rule).
  */
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -42,7 +42,7 @@ export default function ProfileScreen() {
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalSkipped, setGoalSkipped] = useState(false);
 
-  const inProgress = useMemo(() => LESSONS.filter((l) => (runtime[l.id]?.step ?? 0) > 0).map((l) => l.id), [runtime]);
+  const inProgress = useMemo(() => allLessons().filter((l) => (runtime[l.id]?.step ?? 0) > 0).map((l) => l.id), [runtime]);
   const profile = useMemo(() => buildProfile({ attempts: learning, completed, inProgress, goal }), [learning, completed, inProgress, goal]);
 
   if (!hydrated) return <MessageScreen loading />;
@@ -66,7 +66,7 @@ export default function ProfileScreen() {
           <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'center' }}>
             <Portrait character="sen" expression="thinking" size={48} />
             <AppText variant="small" color={colors.textMuted} style={{ flex: 1 }}>
-              A reflection on how you make decisions, built only from the predictions you&apos;ve made on this device. It describes what you did — not who you are.
+              A reflection on how you make decisions, built only from the predictions you&apos;ve made in this app. It describes what you did — not who you are.
             </AppText>
           </View>
 
@@ -176,7 +176,7 @@ export default function ProfileScreen() {
               <>
                 <AppText variant="bodyStrong">What would you like to get better at?</AppText>
                 <View accessibilityRole="radiogroup" accessibilityLabel="What would you like to get better at?" style={{ gap: space.sm }}>
-                  {GOALS.map((g) => (
+                  {allGoals().map((g) => (
                     <View key={g.id} style={{ flexDirection: 'row' }}>
                       <ChoiceCard
                         compact
@@ -203,7 +203,7 @@ export default function ProfileScreen() {
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
                 <AppText variant="small" style={{ flex: 1 }}>
-                  {goal ? GOALS.find((g) => g.id === goal)!.label : 'No goal chosen. You can pick one any time.'}
+                  {goal ? allGoals().find((g) => g.id === goal)!.label : 'No goal chosen. You can pick one any time.'}
                 </AppText>
                 <Button label={goal ? 'Change' : 'Choose'} variant="secondary" compact onPress={() => setEditingGoal(true)} />
               </View>
@@ -226,7 +226,7 @@ export default function ProfileScreen() {
           </View>
 
           <AppText variant="caption" color={colors.textMuted} align="center">
-            Everything here stays on this device. You can export or reset it in Settings.
+            This is worked out on your device from your saved answers. You can export or reset them in Settings.
           </AppText>
         </View>
       </ScrollView>
@@ -283,7 +283,7 @@ function PracticeRow({ title, text, ready }: { title: string; text: string; read
 function SkillRow({ skill, completed }: { skill: SkillSummary; completed: readonly LessonId[] }) {
   const lessons = lessonsForSkill(skill.id);
   const done = lessons.filter((id) => completed.includes(id)).length;
-  const byModule = MODULES.map((m) => {
+  const byModule = allModules().map((m) => {
     const inModule = lessons.filter((id) => getLesson(id)!.module === m.id);
     return { module: m, total: inModule.length, done: inModule.filter((id) => completed.includes(id)).length };
   }).filter((g) => g.total > 0);

@@ -1,15 +1,17 @@
 # Learning data: record, challenges, profile and export
 
-The app keeps a small **learning record** on the device. It holds one entry per submitted answer, from both lesson predictions and practice challenges, and it feeds both the Strategic Thinking Profile and the JSON export. Nothing is sent anywhere unless the learner exports it, and no names, emails, accounts or device identifiers are ever stored.
+The app keeps a small **learning record**: one entry per submitted answer, from lesson predictions, paired scenarios and practice challenges. It feeds both the Strategic Thinking Profile and the JSON export.
+
+**Where it is stored.** Since the Supabase migration the record — with lesson progress, scenario runs, challenge drafts, assessment results and the goal — is saved to the app's Supabase database (see [DATA_ARCHITECTURE.md](DATA_ARCHITECTURE.md)). Each install signs in anonymously: the database stores a random user ID created by Supabase Auth, and the session token that identifies it is kept on the device. No names or emails are collected, and row level security lets each anonymous user read and write only their own rows. The profile is still computed on the device from the record; it is never stored. Clearing the app's storage loses the anonymous session, and with it access to the saved progress (there is no account to recover it with yet).
 
 | Path | What it is |
 |---|---|
 | `src/features/learning/records.ts` | Record types, the lesson prediction catalogue (`PREDICTIONS`), attempt numbering, validation and upgrade, deduplication, goal, export format. |
 | `src/features/learning/profile.ts` | Every profile rule: skills, insights, confidence, first tries, practice, transfer, next step. |
-| `src/features/challenges/content.ts` | The 15 practice challenges, as typed data, plus a one-paragraph concept review per lesson. |
+| `src/features/challenges/content.ts` | Types and accessors for the 15 practice challenges and the per-lesson concept reviews. The challenges themselves are content in Supabase (`content_challenges`, `content_challenge_options`, `content_concept_reviews`). |
 | `src/features/challenges/progress.ts` | Challenge drafts, the atomic submit, retry, resume and summary rules. |
 | `src/features/learning/shareFile.ts` / `.web.ts` | Writing and sharing the export file (native share sheet / browser download). |
-| `src/store/progress.ts` | Persists `learning`, `challengeDrafts` and `goal` next to lesson progress (AsyncStorage). |
+| `src/store/progress.ts` | Holds `learning`, `challengeDrafts`, `goal` and lesson progress for the screens; loaded from and written back to Supabase (`src/data/session.ts`). Only device settings stay in AsyncStorage. |
 | Each lesson's `copy.ts` | `…Records(data)`: the lesson's evaluated predictions, built from the same feedback functions the screen uses. |
 
 ## Items, attempts and first attempts

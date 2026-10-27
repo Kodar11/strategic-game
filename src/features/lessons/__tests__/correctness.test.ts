@@ -13,6 +13,9 @@ import * as l2 from '../strategy-detective/copy.ts';
 import * as l3 from '../coordination-problem/copy.ts';
 import * as l4 from '../predictability-trap/copy.ts';
 import * as l5 from '../incentive-shift/copy.ts';
+import { installSeedCatalog } from '../../../content/seed.ts';
+
+installSeedCatalog();
 
 const grid = (r: { min: number; max: number; step: number }) =>
   Array.from({ length: Math.round((r.max - r.min) / r.step) + 1 }, (_, i) => r.min + i * r.step);
@@ -311,9 +314,9 @@ describe('Lesson 2 — a crowd forecast miss is reasonable unless it is the targ
   });
 
   it('the crowd forecast is recorded as uncertain; the lab (calculable) is not', async () => {
-    const { PREDICTIONS } = await import('../../learning/records.ts');
-    assert.equal(PREDICTIONS['l2.crowd'].basis, 'uncertain');
-    assert.equal(PREDICTIONS['l2.lab'].basis, 'calculable');
+    const { predictionMeta } = await import('../../learning/records.ts');
+    assert.equal(predictionMeta('l2.crowd')!.basis, 'uncertain');
+    assert.equal(predictionMeta('l2.lab')!.basis, 'calculable');
   });
 });
 

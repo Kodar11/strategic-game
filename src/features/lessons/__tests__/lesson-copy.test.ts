@@ -15,6 +15,9 @@ import * as l2 from '../strategy-detective/copy.ts';
 import * as l3 from '../coordination-problem/copy.ts';
 import * as l4 from '../predictability-trap/copy.ts';
 import * as l5 from '../incentive-shift/copy.ts';
+import { installSeedCatalog } from '../../../content/seed.ts';
+
+installSeedCatalog();
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 

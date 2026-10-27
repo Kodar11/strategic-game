@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@supabase/supabase-js": "^2.118.0",
     "expo": "~57.0.30",
     "expo-asset": "~57.0.20",
     "expo-audio": "~57.0.5",
@@ -38,6 +39,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.12",
     "@types/react": "~19.2.2",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
@@ -49,11 +51,14 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"src/**/__tests__/*.test.ts\" \"scripts/__tests__/*.test.mjs\"",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"src/**/__tests__/*.test.ts\" \"supabase/__tests__/*.test.ts\" \"scripts/__tests__/*.test.mjs\"",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
     "tts": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-tts.mjs",
-    "tts:audition": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-tts.mjs --audition"
+    "tts:audition": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-tts.mjs --audition",
+    "content:seed-sql": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env scripts/content/tools.ts seed-sql",
+    "content:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env scripts/content/tools.ts validate",
+    "content:pull": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env scripts/content/tools.ts pull"
   },
   "private": true
 }

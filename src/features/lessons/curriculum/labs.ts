@@ -1,5 +1,5 @@
 import { stoppingValues, shrinkingPieShare } from '../../../game/bargaining.ts';
-import { blockingCoalitions, majorityWinner } from '../../../game/collective.ts';
+import { blockingCoalitions } from '../../../game/collective.ts';
 import { expectedProfit } from '../../../game/auctions.ts';
 import { hawkDove, interiorRestPoint, simulatePopulation } from '../../../game/evolution.ts';
 import { lemonsMarket, posterior, separatingHolds } from '../../../game/information.ts';
@@ -8,11 +8,11 @@ import type { MatrixGame } from '../../../game/payoff-matrix.ts';
 import { AXELROD, cooperateForever, defectAgainstGrim, grimThreshold } from '../../../game/repeated.ts';
 import type { GameTree } from '../../../game/sequential.ts';
 import { fmt, pct } from '../../scenarios/builders.ts';
-import { CENTIPEDE, CAPACITY } from '../../scenarios/content/module3.ts';
-import { FOOD_TRUCKS, NEGOTIATION } from '../../scenarios/content/module1.ts';
-import { BUYER_MULTIPLIER, CARS } from '../../scenarios/content/module5.ts';
-import { COMMITTEE, PROJECT } from '../../scenarios/content/module6.ts';
+import { BUYER_MULTIPLIER, CARS } from '../../scenarios/engines/module5.ts';
+import { PROJECT } from '../../scenarios/engines/module6.ts';
 import type { StatLine, Tone } from '../../scenarios/types.ts';
+import { catalog } from '../../../content/catalog.ts';
+import type { LessonId } from '../../../content/lessons.ts';
 
 /**
  * The interactive "lab" each new lesson uses to name its concept once the learner has played scenario A.
@@ -41,6 +41,17 @@ export type LabSpec =
   | { kind: 'param'; prompt: string; sliders: LabSlider[]; compute: (v: Record<string, number>) => LabOutput }
   | { kind: 'reveal'; prompt: string; cards: RevealCard[] };
 
+/** The lab of a curriculum lesson: its content, with the registered calculation joined in for parameter labs. */
+export function labFor(lesson: LessonId): LabSpec | undefined {
+  return catalog().labs.get(lesson);
+}
+
+/** The executable half of a parameter lab. */
+export interface LabEngine {
+  sliders: readonly string[];
+  compute: (v: Record<string, number>) => LabOutput;
+}
+
 /** A step in a reveal lab. With `guess`, the learner commits to one of the options before the body is shown. */
 export interface RevealCard {
   title: string;
@@ -48,151 +59,22 @@ export interface RevealCard {
   guess?: { question: string; options: string[]; answer: string };
 }
 
-export const LABS: Partial<Record<string, LabSpec>> = {
-  'iterated-dominance': {
-    kind: 'matrix',
-    prompt: 'Delete one round of strictly dominated options at a time and watch the game shrink.',
-    game: NEGOTIATION,
-    rowName: 'You',
-    colName: 'Client',
-    rowLabels: { fast: 'Fast', discount: 'Discount', bundle: 'Bundle' },
-    colLabels: { accept: 'Accept', counter: 'Counter', shop: 'Shop' },
-    eliminate: true,
-  },
-  'best-response': {
-    kind: 'matrix',
-    prompt: 'Tap cells to compare, then ring every best reply. A cell with both payoffs ringed is a Nash equilibrium.',
-    game: FOOD_TRUCKS,
-    rowName: 'You',
-    colName: 'Rival',
-    rowLabels: { station: 'Station', park: 'Park', campus: 'Campus' },
-    colLabels: { station: 'Station', park: 'Park', campus: 'Campus' },
-  },
-  'market-competition': {
-    kind: 'param',
-    prompt: 'Move the rival’s output and watch your best reply move the other way.',
-    sliders: [{ id: 'rival', label: 'Rival’s units', min: 0, max: 12, step: 1, initial: 2 }],
-    compute: ({ rival }) => cournotLab(rival),
-  },
-  evolution: {
-    kind: 'param',
-    prompt: 'Change the value of the resource, the cost of a fight and the starting mix. Where does the population settle?',
-    sliders: [
-      { id: 'V', label: 'Value of the resource (V)', min: 1, max: 10, step: 1, initial: 4 },
-      { id: 'C', label: 'Cost of losing a fight (C)', min: 1, max: 12, step: 1, initial: 6 },
-      { id: 'x0', label: 'Starting share of hawks', min: 5, max: 95, step: 5, initial: 20, unit: '%' },
-    ],
-    compute: ({ V, C, x0 }) => hawkDoveLab(V, C, x0 / 100),
-  },
-  'sequential-moves': { kind: 'tree', prompt: 'Solve the growing-pot game from the last move backwards, one step at a time.', tree: CENTIPEDE },
-  credibility: { kind: 'tree', prompt: 'Solve the capacity game backwards. Watch how the investment changes your own later choice.', tree: CAPACITY },
-  bargaining: {
-    kind: 'param',
-    prompt: 'How much of the pie survives each round, and how many rounds are there? See what the first proposer can keep.',
-    sliders: [
-      { id: 'delta', label: 'Share of the pie left after each rejection', min: 10, max: 90, step: 10, initial: 60, unit: '%' },
-      { id: 'rounds', label: 'Rounds of offers', min: 1, max: 6, step: 1, initial: 3 },
-    ],
-    compute: ({ delta, rounds }) => bargainingLab(delta / 100, rounds),
-  },
-  'war-of-attrition': {
-    kind: 'param',
-    prompt: 'Set the prize, the cost per round and how often the other side quits. When is staying in worth it?',
-    sliders: [
-      { id: 'prize', label: 'Prize', min: 1, max: 20, step: 1, initial: 6 },
-      { id: 'cost', label: 'Cost per round', min: 1, max: 5, step: 1, initial: 1 },
-      { id: 'q', label: 'Chance they quit each round', min: 5, max: 60, step: 5, initial: 25, unit: '%' },
-    ],
-    compute: ({ prize, cost, q }) => attritionLab(prize, cost, q / 100),
-  },
-  'repeated-cooperation': {
-    kind: 'param',
-    prompt: 'Change how likely the relationship is to continue, and how late cheating is noticed.',
-    sliders: [
-      { id: 'delta', label: 'Chance of another round', min: 10, max: 95, step: 5, initial: 60, unit: '%' },
-      { id: 'delay', label: 'Rounds before cheating is noticed', min: 0, max: 3, step: 1, initial: 0 },
-    ],
-    compute: ({ delta, delay }) => repeatedLab(delta / 100, delay),
-  },
-  'bayesian-uncertainty': {
-    kind: 'param',
-    prompt: 'Change the base rate and how strongly the evidence points each way. Watch the posterior.',
-    sliders: [
-      { id: 'prior', label: 'Base rate (prior)', min: 1, max: 90, step: 1, initial: 10, unit: '%' },
-      { id: 'hit', label: 'Chance of the evidence if it’s true', min: 5, max: 100, step: 5, initial: 70, unit: '%' },
-      { id: 'false', label: 'Chance of the evidence if it’s false', min: 5, max: 100, step: 5, initial: 20, unit: '%' },
-    ],
-    compute: ({ prior, hit, false: fa }) => bayesLab(prior / 100, hit / 100, fa / 100),
-  },
-  signaling: {
-    kind: 'param',
-    prompt: 'Change what the certificate costs each type. When does it separate them?',
-    sliders: [
-      { id: 'ch', label: 'Cost for high-productivity workers', min: 0, max: 10, step: 1, initial: 2 },
-      { id: 'cl', label: 'Cost for low-productivity workers', min: 0, max: 12, step: 1, initial: 7 },
-    ],
-    compute: ({ ch, cl }) => signalingLab(ch, cl),
-  },
-  auctions: {
-    kind: 'param',
-    prompt: 'Try different bids for a camera worth 60 to you. Compare the two auction formats.',
-    sliders: [{ id: 'bid', label: 'Your bid', min: 0, max: 100, step: 5, initial: 60 }],
-    compute: ({ bid }) => auctionLab(bid),
-  },
-  'market-quality': {
-    kind: 'param',
-    prompt: 'Change how much more buyers value a car than its owner, and the price offered.',
-    sliders: [
-      { id: 'mult', label: 'Buyer’s value ÷ owner’s value', min: 100, max: 250, step: 10, initial: 150, unit: '%' },
-      { id: 'price', label: 'Price offered', min: 10, max: 100, step: 10, initial: 60 },
-    ],
-    compute: ({ mult, price }) => lemonsLab(mult / 100, price),
-  },
-  coalitions: {
-    kind: 'param',
-    prompt: 'Split the 90 between A, B and C (C gets what’s left). Find a split no group can block.',
-    sliders: [
-      { id: 'A', label: 'A’s share', min: 0, max: 90, step: 5, initial: 30 },
-      { id: 'B', label: 'B’s share', min: 0, max: 90, step: 5, initial: 30 },
-    ],
-    compute: ({ A, B }) => coreLab(A, B),
-  },
-  voting: {
-    kind: 'reveal',
-    prompt: 'Guess the winner of each head-to-head vote between the three proposals, then reveal it.',
-    cards: [
-      ['A', 'B'],
-      ['B', 'C'],
-      ['C', 'A'],
-    ].map(([x, y]) => {
-      const w = majorityWinner(COMMITTEE, x, y)!;
-      const forW = COMMITTEE.filter((r) => r.indexOf(w) < r.indexOf(w === x ? y : x)).length;
-      return { title: `${x} vs ${y}`, body: `${w} wins ${forW}–${3 - forW}.`, guess: { question: 'which wins by majority?', options: [x, y], answer: w } };
-    }),
-  },
-  brinkmanship: {
-    kind: 'param',
-    prompt: 'One round at a level of the ladder: how do the disaster risk and their chance of backing down trade off?',
-    sliders: [
-      { id: 'risk', label: 'Disaster risk this round', min: 0, max: 50, step: 5, initial: 5, unit: '%' },
-      { id: 'yield', label: 'Chance they back down', min: 0, max: 90, step: 5, initial: 35, unit: '%' },
-    ],
-    compute: ({ risk, yield: y }) => brinkLab(risk / 100, y / 100),
-  },
-  'strategic-practice': {
-    kind: 'reveal',
-    prompt: 'Work through the launch decision step by step. Where a step asks, commit to an answer before revealing.',
-    cards: [
-      { title: '1 · Players and objectives', body: 'Your startup and the larger rival, each maximising its own payoff.' },
-      { title: '2 · Actions', body: 'Each can launch now or wait a quarter.' },
-      { title: '3 · Information', body: 'Payoffs are your team’s estimates; both know them. No hidden types.' },
-      { title: '4 · Timing', body: 'Sequential: the rival sees your launch within days and can respond.', guess: { question: 'how are the moves timed?', options: ['Simultaneous', 'Sequential'], answer: 'Sequential' } },
-      { title: '5 · Uncertainty and incentives', body: 'Your estimates could be wrong; the rival would rather you didn’t launch first.' },
-      { title: '6 · Model', body: 'A sequential game: solve it by backward induction.', guess: { question: 'which method fits?', options: ['Backward induction', 'Look for a dominant strategy', 'Randomise'], answer: 'Backward induction' } },
-      { title: '7 · Prediction', body: 'If you launch now, the rival waits (4 > 3); if you wait, it launches (6 > 3). Launch now: 6.', guess: { question: 'what should you do?', options: ['Launch now', 'Wait a quarter'], answer: 'Launch now' } },
-      { title: '8 · What would change it', body: 'If the rival couldn’t see your move in time, or if your estimates of its payoffs are off.' },
-    ],
-  },
+/**
+ * The calculation behind each parameter lab, keyed by lesson. The lab's prompt and slider layout are content; the
+ * slider ids listed here are the inputs `compute` reads, and the catalog refuses content whose sliders differ.
+ */
+export const LAB_ENGINES: Partial<Record<string, LabEngine>> = {
+  'market-competition': { sliders: ['rival'], compute: ({ rival }) => cournotLab(rival) },
+  evolution: { sliders: ['V', 'C', 'x0'], compute: ({ V, C, x0 }) => hawkDoveLab(V, C, x0 / 100) },
+  bargaining: { sliders: ['delta', 'rounds'], compute: ({ delta, rounds }) => bargainingLab(delta / 100, rounds) },
+  'war-of-attrition': { sliders: ['prize', 'cost', 'q'], compute: ({ prize, cost, q }) => attritionLab(prize, cost, q / 100) },
+  'repeated-cooperation': { sliders: ['delta', 'delay'], compute: ({ delta, delay }) => repeatedLab(delta / 100, delay) },
+  'bayesian-uncertainty': { sliders: ['prior', 'hit', 'false'], compute: ({ prior, hit, false: fa }) => bayesLab(prior / 100, hit / 100, fa / 100) },
+  signaling: { sliders: ['ch', 'cl'], compute: ({ ch, cl }) => signalingLab(ch, cl) },
+  auctions: { sliders: ['bid'], compute: ({ bid }) => auctionLab(bid) },
+  'market-quality': { sliders: ['mult', 'price'], compute: ({ mult, price }) => lemonsLab(mult / 100, price) },
+  coalitions: { sliders: ['A', 'B'], compute: ({ A, B }) => coreLab(A, B) },
+  brinkmanship: { sliders: ['risk', 'yield'], compute: ({ risk, yield: y }) => brinkLab(risk / 100, y / 100) },
 };
 
 // ── Lab computations ─────────────────────────────────────────────────────────

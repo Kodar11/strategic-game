@@ -3,8 +3,11 @@ import { describe, it } from 'node:test';
 
 import { type MatrixGame, colWeaklyDominatedBy, rowWeaklyDominatedBy } from '../../../game/payoff-matrix.ts';
 import { getScenario } from '../../scenarios/index.ts';
-import { noReturnValue, openFirmChance, PRECOMMIT } from '../../scenarios/content/module6.ts';
-import { CURRICULUM_LESSONS } from '../curriculum/specs.ts';
+import { noReturnValue, openFirmChance, PRECOMMIT } from '../../scenarios/engines/module6.ts';
+import { curriculumSpec } from '../curriculum/specs.ts';
+import { installSeedCatalog } from '../../../content/seed.ts';
+
+installSeedCatalog();
 
 /** Regression tests for defects found in the curriculum accuracy audit (October 2026). */
 
@@ -83,7 +86,7 @@ describe('Audit · weak dominance example in Lesson 2', () => {
   });
 
   it('the lesson panel quotes exactly this game', () => {
-    const panel = CURRICULUM_LESSONS['iterated-dominance']!.concept.panels.find((p) => p.title === 'Weak dominance needs care')!;
+    const panel = curriculumSpec('iterated-dominance')!.concept.panels.find((p) => p.title === 'Weak dominance needs care')!;
     assert.match(panel.body, /T \(1, 1\) \(0, 0\), M \(1, 1\) \(2, 1\), B \(0, 0\) \(2, 1\)/);
   });
 });

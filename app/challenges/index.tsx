@@ -8,11 +8,11 @@ import { Backdrop } from '@/src/components/ui/Backdrop';
 import { IconButton } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Card';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
-import { LESSONS, type LessonId, type LessonMeta, MODULES } from '@/src/content/lessons';
+import { allLessons, type LessonId, type LessonMeta, allModules } from '@/src/content/lessons';
 import { challengesFor } from '@/src/features/challenges/content';
 import { isTried } from '@/src/features/challenges/progress';
 import type { LearningAttempt } from '@/src/features/learning/records';
-import { SCENARIOS, scenariosFor } from '@/src/features/scenarios';
+import { allScenarios, scenariosFor } from '@/src/features/scenarios';
 import { useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, shadow, space } from '@/src/theme/tokens';
 
@@ -44,15 +44,15 @@ export default function ChallengesScreen() {
               Practice
             </AppText>
             <AppText variant="small" color={colors.textMuted} tabular>
-              {played.length}/{SCENARIOS.length} played
+              {played.length}/{allScenarios().length} played
             </AppText>
           </View>
           <AppText color={colors.textMuted}>
             Every lesson has three playable scenarios: learn the mechanism (A), change an assumption (B), transfer it (C). No lesson required first.
           </AppText>
 
-          {MODULES.map((m) => {
-            const lessons = LESSONS.filter((l) => l.module === m.id);
+          {allModules().map((m) => {
+            const lessons = allLessons().filter((l) => l.module === m.id);
             const ids = lessons.flatMap((l) => scenariosFor(l.id).map((s) => s.id));
             const moduleDone = ids.filter((id) => played.includes(id)).length;
             return (

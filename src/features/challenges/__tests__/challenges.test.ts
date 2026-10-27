@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { type Confidence, chooseAnswer, emptyPrediction, rateConfidence } from '../../../components/lesson/prediction-state.ts';
-import { LESSONS, type LessonId } from '../../../content/lessons.ts';
+import { allLessons, type LessonId } from '../../../content/lessons.ts';
 import { buildProfile } from '../../learning/profile.ts';
 import { type LearningAttempt, buildLearningExport, firstAttempts, mergeAttempts, recordAttempt, sanitizeAttempts } from '../../learning/records.ts';
-import { CHALLENGES, CONCEPT_REVIEW, challengesFor, getChallenge } from '../content.ts';
+import { allChallenges, conceptReview, challengesFor, getChallenge } from '../content.ts';
 import {
   type ChallengeDrafts,
   type ChallengeState,
@@ -19,6 +19,9 @@ import {
   summaryTakeaway,
   triedCount,
 } from '../progress.ts';
+import { installSeedCatalog } from '../../../content/seed.ts';
+
+installSeedCatalog();
 
 const SKILL_IDS = ['anticipating', 'incentives', 'coordination', 'uncertainty'];
 const sentences = (s: string) => s.split(/(?<=[.!?”])\s+(?=[A-Z“"])/).length;
@@ -35,22 +38,22 @@ const fresh = (completed: LessonId[] = []): ChallengeState => ({ challengeDrafts
 
 describe('Challenge content', () => {
   it('has fifteen challenges: exactly three per lesson, ordered 1–3, with unique ids', () => {
-    assert.equal(CHALLENGES.length, 15);
-    assert.equal(new Set(CHALLENGES.map((c) => c.id)).size, 15);
+    assert.equal(allChallenges().length, 15);
+    assert.equal(new Set(allChallenges().map((c) => c.id)).size, 15);
     // The five original lessons have multiple-choice challenges; the other seventeen have only playable scenarios.
-    const withChallenges = LESSONS.filter((l) => challengesFor(l.id).length);
+    const withChallenges = allLessons().filter((l) => challengesFor(l.id).length);
     assert.deepEqual(withChallenges.map((l) => l.id).sort(), ['cooperation-trap', 'coordination-problem', 'incentive-shift', 'predictability-trap', 'strategy-detective']);
     for (const l of withChallenges) {
       const list = challengesFor(l.id);
       assert.equal(list.length, 3, l.id);
       assert.deepEqual(list.map((c) => c.order), [1, 2, 3], l.id);
-      assert.ok(CONCEPT_REVIEW[l.id]!.summary.length > 0, l.id);
+      assert.ok(conceptReview(l.id)!.summary.length > 0, l.id);
     }
   });
 
   it('every challenge references a real lesson and skill, and is short enough to read in seconds', () => {
-    for (const c of CHALLENGES) {
-      assert.ok(LESSONS.some((l) => l.id === c.lesson), c.id);
+    for (const c of allChallenges()) {
+      assert.ok(allLessons().some((l) => l.id === c.lesson), c.id);
       assert.ok(SKILL_IDS.includes(c.skill), c.id);
       assert.ok(c.concept.length > 0 && c.takeaway.length > 0 && c.question.length > 0, c.id);
       assert.ok(c.version >= 1, c.id);
@@ -61,7 +64,7 @@ describe('Challenge content', () => {
   });
 
   it('every option has feedback and a verdict; ids are unique within a challenge', () => {
-    for (const c of CHALLENGES) {
+    for (const c of allChallenges()) {
       assert.equal(new Set(c.options.map((o) => o.id)).size, c.options.length, c.id);
       for (const o of c.options) {
         assert.ok(['match', 'defensible', 'depends', 'reasonable', 'misconception'].includes(o.verdict), `${c.id}/${o.id}`);
@@ -72,7 +75,7 @@ describe('Challenge content', () => {
   });
 
   it('evaluable challenges have exactly one strongest answer; unknowable ones have none', () => {
-    for (const c of CHALLENGES) {
+    for (const c of allChallenges()) {
       const strongest = c.options.filter((o) => o.verdict === 'match').length;
       if (c.basis === 'calculable') {
         assert.equal(strongest, 1, c.id);
@@ -83,8 +86,8 @@ describe('Challenge content', () => {
       }
       assert.ok(c.options.some((o) => o.verdict !== 'match'), c.id);
     }
-    assert.ok(CHALLENGES.some((c) => c.basis === 'uncertain'), 'at least one unknowable challenge');
-    assert.ok(CHALLENGES.some((c) => c.options.filter((o) => o.verdict === 'defensible' || o.verdict === 'depends').length > 0), 'defensible answers exist');
+    assert.ok(allChallenges().some((c) => c.basis === 'uncertain'), 'at least one unknowable challenge');
+    assert.ok(allChallenges().some((c) => c.options.filter((o) => o.verdict === 'defensible' || o.verdict === 'depends').length > 0), 'defensible answers exist');
   });
 
   it('feedback is deterministic and comes straight from the data', () => {
@@ -277,7 +280,7 @@ describe('Profile evidence from first attempts', () => {
   });
 
   it('suggests the challenges of a completed lesson once lessons are done', () => {
-    const all = LESSONS.map((l) => l.id);
+    const all = allLessons().map((l) => l.id);
     const p = profileOf([], all);
     assert.equal(p.next.kind, 'challenges');
     assert.equal(p.next.lesson, 'cooperation-trap');

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { type Confidence, chooseAnswer, emptyPrediction, lockPrediction, rateConfidence } from '../../../components/lesson/prediction-state.ts';
-import { LESSONS } from '../../../content/lessons.ts';
+import { allLessons } from '../../../content/lessons.ts';
 import * as l1 from '../../lessons/cooperation-trap/copy.ts';
 import * as l2 from '../../lessons/strategy-detective/copy.ts';
 import * as l3 from '../../lessons/coordination-problem/copy.ts';
@@ -15,7 +15,7 @@ import {
   type Evaluation,
   type LearningAttempt,
   MAX_ATTEMPTS,
-  PREDICTIONS,
+  predictionMeta,
   type PredictionKey,
   buildLearningExport,
   evaluationFromVerdict,
@@ -25,13 +25,16 @@ import {
   sanitizeAttempts,
   sanitizeGoal,
 } from '../records.ts';
+import { installSeedCatalog } from '../../../content/seed.ts';
+
+installSeedCatalog();
 
 const locked = <T extends string>(answer: T, confidence: Confidence, at: number) =>
   lockPrediction(rateConfidence(chooseAnswer(emptyPrediction<T>(), answer), confidence), at);
 
 /** A hand-made record for profile tests. */
 function rec(prediction: PredictionKey, evaluation: Evaluation, confidence: Confidence, at: number, attempt = 1): LearningAttempt {
-  const meta = PREDICTIONS[prediction];
+  const meta = predictionMeta(prediction)!;
   return { id: `${prediction}@${at}`, schemaVersion: 1, lesson: meta.lesson, prediction, skill: meta.skill, basis: meta.basis, answer: 'x', confidence, evaluation, outcome: '', lockedAt: at, kind: 'lesson', attempt, lessonCompleted: null, contentVersion: null };
 }
 
@@ -219,7 +222,7 @@ describe('Strategic Thinking Profile', () => {
       rec('l4.compare', 'misconception', 3, 4),
       rec('l4.lab', 'misconception', 3, 5),
     ];
-    const p = buildProfile({ ...empty, attempts, completed: LESSONS.map((l) => l.id) });
+    const p = buildProfile({ ...empty, attempts, completed: allLessons().map((l) => l.id) });
     assert.equal(p.primary?.id, 'gap');
     assert.equal(p.primary?.title, 'Strong on incentives; uncertain outcomes are worth practising');
     assert.equal(p.primary?.lesson, 'predictability-trap');
