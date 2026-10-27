@@ -39,7 +39,14 @@ export type LabSpec =
   | { kind: 'matrix'; prompt: string; game: MatrixGame; rowName: string; colName: string; rowLabels: Record<string, string>; colLabels: Record<string, string>; eliminate?: boolean }
   | { kind: 'tree'; prompt: string; tree: GameTree }
   | { kind: 'param'; prompt: string; sliders: LabSlider[]; compute: (v: Record<string, number>) => LabOutput }
-  | { kind: 'reveal'; prompt: string; cards: { title: string; body: string }[] };
+  | { kind: 'reveal'; prompt: string; cards: RevealCard[] };
+
+/** A step in a reveal lab. With `guess`, the learner commits to one of the options before the body is shown. */
+export interface RevealCard {
+  title: string;
+  body: string;
+  guess?: { question: string; options: string[]; answer: string };
+}
 
 export const LABS: Partial<Record<string, LabSpec>> = {
   'iterated-dominance': {
@@ -152,7 +159,7 @@ export const LABS: Partial<Record<string, LabSpec>> = {
   },
   voting: {
     kind: 'reveal',
-    prompt: 'Reveal each head-to-head vote between the three proposals.',
+    prompt: 'Guess the winner of each head-to-head vote between the three proposals, then reveal it.',
     cards: [
       ['A', 'B'],
       ['B', 'C'],
@@ -160,7 +167,7 @@ export const LABS: Partial<Record<string, LabSpec>> = {
     ].map(([x, y]) => {
       const w = majorityWinner(COMMITTEE, x, y)!;
       const forW = COMMITTEE.filter((r) => r.indexOf(w) < r.indexOf(w === x ? y : x)).length;
-      return { title: `${x} vs ${y}`, body: `${w} wins ${forW}–${3 - forW}.` };
+      return { title: `${x} vs ${y}`, body: `${w} wins ${forW}–${3 - forW}.`, guess: { question: 'which wins by majority?', options: [x, y], answer: w } };
     }),
   },
   brinkmanship: {
@@ -174,15 +181,15 @@ export const LABS: Partial<Record<string, LabSpec>> = {
   },
   'strategic-practice': {
     kind: 'reveal',
-    prompt: 'Work through the launch decision step by step. Reveal each question in order.',
+    prompt: 'Work through the launch decision step by step. Where a step asks, commit to an answer before revealing.',
     cards: [
       { title: '1 · Players and objectives', body: 'Your startup and the larger rival, each maximising its own payoff.' },
       { title: '2 · Actions', body: 'Each can launch now or wait a quarter.' },
       { title: '3 · Information', body: 'Payoffs are your team’s estimates; both know them. No hidden types.' },
-      { title: '4 · Timing', body: 'Sequential: the rival sees your launch within days and can respond.' },
+      { title: '4 · Timing', body: 'Sequential: the rival sees your launch within days and can respond.', guess: { question: 'how are the moves timed?', options: ['Simultaneous', 'Sequential'], answer: 'Sequential' } },
       { title: '5 · Uncertainty and incentives', body: 'Your estimates could be wrong; the rival would rather you didn’t launch first.' },
-      { title: '6 · Model', body: 'A sequential game: solve it by backward induction.' },
-      { title: '7 · Prediction', body: 'If you launch now, the rival waits (4 > 3); if you wait, it launches (6 > 3). Launch now: 6.' },
+      { title: '6 · Model', body: 'A sequential game: solve it by backward induction.', guess: { question: 'which method fits?', options: ['Backward induction', 'Look for a dominant strategy', 'Randomise'], answer: 'Backward induction' } },
+      { title: '7 · Prediction', body: 'If you launch now, the rival waits (4 > 3); if you wait, it launches (6 > 3). Launch now: 6.', guess: { question: 'what should you do?', options: ['Launch now', 'Wait a quarter'], answer: 'Launch now' } },
       { title: '8 · What would change it', body: 'If the rival couldn’t see your move in time, or if your estimates of its payoffs are off.' },
     ],
   },

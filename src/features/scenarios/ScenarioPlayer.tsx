@@ -15,7 +15,7 @@ import { Slider } from '@/src/components/ui/Slider';
 import { useProgress } from '@/src/store/progress';
 import { colors, radius, space } from '@/src/theme/tokens';
 import { getScenario } from './index';
-import { freshRun, replay, runPhase } from './runtime';
+import { type AlternativesView, alternatives, freshRun, replay, runPhase } from './runtime';
 import { type DecisionPrompt, type Input, SLOT_INFO, type ScenarioSpec } from './types';
 import { Bars, ScenarioVisualView } from './visuals';
 
@@ -51,6 +51,7 @@ function Player({ spec }: { spec: ScenarioSpec }) {
   const result = phase === 'done' && state !== null ? spec.play.result(state) : null;
   const log = state !== null && spec.play.log ? spec.play.log(state) : [];
   const chosen = spec.predict.options.find((o) => o.id === run.prediction.answer);
+  const compare = useMemo(() => (phase === 'done' ? alternatives(spec, run) : null), [phase, spec, run]);
 
   return (
     <View style={{ gap: space.lg }}>
@@ -149,10 +150,17 @@ function Player({ spec }: { spec: ScenarioSpec }) {
             ))}
           </Card>
           {chosen ? (
-            <PredictionResult predicted={chosen.label} actual={spec.predict.modelAnswer} verdict={chosen.verdict} confidence={run.prediction.confidence}>
+            <PredictionResult
+              predicted={chosen.label}
+              actual={spec.predict.modelAnswer}
+              actualLabel="The model’s answer"
+              note={spec.formal.chance ? 'This game has random draws: your single run above can differ from the model’s answer, and a lucky or unlucky run doesn’t change whether the reasoning was sound.' : undefined}
+              verdict={chosen.verdict}
+              confidence={run.prediction.confidence}>
               {chosen.feedback}
             </PredictionResult>
           ) : null}
+          {compare ? <CompareOptions view={compare} /> : null}
           <Panel tone="insight" title="The reasoning">
             <View style={{ gap: space.sm }}>
               {spec.explain.map((e) => (
@@ -271,7 +279,40 @@ function Decision({ prompt, onCommit }: { prompt: DecisionPrompt; onCommit: (inp
   );
 }
 
+/** Every choice the learner could have made, replayed through the same rules — the scenario's "what if" step. */
+function CompareOptions({ view }: { view: AlternativesView }) {
+  return (
+    <Card style={{ gap: space.sm }}>
+      <SectionLabel>Compare your options</SectionLabel>
+      <AppText variant="small" color={colors.textMuted}>
+        {view.expected
+          ? `${view.stat} for each choice. These are expected values, so they don’t depend on the luck of one run.`
+          : `${view.stat} for each choice. Same rules, same other side — only your choice changes.`}
+      </AppText>
+      <View accessibilityRole="list" style={{ gap: 4 }}>
+        {view.rows.map((r) => (
+          <View
+            key={String(r.input)}
+            accessible
+            accessibilityLabel={`${r.label}: ${r.value}${r.mine ? ', your choice' : ''}`}
+            style={[styles.compareRow, r.mine && styles.compareMine]}>
+            <AppText variant="small" color={r.mine ? colors.text : colors.textBody} style={{ flex: 1 }}>
+              {r.label}
+              {r.mine ? ' · your choice' : ''}
+            </AppText>
+            <AppText variant="small" weight="semibold" color={r.mine ? colors.primaryText : colors.text} tabular>
+              {r.value}
+            </AppText>
+          </View>
+        ))}
+      </View>
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
+  compareRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 36, paddingHorizontal: space.md, paddingVertical: space.xs, borderRadius: radius.md, backgroundColor: colors.bgRaised },
+  compareMine: { borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primarySoft },
   formalToggle: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingTop: space.sm, minHeight: 44 },
   decision: {
     gap: space.md,

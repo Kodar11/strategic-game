@@ -179,36 +179,74 @@ function ParamLab({ lab, onExplored }: { lab: Extract<LabSpec, { kind: 'param' }
   );
 }
 
+/**
+ * Step-by-step reveal. A card with a `guess` asks the learner to commit to an answer first; the reveal then says
+ * whether the guess matched. Guesses are part of the experiment, not recorded predictions.
+ */
 function RevealLab({ lab, onExplored }: { lab: Extract<LabSpec, { kind: 'reveal' }>; onExplored: () => void }) {
   const [shown, setShown] = useState(0);
+  const [guesses, setGuesses] = useState<Record<number, string>>({});
+  const reveal = () => {
+    const next = shown + 1;
+    setShown(next);
+    if (next === lab.cards.length) onExplored();
+  };
   return (
     <Card style={{ gap: space.md }}>
       <AppText variant="small" color={colors.textMuted}>
         {lab.prompt}
       </AppText>
-      {lab.cards.map((c, i) =>
-        i < shown ? (
-          <View key={c.title} style={styles.card}>
-            <SectionLabel>{c.title}</SectionLabel>
-            <AppText variant="small">{c.body}</AppText>
-          </View>
-        ) : i === shown ? (
+      {lab.cards.map((c, i) => {
+        if (i > shown) return null;
+        const guess = guesses[i];
+        if (i < shown)
+          return (
+            <View key={c.title} style={styles.card}>
+              <SectionLabel>{c.title}</SectionLabel>
+              {c.guess && guess ? (
+                <AppText variant="caption" color={guess === c.guess.answer ? colors.success : colors.insight}>
+                  {guess === c.guess.answer ? `You said “${guess}” — right.` : `You said “${guess}”. Look again:`}
+                </AppText>
+              ) : null}
+              <AppText variant="small">{c.body}</AppText>
+            </View>
+          );
+        if (c.guess)
+          return (
+            <View key={c.title} style={[styles.card, styles.hidden]}>
+              <AppText variant="small" color={colors.accent}>
+                {c.title}: {c.guess.question}
+              </AppText>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }} accessibilityRole="radiogroup">
+                {c.guess.options.map((o) => (
+                  <Pressable
+                    key={o}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: guess === o }}
+                    onPress={() => setGuesses((g) => ({ ...g, [i]: o }))}
+                    style={[styles.chip, guess === o && styles.chipOn]}>
+                    <AppText variant="small" color={guess === o ? colors.text : colors.textBody}>
+                      {o}
+                    </AppText>
+                  </Pressable>
+                ))}
+              </View>
+              <Button label="Reveal" variant="secondary" compact disabled={!guess} onPress={reveal} style={{ alignSelf: 'flex-start' }} />
+            </View>
+          );
+        return (
           <Pressable
             key={c.title}
             accessibilityRole="button"
             accessibilityLabel={`Reveal ${c.title}`}
-            onPress={() => {
-              const next = shown + 1;
-              setShown(next);
-              if (next === lab.cards.length) onExplored();
-            }}
+            onPress={reveal}
             style={({ pressed }) => [styles.card, styles.hidden, pressed && { backgroundColor: colors.surfaceHigh }]}>
             <AppText variant="small" color={colors.accent}>
               Tap to reveal: {c.title}
             </AppText>
           </Pressable>
-        ) : null,
-      )}
+        );
+      })}
     </Card>
   );
 }
@@ -216,4 +254,6 @@ function RevealLab({ lab, onExplored }: { lab: Extract<LabSpec, { kind: 'reveal'
 const styles = StyleSheet.create({
   card: { padding: space.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgRaised, gap: 4 },
   hidden: { borderStyle: 'dashed', borderColor: 'rgba(34,211,238,0.4)', minHeight: 44, justifyContent: 'center' },
+  chip: { minHeight: 40, justifyContent: 'center', paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.borderStrong },
+  chipOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
 });

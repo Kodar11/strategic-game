@@ -24,6 +24,9 @@ Not every stage gets its own screen, and no lesson is forced into an identical t
   - Every prediction's result also goes to the learning record (see [LEARNING_DATA.md](LEARNING_DATA.md)).
 - **Feedback comes from state.** All learner-dependent wording lives in each lesson's `copy.ts` as pure functions of lesson state and the game engine, and is covered by `src/features/lessons/__tests__/lesson-copy.test.ts`.
 - **Scripted opponents are described as scripted.** Rohan, Nina, Maya and the Lesson 2 crowd each follow a stated, fixed policy. The screens say so; nothing implies they adapted to the learner unless the model does (Maya reads past shots only).
+- **Show the choices not taken.** After a single-decision scenario, "Compare your options" replays every alternative through the scenario's own rules (`alternatives()` in `scenarios/runtime.ts`). Random scenarios compare only an expected value or guaranteed chance (`explore.expected`), never one run's draws; multi-step games don't get it. See [LESSON_AUDIT.md](LESSON_AUDIT.md).
+- **The model's answer is not "what happened".** In scenarios the prediction is compared with "The model's answer"; random scenarios add that a single run can differ, and luck doesn't change whether the reasoning was sound.
+- **Ask before revealing, even in labs.** Reveal labs can attach a guess to a card; the learner commits before the card opens (not recorded, no confidence — it's part of the experiment).
 - **Transfer questions don't name the concept.** After the learner answers, `TransferQuestion` shows what carries over from the lesson's model and where the analogy stops. A test checks that transfer prompts don't contain the concept's name.
 - **Completion reflects the learner's path.** `Completion` shows a recap built from state (never a judgement of the person), one reflection question or challenge, and a hook into the next lesson.
 

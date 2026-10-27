@@ -573,6 +573,7 @@ const L3: ScenarioSpec[] = [
     lesson: 'best-response',
     slot: 'B',
     version: 1,
+    explore: { expected: true },
     title: 'One penalty kick',
     purpose: 'Interests are now directly opposed — and best replies chase each other in a circle.',
     setup: 'You take one penalty. You kick left or right; the keeper dives left or right at the same moment. The numbers are your chances of scoring; the keeper wants the opposite.',

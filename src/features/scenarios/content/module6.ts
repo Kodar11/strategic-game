@@ -287,6 +287,7 @@ const L20: ScenarioSpec[] = [
     lesson: 'voting',
     slot: 'A',
     version: 1,
+    explore: { stat: 'Expected for your vote', expected: true },
     title: 'The last ballot',
     purpose: 'Under plurality rule, voting for your favourite can help your least favourite win.',
     setup: 'Ten people vote for club president by plurality (most votes wins). The other nine have already voted: X 4, Y 4, Z 1. You cast the last vote. Your ranking: Z (worth 10 to you), then Y (6), then X (0).',

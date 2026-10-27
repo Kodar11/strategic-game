@@ -385,6 +385,7 @@ const L12: ScenarioSpec[] = [
     lesson: 'war-of-attrition',
     slot: 'B',
     version: 1,
+    explore: { stat: 'Expected for your bid', expected: true },
     title: 'Everyone pays',
     purpose: 'One sealed effort instead of waiting: you pay what you bid whether you win or lose.',
     setup: 'Two firms compete for a contract worth 10 by preparing proposals. The better-funded proposal wins, but each firm pays its own preparation costs regardless. You choose how much to spend (0–10).',

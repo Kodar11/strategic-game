@@ -137,6 +137,13 @@ export interface ScenarioSpec<S = unknown> {
   explain: string[];
   takeaway: string;
   skill: SkillArea;
+  /**
+   * "Compare your options" after a single-decision run: every other choice, replayed through the same rules.
+   * On by default for scenarios without chance moves. Scenarios with chance must opt in with an `expected` stat
+   * (an expected value or guaranteed chance), so one run's luck is never presented as a comparison of strategies.
+   * `values` picks the slider values to compare (default: every value when there are at most 13).
+   */
+  explore?: false | { stat?: string; values?: number[]; expected?: boolean };
   /** Fixed seed for tests; play-throughs use a fresh seed. */
   testSeed?: number;
 }

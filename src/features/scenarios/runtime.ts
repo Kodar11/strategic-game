@@ -171,3 +171,74 @@ export function restartScenario(state: Pick<ScenarioState, 'scenarioRuns'>, id: 
   if (!spec) return null;
   return { ...state.scenarioRuns, [id]: freshRun(spec, seed) };
 }
+
+// ── Counterfactuals: what the learner's other choices would have produced ────
+
+export interface Alternative {
+  /** The option's label (or the value, for number prompts). */
+  label: string;
+  input: Input;
+  headline: string;
+  /** The compared stat's value for this choice. */
+  value: string;
+  mine: boolean;
+}
+
+export interface AlternativesView {
+  /** Which stat is compared (e.g. "Your profit", "Expected for your bid"). */
+  stat: string;
+  /** True when the compared stat is an expected value or guaranteed chance rather than one run's outcome. */
+  expected: boolean;
+  rows: Alternative[];
+}
+
+const MAX_GRID = 13;
+
+/** Slider values to compare: the configured ones (plus the learner's pick), or every grid value on a short range. */
+export function compareValues(p: { min: number; max: number; step: number }, chosen: number, configured?: number[]): number[] | null {
+  const grid = Math.round((p.max - p.min) / p.step) + 1;
+  const values = configured ?? (grid <= MAX_GRID ? Array.from({ length: grid }, (_, i) => Number((p.min + i * p.step).toFixed(6))) : null);
+  if (!values) return null;
+  return [...new Set([...values, chosen])].sort((a, b) => a - b);
+}
+
+/**
+ * For a finished single-decision run: replay the same seed with every other choice, using the scenario's own rules
+ * (see `ScenarioSpec.explore`). Null when the scenario doesn't support a fair comparison.
+ */
+export function alternatives(spec: ScenarioSpec, run: ScenarioRun): AlternativesView | null {
+  const cfg = spec.explore;
+  if (cfg === false || run.inputs.length !== 1) return null;
+  if (spec.formal.chance && !(cfg && cfg.expected)) return null;
+  const start = spec.play.init(run.seed);
+  const prompt = spec.play.prompt(start);
+  if (!prompt || prompt.kind === 'allocation') return null;
+  const chosen = run.inputs[0];
+  let options: { label: string; input: Input }[];
+  if (prompt.kind === 'choice') options = prompt.options.map((o) => ({ label: o.label, input: o.id }));
+  else {
+    if (typeof chosen !== 'number') return null;
+    const values = compareValues(prompt, chosen, cfg ? cfg.values : undefined);
+    if (!values) return null;
+    const unit = (x: number) => (prompt.unit ? ` ${x === 1 && prompt.unit.endsWith('s') ? prompt.unit.slice(0, -1) : prompt.unit}` : '');
+    options = values.map((x) => ({ label: prompt.percent ? `${x}%` : `${x}${unit(x)}`, input: x }));
+  }
+  const rows: Alternative[] = [];
+  let stat: string | null = null;
+  for (const o of options) {
+    let r: ScenarioResult;
+    try {
+      const s = spec.play.apply(spec.play.init(run.seed), o.input);
+      if (spec.play.prompt(s) !== null) return null;
+      r = spec.play.result(s);
+    } catch {
+      return null;
+    }
+    const line = cfg && cfg.stat ? r.stats.find((x) => x.label === cfg.stat) : (r.stats.find((x) => x.tone === 'blue') ?? r.stats[0]);
+    if (!line) return null;
+    if (stat === null) stat = line.label;
+    else if (stat !== line.label) return null;
+    rows.push({ label: o.label, input: o.input, headline: r.headline, value: line.value.replace(/^-0$/, '0'), mine: o.input === chosen });
+  }
+  return { stat: stat!, expected: !!spec.formal.chance || !!(cfg && cfg.expected), rows };
+}

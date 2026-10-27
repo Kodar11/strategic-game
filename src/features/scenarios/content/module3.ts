@@ -306,23 +306,24 @@ export const CAPACITY: GameTree = {
   ),
 };
 
-export const LATE_PAYMENT: GameTree = {
-  players: ['You', 'Supplier'],
+/** Lesson 9 transfer: a promise, not a threat. Payoffs (you, manager). Weekend work costs you 3 and is worth 8 to the manager; the bonus is 5. */
+export const WEEKEND_BONUS: GameTree = {
+  players: ['You', 'Manager'],
   root: decision(
-    'pay',
+    'work',
     0,
     [
-      { id: 'on-time', label: 'Pay on time', child: leaf('ontime', [0, 0]) },
+      { id: 'normal', label: 'Work normal hours', child: leaf('normal', [0, 0]) },
       {
-        id: 'late',
-        label: 'Pay late again',
-        child: decision('react', 1, [
-          { id: 'cut', label: 'Supplier cuts you off', child: leaf('cut', [-6, -10]) },
-          { id: 'tolerate', label: 'Supplier tolerates it', child: leaf('tol', [2, -1]) },
+        id: 'weekend',
+        label: 'Work the weekend',
+        child: decision('bonus', 1, [
+          { id: 'pay', label: 'Manager pays the bonus', child: leaf('paid', [2, 3]) },
+          { id: 'skip', label: 'Manager skips the bonus', child: leaf('skipped', [-3, 8]) },
         ]),
       },
     ],
-    'Do you pay this invoice on time?',
+    'Do you work the weekend for the promised bonus?',
   ),
 };
 
@@ -416,40 +417,56 @@ const L9: ScenarioSpec[] = [
     id: 'l9.c.empty-threat',
     lesson: 'credibility',
     slot: 'C',
-    version: 1,
-    title: 'The late payment',
-    purpose: 'A different setting: a supplier’s threat that sounds serious.',
-    setup: 'Your firm keeps paying a supplier late. Their account manager emails: “One more late payment and we stop supplying you.” You are their biggest customer.',
-    rules: ['Pay on time: both 0 (baseline).', 'Pay late and they cut you off: you −6 (finding a new supplier), they −10 (losing the account).', 'Pay late and they tolerate it: you +2 (cash flow), they −1 (interest lost).'],
-    formal: {
-      players: 'You (customer) and the supplier.',
-      actions: 'You: pay on time or late. Supplier, after a late payment: cut off or tolerate.',
-      timing: 'Sequential.',
-      information: 'Perfect information; one-off decision.',
-      payoffs: 'As listed (you first).',
-      opponent: 'After a late payment, the supplier does what pays it more.',
-      solution: 'Subgame-perfect equilibrium: pay late; the supplier tolerates.',
-      source: 'original',
-      sourceNote: 'Designed for this app; same structure as the entry game.',
-    },
-    visual: { kind: 'tree', tree: LATE_PAYMENT },
-    predict: {
-      question: 'Is the supplier’s threat credible?',
-      basis: 'calculable',
-      modelAnswer: 'No: cutting you off costs them 10, tolerating costs 1.',
-      options: [
-        { id: 'no', label: 'No — cutting off its biggest customer hurts it more', verdict: 'match', feedback: 'After a late payment, the supplier compares −10 with −1. Carrying out the threat is the worse option for them.' },
-        { id: 'yes', label: 'Yes — they put it in writing', verdict: 'misconception', feedback: 'Writing it down doesn’t change their payoffs unless it creates a real cost to backing down.' },
-        { id: 'reputation', label: 'It depends on whether they need a tough reputation', verdict: 'depends', feedback: 'With many customers watching over many periods, fighting once might pay. That’s a different, repeated game — not the one described.' },
-      ],
-      solve: () => (backwardInduction(LATE_PAYMENT).choice.react === 'tolerate' ? 'no' : 'yes'),
-    },
-    play: treePlay({ tree: LATE_PAYMENT, you: 0, opponentRule: 'The supplier’s rule: once you’ve paid late, do what costs it less.', extraLines: (p) => [p[0] === 'late' ? 'Ethics and long-term relationships aside, the threat didn’t change the supplier’s incentive once the payment was late.' : 'Paying on time is the cooperative choice — but on these payoffs the threat wasn’t what should have made you do it.'] }),
-    explain: [
-      'Same structure as the entry game: the threatened action hurts the threatener. Backward induction says the supplier tolerates the late payment.',
-      'Where reputation matters — many customers, many periods — the analysis can change. Selten’s “chain-store paradox” (1978) shows that even then, backward induction over a known, finite number of markets predicts no fighting, which many find counter-intuitive; models with uncertainty about the incumbent’s type can restore deterrence.',
+    // v2: replaced the late-payment threat (a reskin of scenario A) with a promise — a genuine transfer.
+    version: 2,
+    title: 'The weekend bonus',
+    purpose: 'Transfer: from threats to promises. A reward offered now for something the other side does later.',
+    setup:
+      'Your manager needs a report by Monday and says: “Work this weekend and I’ll get you a 5-point bonus.” Nothing is in writing, the manager decides on bonuses alone, and this is a one-off project. The weekend costs you 3; the finished report is worth 8 to the manager.',
+    rules: [
+      'Normal hours: nothing changes (0 each).',
+      'Weekend, bonus paid: you 5 − 3 = 2; the manager 8 − 5 = 3.',
+      'Weekend, bonus skipped: you −3; the manager keeps all 8.',
+      'The manager decides about the bonus after the weekend is worked.',
     ],
-    takeaway: 'Before giving in to a threat, ask: if I call the bluff, what will they actually prefer to do?',
+    formal: {
+      players: 'You and your manager.',
+      actions: 'You: work the weekend or normal hours. Manager, after a worked weekend: pay the bonus or skip it.',
+      timing: 'Sequential: you act first; the manager decides afterwards.',
+      information: 'Perfect information; one-off interaction; the promise is not binding.',
+      payoffs: 'As listed (you first). Both care only about these points.',
+      opponent: 'After the weekend, the manager does what pays the manager more.',
+      solution: 'Subgame-perfect equilibrium: the manager would skip (8 > 3), so you work normal hours (0 > −3). Both miss (2, 3).',
+      source: 'original',
+      sourceNote: 'Designed for this app: the promise counterpart of the entry game (a one-shot trust problem).',
+    },
+    visual: { kind: 'tree', tree: WEEKEND_BONUS },
+    predict: {
+      question: 'Once your weekend is worked, will a manager who cares only about these points pay the bonus?',
+      basis: 'calculable',
+      modelAnswer: 'No: after the weekend, skipping pays the manager 8 and paying only 3.',
+      options: [
+        { id: 'no', label: 'No — by then paying only costs the manager', verdict: 'match', feedback: 'After the weekend, the manager compares 3 (pay) with 8 (skip). The promise asked for something that won’t be in the manager’s interest when the time comes.' },
+        { id: 'yes', label: 'Yes — a promise is a promise', verdict: 'misconception', feedback: 'Saying it costs nothing, and nothing makes breaking it costly here. Judge a promise like a threat: by what the promiser will prefer later.' },
+        { id: 'binding', label: 'Only if the bonus were written into a binding agreement', verdict: 'defensible', feedback: 'That is exactly what would fix it — a binding agreement changes the manager’s later payoffs. As described, though, nothing binds the manager, so the answer here is no.' },
+      ],
+      solve: () => (backwardInduction(WEEKEND_BONUS).choice.bonus === 'skip' ? 'no' : 'yes'),
+    },
+    play: treePlay({
+      tree: WEEKEND_BONUS,
+      you: 0,
+      opponentRule: 'The manager’s rule: once the weekend is worked, do whatever pays the manager more.',
+      extraLines: (p) => [
+        p[0] === 'weekend'
+          ? 'You trusted a promise that the manager had no reason to keep once your work was done.'
+          : 'Declining was the sensible reply to an unenforceable promise — even though a kept promise would have left you both better off (2 and 3 instead of 0 and 0).',
+      ],
+    }),
+    explain: [
+      'A threat says “do this or I’ll hurt you later”; a promise says “do this and I’ll reward you later”. Both are tested the same way: when “later” arrives, will the promiser still want to follow through? Here the manager won’t, so the promise is worth nothing.',
+      'The cost falls on both sides: you stay home, and the manager loses a report worth 8 that would have cost only 5. That’s why credible promises are valuable — and why people use contracts, deposits, or relationships they want to keep (Lesson 13) to make them binding.',
+    ],
+    takeaway: 'Test a promise the way you test a threat: when the time comes, will keeping it still be in their interest?',
     skill: 'anticipating',
   }),
 ];
@@ -500,6 +517,7 @@ const L10: ScenarioSpec[] = [
     lesson: 'incentive-shift',
     slot: 'A',
     version: 1,
+    explore: { stat: 'Your expected profit', values: [0, 10, 20, 25, 30, 50], expected: true },
     title: 'The commission plan',
     purpose: 'From rules between rivals to a contract with someone whose effort you can’t see.',
     setup: 'You hire a salesperson. You can see their sales, but not how hard they worked. Hard work makes a big sale more likely, but even a lazy month can get lucky. You pay a base of 10 plus a commission on revenue.',
@@ -567,6 +585,7 @@ const L10: ScenarioSpec[] = [
     lesson: 'incentive-shift',
     slot: 'B',
     version: 1,
+    explore: { values: [0, 20, 30, 40, 50, 100] },
     title: 'Checking the batches',
     purpose: 'Instead of paying for results, you watch — but watching costs money and misses things.',
     setup: 'A subcontractor makes batches for you. Working carefully costs them 3 per batch. You can inspect some batches; each inspection costs you 2 and catches careless work 75% of the time. A caught careless batch loses the subcontractor its 10 bonus. A careless batch that ships costs you 8.',

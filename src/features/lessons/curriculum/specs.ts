@@ -235,7 +235,7 @@ export const CURRICULUM_LESSONS: Partial<Record<LessonId, CurriculumLessonSpec>>
         { id: 'strong', label: 'Very — parents have the authority', verdict: 'misconception', feedback: 'Authority makes it possible, not attractive. Ask what the parent will prefer at the time.' },
         { id: 'reputation', label: 'It depends on whether the parents have carried out threats before', verdict: 'defensible', feedback: 'Reputation can matter in repeated settings — but this particular threat is costly to carry out, so it starts weak.' },
       ],
-      analogy: { holds: 'The threatened action hurts the threatener, like the supplier cutting off its biggest customer.', differs: 'Families interact repeatedly and care about each other, which can make even costly threats sometimes credible.' },
+      analogy: { holds: 'The threatened action hurts the threatener, like Rohan fighting a price war after you’ve entered.', differs: 'Families interact repeatedly and care about each other, which can make even costly threats sometimes credible.' },
     },
     completion: {
       takeaway: 'Believe threats that the other side would want to carry out. Make yours credible by changing what you’ll want to do later.',

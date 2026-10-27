@@ -104,7 +104,7 @@ A threat only works if carrying it out would make sense. Main experience: scenar
 |---|---|---|---|
 | A | “Enter and I’ll crush you” (`l9.a.market-entry`) | canonical — The standard entry-deterrence game (cf. Selten, 1978). | Subgame-perfect equilibrium: enter, Rohan accommodates. The threat is not credible. |
 | B | Making the threat real (`l9.b.commitment`) | adapted — Capacity as a strategic commitment, after Dixit (1980); numbers are this app’s. | Subgame-perfect equilibrium: build capacity; the entrant stays out; you earn 7 (vs 5 without). |
-| C | The late payment (`l9.c.empty-threat`) | original — Designed for this app; same structure as the entry game. | Subgame-perfect equilibrium: pay late; the supplier tolerates. |
+| C | The weekend bonus (`l9.c.empty-threat`) | original — Designed for this app: the promise counterpart of the entry game (a one-shot trust problem). | Subgame-perfect equilibrium: the manager would skip (8 > 3), so you work normal hours (0 > −3). Both miss (2, 3). |
 
 ### Lesson 10 · Incentives and Hidden Actions (`incentive-shift`)
 

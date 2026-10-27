@@ -167,9 +167,15 @@ export function PredictionResult({
   children,
   delay = 0,
   confidence,
+  actualLabel = 'What happened',
+  note,
 }: {
   predicted: string;
   actual: string;
+  /** Heading over `actual`. Use "The model's answer" when `actual` is the analysis rather than this run's outcome. */
+  actualLabel?: string;
+  /** A short line under the comparison, e.g. that a single random run can differ from the expected answer. */
+  note?: string;
   verdict: Verdict;
   title?: string;
   children?: ReactNode;
@@ -183,7 +189,7 @@ export function PredictionResult({
   const sure = confidence ? ` (${confidenceLabel(confidence).toLowerCase()})` : '';
   return (
     <Animated.View entering={enter(delay)} style={{ gap: space.sm }}>
-      <View style={styles.compare} accessible accessibilityLabel={`You predicted ${predicted}${sure}. What happened: ${actual}.`}>
+      <View style={styles.compare} accessible accessibilityLabel={`You predicted ${predicted}${sure}. ${actualLabel}: ${actual}.`}>
         <View style={styles.half}>
           <AppText variant="caption" color={colors.accent}>
             You predicted
@@ -198,11 +204,16 @@ export function PredictionResult({
         <Icon size={20} color={hit ? colors.success : colors.textMuted} strokeWidth={2.2} />
         <View style={styles.half}>
           <AppText variant="caption" color={colors.textMuted}>
-            What happened
+            {actualLabel}
           </AppText>
           <AppText variant="bodyStrong">{actual}</AppText>
         </View>
       </View>
+      {note ? (
+        <AppText variant="caption" color={colors.textMuted}>
+          {note}
+        </AppText>
+      ) : null}
       {children ? (
         <FeedbackPanel verdict={verdict} title={title}>
           {children}

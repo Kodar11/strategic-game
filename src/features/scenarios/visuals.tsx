@@ -78,7 +78,7 @@ function Branch({ tree, node, path, depth, taken }: { tree: GameTree; node: Tree
   return (
     <View style={{ gap: 4 }}>
       <AppText variant="caption" color={node.player === 0 ? colors.primaryText : colors.rivalText}>
-        {mover} decides
+        {mover === 'You' ? 'You decide' : `${mover} decides`}
       </AppText>
       {node.actions.map((a) => {
         const on = taken && path?.[depth] === a.id;
