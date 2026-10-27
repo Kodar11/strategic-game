@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ArrowLeft, ArrowRight, Volume2, VolumeX, X } from '@/src/components/ui/icons';
+import { ArrowLeft, ArrowRight, RotateCcw, Volume2, VolumeX, X } from '@/src/components/ui/icons';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, useAnimatedStyle, withTiming } from 'react-native-reanimated';
@@ -39,11 +39,14 @@ export function LessonShell({
   steps,
   step,
   goTo,
+  onRestart,
 }: {
   lesson: LessonMeta;
   steps: StepDef[];
   step: number;
   goTo: (n: number) => void;
+  /** Start the lesson again from the first step; offered in the header once the learner is past it. */
+  onRestart?: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const reduced = useMotionReduced();
@@ -96,6 +99,7 @@ export function LessonShell({
             <AppText variant="caption" color={colors.textMuted} tabular style={{ minWidth: 32, textAlign: 'right' }}>
               {step + 1}/{steps.length}
             </AppText>
+            {onRestart && step > 0 && !isFinal ? <IconButton icon={RotateCcw} label="Start over from the first step" onPress={onRestart} /> : null}
             <IconButton
               icon={narrationOn ? Volume2 : VolumeX}
               label={narrationOn ? 'Mute narration' : 'Unmute narration'}

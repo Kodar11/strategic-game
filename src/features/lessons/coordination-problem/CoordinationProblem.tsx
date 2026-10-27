@@ -416,7 +416,7 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
     },
   ];
 
-  return <LessonShell lesson={lesson} steps={steps} step={step} goTo={goTo} />;
+  return <LessonShell lesson={lesson} steps={steps} step={step} goTo={goTo} onRestart={restart} />;
 }
 
 function MeetPrediction({ round, predicted, confidence, result }: { round: 1 | 2; predicted: Place; confidence: Confidence | null; result: MeetupResult }) {

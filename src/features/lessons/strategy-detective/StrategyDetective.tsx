@@ -455,7 +455,7 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
     },
   ];
 
-  return <LessonShell lesson={lesson} steps={steps} step={step} goTo={goTo} />;
+  return <LessonShell lesson={lesson} steps={steps} step={step} goTo={goTo} onRestart={restart} />;
 }
 
 function NumberPicker({ value, onChange, locked }: { value: number; onChange: (v: number) => void; locked: boolean }) {

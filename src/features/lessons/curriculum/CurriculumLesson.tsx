@@ -133,5 +133,5 @@ export default function CurriculumLesson({ lesson }: { lesson: LessonMeta }) {
     },
   ];
 
-  return <LessonShell lesson={lesson} steps={steps} step={step} goTo={goTo} />;
+  return <LessonShell lesson={lesson} steps={steps} step={step} goTo={goTo} onRestart={restart} />;
 }

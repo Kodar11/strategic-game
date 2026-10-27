@@ -532,7 +532,7 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
     },
   ];
 
-  return <LessonShell lesson={lesson} steps={steps} step={step} goTo={goTo} />;
+  return <LessonShell lesson={lesson} steps={steps} step={step} goTo={goTo} onRestart={restart} />;
 }
 
 function ShotButton({ s, onPress }: { s: Side; onPress: () => void }) {

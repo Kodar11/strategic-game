@@ -1,6 +1,6 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { ArrowRight, CalendarDays, CircleCheck, Clock, Lock, Play, RotateCcw, Settings, Target, Trophy } from '@/src/components/ui/icons';
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,9 +17,12 @@ import { type Category, type CategoryIndex, categoryProgress, lessonCategories, 
 import { allLessons, type LessonId, type LessonMeta, allModules, type ModuleMeta } from '@/src/content/lessons';
 import { allAssessments, type Assessment, getAssessment, moduleCheckpoint, splitAssessmentTitle } from '@/src/features/assessments/content';
 import { type AssessmentRun, finalUnlocked } from '@/src/features/assessments/scoring';
+import { useDaily } from '@/src/data/daily-session';
+import { formatDay, monthKey, monthOf } from '@/src/features/daily/dates';
 import { allScenarios } from '@/src/features/scenarios';
 import { type LessonRuntime, useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, shadow, space } from '@/src/theme/tokens';
+import { useMotionReduced } from '@/src/utils/feedback';
 
 function openLesson(id: LessonId) {
   router.push({ pathname: '/lesson/[lessonId]', params: { lessonId: id } });
@@ -40,6 +43,19 @@ export default function Home() {
   // null = "All": the module view, exactly as before categories existed.
   const [category, setCategory] = useState<string | null>(null);
   const categories = lessonCategories();
+  const reduced = useMotionReduced();
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  const columnY = useRef(0);
+  const lessonsY = useRef(0);
+
+  // Switching filters swaps the list below; if the learner had scrolled past the Lessons heading, bring it back to
+  // the top so the new list starts in view instead of leaving them somewhere in the middle of it.
+  const selectCategory = (id: string | null) => {
+    setCategory(id);
+    const top = columnY.current + lessonsY.current - space.sm;
+    if (scrollY.current > top) scrollRef.current?.scrollTo({ y: top, animated: !reduced });
+  };
 
   if (!hydrated) return <MessageScreen loading />;
 
@@ -56,8 +72,12 @@ export default function Home() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Backdrop />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + space.md, paddingBottom: insets.bottom + space.huge, paddingHorizontal: space.lg }}>
-        <View style={styles.column}>
+      <ScrollView
+        ref={scrollRef}
+        onScroll={(e) => (scrollY.current = e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={32}
+        contentContainerStyle={{ paddingTop: insets.top + space.sm, paddingBottom: insets.bottom + space.xxl, paddingHorizontal: space.lg }}>
+        <View style={styles.column} onLayout={(e) => (columnY.current = e.nativeEvent.layout.y)}>
           <View style={styles.topBar}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
               <View style={styles.logo}>
@@ -92,9 +112,7 @@ export default function Home() {
             <AppText variant="display" accessibilityRole="header">
               Think in Strategies.
             </AppText>
-            <AppText color={colors.textMuted}>
-              Twenty-two short games in six modules. Make a call, watch what happens, then find out why — and where else the idea shows up.
-            </AppText>
+            <AppText color={colors.textMuted}>Make decisions, see what happens, and discover why.</AppText>
           </Animated.View>
 
           {suggested ? (
@@ -102,7 +120,7 @@ export default function Home() {
               <Pressable
                 onPress={() => openLesson(suggested.id)}
                 accessibilityRole="button"
-                accessibilityLabel={`${resume ? 'Resume' : 'Start'} lesson ${suggested.number}, ${suggested.title}`}
+                accessibilityLabel={`${resume ? 'Resume' : 'Start'} lesson ${suggested.number}, ${suggested.title}${resume ? `, step ${runtime[resume.id]!.step + 1} of ${runtime[resume.id]!.total}` : ''}`}
                 style={({ pressed }) => [styles.resume, pressed && { backgroundColor: colors.primaryPressed }]}>
                 <View style={{ flex: 1, gap: 2 }}>
                   <AppText variant="caption" color="#DBEAFE">
@@ -113,62 +131,49 @@ export default function Home() {
                   </AppText>
                   {resume ? <ResumeProgress run={runtime[resume.id]!} light /> : null}
                 </View>
-                <View style={styles.resumeIcon}>
-                  <Play size={20} color={colors.primary} fill={colors.primary} />
+                <View style={styles.resumePill}>
+                  <Play size={14} color={colors.primary} fill={colors.primary} />
+                  <AppText variant="small" weight="semibold" color={colors.primary}>
+                    {resume ? 'Resume' : 'Start'}
+                  </AppText>
                 </View>
               </Pressable>
             </Animated.View>
           ) : null}
 
-          <Animated.View entering={enter(100)}>
+          <Animated.View entering={enter(100)} style={styles.utilities}>
             <Pressable
               onPress={() => router.push('/challenges')}
               accessibilityRole="button"
-              accessibilityLabel={`Practice in new situations. ${played} of ${allScenarios().length} scenarios played. No lesson required.`}
-              style={({ pressed }) => [styles.practice, { marginBottom: space.md }, pressed && { backgroundColor: colors.surfaceHigh }]}>
-              <View style={styles.practiceIcon}>
-                <Target size={20} color={colors.primaryText} strokeWidth={2.2} />
-              </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <AppText variant="bodyStrong">Practice in new situations</AppText>
-                <AppText variant="caption" color={colors.textMuted}>
-                  {played} of {allScenarios().length} scenarios played · open any time
-                </AppText>
-              </View>
-              <ArrowRight size={18} color={colors.textMuted} />
-            </Pressable>
-          </Animated.View>
-
-          <Animated.View entering={enter(110)}>
-            <Pressable
-              onPress={() => router.push('/daily')}
-              accessibilityRole="button"
-              accessibilityLabel="Daily strategic challenge. One short decision a day, with a calendar of past challenges."
+              accessibilityLabel={`Practice in new situations. Apply what you've learned. ${played} of ${allScenarios().length} scenarios played. No lesson required.`}
               style={({ pressed }) => [styles.practice, pressed && { backgroundColor: colors.surfaceHigh }]}>
-              <View style={[styles.practiceIcon, { backgroundColor: colors.insightSoft }]}>
-                <CalendarDays size={20} color={colors.insight} strokeWidth={2.2} />
+              <View style={styles.practiceIcon}>
+                <Target size={18} color={colors.primaryText} strokeWidth={2.2} />
               </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <AppText variant="bodyStrong">Daily challenge</AppText>
-                <AppText variant="caption" color={colors.textMuted}>
-                  One short decision a day · calendar and past results
+              <View style={{ flex: 1 }}>
+                <AppText variant="bodyStrong">Practice in new situations</AppText>
+                <AppText variant="caption" color={colors.textMuted} tabular>
+                  {played} of {allScenarios().length} scenarios played
                 </AppText>
               </View>
               <ArrowRight size={18} color={colors.textMuted} />
             </Pressable>
+            <DailyRow />
           </Animated.View>
 
-          <View style={styles.sectionHead}>
-            <AppText variant="heading">Lessons</AppText>
+          <View style={styles.sectionHead} onLayout={(e) => (lessonsY.current = e.nativeEvent.layout.y)}>
+            <AppText variant="heading" accessibilityRole="header">
+              Lessons
+            </AppText>
             <AppText variant="small" color={colors.textMuted} tabular>
               {doneCount} of {allLessons().length} complete
             </AppText>
           </View>
 
-          {categories ? <CategoryFilter index={categories} completed={completed} value={category} onChange={setCategory} /> : null}
+          {categories ? <CategoryFilter index={categories} completed={completed} value={category} onChange={selectCategory} /> : null}
 
           {activeCategory ? (
-            <View style={{ gap: space.lg }}>
+            <View style={{ gap: space.md }}>
               <CategoryHeader category={activeCategory} done={categoryDone?.done ?? 0} total={categoryDone?.total ?? 0} />
               {lessonsInCategory(categories!, activeCategory.id, allLessons()).map((lesson) => (
                 <LessonCard key={lesson.id} lesson={lesson} done={completed.includes(lesson.id)} run={runtime[lesson.id]} />
@@ -177,7 +182,7 @@ export default function Home() {
           ) : (
           <View style={{ gap: space.xxl }}>
             {allModules().map((m, mi) => (
-              <Animated.View key={m.id} entering={enter(120 + mi * 60)} style={{ gap: space.lg }}>
+              <Animated.View key={m.id} entering={enter(120 + mi * 60)} style={{ gap: space.md }}>
                 <ModuleHeader module={m} done={allLessons().filter((l) => l.module === m.id && completed.includes(l.id)).length} total={allLessons().filter((l) => l.module === m.id).length} />
                 {allLessons().filter((l) => l.module === m.id).map((lesson) => (
                   <LessonCard key={lesson.id} lesson={lesson} done={completed.includes(lesson.id)} run={runtime[lesson.id]} />
@@ -189,12 +194,53 @@ export default function Home() {
           </View>
           )}
 
-          <AppText variant="caption" color={colors.textFaint} align="center" style={{ marginTop: space.xxl }}>
+          <AppText variant="caption" color={colors.textMuted} align="center" style={{ marginTop: space.xl }}>
             Simplified models of real situations. They sharpen how you reason — they don&apos;t predict everything.
           </AppText>
         </View>
       </ScrollView>
     </View>
+  );
+}
+
+/**
+ * Daily challenge entry point. Shows today's real state from the server-backed daily store (the same month cache the
+ * Daily screen uses): open, answered, or nothing published. While loading, or if the server can't be reached, it only
+ * describes the feature — it never guesses a state. The whole row opens the Daily screen.
+ */
+function DailyRow() {
+  const today = useDaily((s) => s.today);
+  const loadMonth = useDaily((s) => s.loadMonth);
+  const month = useDaily((s) => s.months[monthKey(monthOf(s.today))]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadMonth(monthOf(today));
+    }, [loadMonth, today]),
+  );
+
+  const data = month?.status === 'ready' ? month.data : null;
+  const answered = !!data?.attempts.get(formatDay(today));
+  const open = !answered && !!data?.entries.get(formatDay(today));
+  const status = !data ? 'One decision a day' : answered ? 'Completed today · review your answer' : open ? 'Take today’s challenge' : 'No challenge today · past ones stay open';
+
+  return (
+    <Pressable
+      onPress={() => router.push('/daily')}
+      accessibilityRole="button"
+      accessibilityLabel={`Daily challenge. ${status}.${data ? '' : ' One short decision a day, with a calendar of past challenges.'}`}
+      style={({ pressed }) => [styles.practice, pressed && { backgroundColor: colors.surfaceHigh }]}>
+      <View style={[styles.practiceIcon, { backgroundColor: colors.insightSoft }]}>
+        <CalendarDays size={18} color={colors.insight} strokeWidth={2.2} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <AppText variant="bodyStrong">Daily challenge</AppText>
+        <AppText variant="caption" color={open ? colors.insight : answered ? colors.success : colors.textMuted}>
+          {status}
+        </AppText>
+      </View>
+      {answered ? <CircleCheck size={18} color={colors.success} strokeWidth={2.4} /> : <ArrowRight size={18} color={colors.textMuted} />}
+    </Pressable>
   );
 }
 
@@ -225,7 +271,7 @@ function CategoryFilter({ index, completed, value, onChange }: { index: Category
       showsHorizontalScrollIndicator={false}
       accessibilityRole="tablist"
       accessibilityLabel="Lesson categories"
-      style={{ marginHorizontal: -space.lg, marginBottom: space.lg }}
+      style={{ marginHorizontal: -space.lg, marginBottom: space.md, flexGrow: 0 }}
       contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.sm }}>
       {chips.map((c) => {
         const on = c.id === value;
@@ -237,10 +283,10 @@ function CategoryFilter({ index, completed, value, onChange }: { index: Category
             accessibilityState={{ selected: on }}
             accessibilityLabel={`${c.title}, ${c.count.replace('/', ' of ')} lessons complete`}
             style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && !on && { backgroundColor: colors.surfaceHigh }]}>
-            <AppText variant="small" weight="semibold" color={on ? colors.text : colors.textBody}>
+            <AppText variant="small" weight="semibold" color={on ? '#fff' : colors.textBody} numberOfLines={1}>
               {c.title}
             </AppText>
-            <AppText variant="caption" color={on ? colors.primaryText : colors.textMuted} tabular>
+            <AppText variant="caption" color={on ? '#DBEAFE' : colors.textMuted} tabular>
               {c.count}
             </AppText>
           </Pressable>
@@ -252,7 +298,7 @@ function CategoryFilter({ index, completed, value, onChange }: { index: Category
 
 function CategoryHeader({ category, done, total }: { category: Category; done: number; total: number }) {
   return (
-    <View style={{ gap: space.xs }} accessibilityRole="header">
+    <View style={{ gap: 2 }} accessibilityRole="header">
       <AppText variant="overline" color={colors.primaryText}>
         Category · {done}/{total} complete
       </AppText>
@@ -277,8 +323,9 @@ function AssessmentCard({ a, run, locked, final, unlockedCount }: { a: Assessmen
   const passed = score !== null && score / a.items.length >= a.passMark - 1e-9;
   const drafting = !submitted && !!run && Object.keys(run.answers).length > 0;
   const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+  const checkpoints = allAssessments().filter((x) => x.id !== 'final').length;
   const status = locked
-    ? `Locked · ${unlockedCount ?? 0} of 6 checkpoints submitted`
+    ? `Locked · submit every checkpoint to unlock (${unlockedCount ?? 0} of ${checkpoints} done)`
     : submitted
       ? `${passed ? 'Passed' : 'Submitted'} · best ${fmt(score!)} / ${a.items.length}`
       : drafting
@@ -325,8 +372,8 @@ function ResumeProgress({ run, light }: { run: LessonRuntime; light?: boolean })
   );
 }
 
+/** Restarting a lesson lives in the lesson's own header, so each card has a single action. */
 function LessonCard({ lesson, done, run }: { lesson: LessonMeta; done: boolean; run?: LessonRuntime }) {
-  const clearRuntime = useProgress((s) => s.clearRuntime);
   const inProgress = !!run && run.step > 0;
   const action = inProgress ? 'Resume' : done ? 'Replay' : 'Start';
 
@@ -366,15 +413,10 @@ function LessonCard({ lesson, done, run }: { lesson: LessonMeta; done: boolean; 
           <AppText variant="small" color={colors.textMuted}>
             {lesson.description}
           </AppText>
-          {inProgress ? <ResumeProgress run={run!} /> : null}
         </View>
       </Pressable>
       <View style={styles.cardActions}>
-        {inProgress ? (
-          <Button label="Start over" variant="ghost" compact icon={RotateCcw} iconPosition="left" onPress={() => clearRuntime(lesson.id)} />
-        ) : (
-          <View />
-        )}
+        <View style={{ flex: 1 }}>{inProgress ? <ResumeProgress run={run!} /> : null}</View>
         <Button
           label={action}
           compact
@@ -390,11 +432,11 @@ function LessonCard({ lesson, done, run }: { lesson: LessonMeta; done: boolean; 
 
 const styles = StyleSheet.create({
   column: { maxWidth: MAX_CONTENT_WIDTH, width: '100%', alignSelf: 'center' },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.xl },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.sm },
   logo: { width: 22, height: 22, borderRadius: 6, overflow: 'hidden', flexDirection: 'row', transform: [{ rotate: '45deg' }] },
   logoHalf: { flex: 1 },
-  hero: { gap: space.md, marginBottom: space.xxl },
-  cast: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: space.sm },
+  hero: { gap: space.sm, marginBottom: space.xl },
+  cast: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: space.xs },
   castItem: {},
   resume: {
     flexDirection: 'row',
@@ -402,20 +444,31 @@ const styles = StyleSheet.create({
     gap: space.md,
     backgroundColor: colors.primary,
     borderRadius: radius.xl,
-    padding: space.lg,
-    marginBottom: space.xxl,
+    paddingVertical: space.md,
+    paddingHorizontal: space.lg,
+    marginBottom: space.md,
   },
-  resumeIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  resumePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 40,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    backgroundColor: '#fff',
+  },
+  utilities: { gap: space.sm, marginBottom: space.xl },
   practice: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
+    minHeight: 60,
     backgroundColor: colors.surface,
-    borderRadius: radius.xl,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: space.lg,
-    marginBottom: space.xxl,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
   },
   assessment: {
     flexDirection: 'row',
@@ -431,8 +484,8 @@ const styles = StyleSheet.create({
   },
   final: { borderStyle: 'solid', borderColor: 'rgba(253,186,116,0.4)', padding: space.lg },
   assessmentDone: { borderStyle: 'solid', borderColor: 'rgba(74,222,128,0.35)' },
-  practiceIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: space.md },
+  practiceIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: space.sm },
   card: { backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   cardNumber: {
     position: 'absolute',
@@ -455,27 +508,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.sm,
     paddingVertical: 3,
   },
-  cardBody: { padding: space.lg, paddingBottom: space.sm, gap: space.sm },
+  cardBody: { paddingHorizontal: space.lg, paddingTop: space.md, gap: 6 },
   cardActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: space.md,
     paddingHorizontal: space.lg,
-    paddingBottom: space.lg,
-    paddingTop: space.xs,
+    paddingBottom: space.md,
+    paddingTop: space.sm,
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.sm,
-    minHeight: 40,
-    paddingHorizontal: space.md,
+    gap: 6,
+    height: 40,
+    paddingHorizontal: 14,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  chipOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  chipOn: { borderColor: colors.primary, backgroundColor: colors.primary },
   miniTrack: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.surfaceHigh, overflow: 'hidden' },
   miniFill: { height: '100%', backgroundColor: colors.primary, borderRadius: 2 },
 });

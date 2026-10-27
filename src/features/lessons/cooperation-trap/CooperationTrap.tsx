@@ -625,7 +625,7 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
     },
   ];
 
-  return <LessonShell lesson={lesson} steps={steps} step={step} goTo={goTo} />;
+  return <LessonShell lesson={lesson} steps={steps} step={step} goTo={goTo} onRestart={restart} />;
 }
 
 function Reveal({

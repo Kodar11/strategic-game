@@ -532,7 +532,7 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
     },
   ];
 
-  return <LessonShell lesson={lesson} steps={steps} step={step} goTo={goTo} />;
+  return <LessonShell lesson={lesson} steps={steps} step={step} goTo={goTo} onRestart={restart} />;
 }
 
 function CompareRow({ label, before, after }: { label: string; before: string; after: string }) {
