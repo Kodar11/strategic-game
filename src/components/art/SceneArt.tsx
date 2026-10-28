@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { memo, useId } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
@@ -9,7 +9,7 @@ import { palette } from '@/src/theme/tokens';
  * Lesson scene illustrations (vector). These are environment plates only — all labels, numbers and
  * choices are rendered as native text on top. Replace with approved raster scenes via docs/ASSETS.md.
  */
-export function SceneArt({ scene, height = 160, style }: { scene: SceneId; height?: number; style?: StyleProp<ViewStyle> }) {
+function SceneArtView({ scene, height = 160, style }: { scene: SceneId; height?: number; style?: StyleProp<ViewStyle> }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const id = (n: string) => `${n}${uid}`;
   return (
@@ -254,3 +254,6 @@ function Policy() {
     </G>
   );
 }
+
+// Memoized: a pure drawing of primitive props, re-rendered otherwise whenever a parent screen updates.
+export const SceneArt = memo(SceneArtView);

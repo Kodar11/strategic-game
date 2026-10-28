@@ -343,9 +343,12 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
               body="An extension of the original game: suppose your phone survives just long enough to send Nina one message. The payoffs stay exactly the same."
             />
             <AppText variant="bodyStrong">Which message do you send?</AppText>
-            <View style={{ flexDirection: 'row', gap: space.sm }} accessibilityRole="radiogroup">
+            {/* One full-width row per message, so each reads on a single line instead of a cramped half-width card. */}
+            <View style={{ gap: space.sm }} accessibilityRole="radiogroup" accessibilityLabel="Which message do you send?">
               {(['cafe', 'park'] as const).map((p) => (
-                <ChoiceCard key={p} compact icon={MessageCircle} title={`"Meet at the ${p === 'cafe' ? 'café' : 'park'}"`} selected={data.message === p} onSelect={() => update({ message: p })} />
+                <View key={p} style={{ flexDirection: 'row' }}>
+                  <ChoiceCard compact icon={MessageCircle} title={`“Meet at the ${p === 'cafe' ? 'café' : 'park'}”`} selected={data.message === p} onSelect={() => update({ message: p })} />
+                </View>
               ))}
             </View>
             {msg && data.message ? (

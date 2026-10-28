@@ -59,13 +59,23 @@ const deviceStorage = Platform.OS === 'web' && typeof window === 'undefined' ? n
 
 /** Before the migration everything was saved under this key. Only its settings are read (once); then it is removed. */
 const LEGACY_KEY = 'strategic-game/progress';
+/**
+ * `persist` writes after every store update — each lesson step and tap — though only `settings` is saved. Writing
+ * only when the serialized settings actually changed keeps two storage calls off every interaction.
+ */
+let lastWritten: string | null = null;
 const storage: StateStorage = {
   getItem: async (name) => (await deviceStorage.getItem(name)) ?? (await deviceStorage.getItem(LEGACY_KEY)),
   setItem: async (name, value) => {
+    if (value === lastWritten) return;
     await deviceStorage.setItem(name, value);
-    await deviceStorage.removeItem(LEGACY_KEY);
+    if (lastWritten === null) await deviceStorage.removeItem(LEGACY_KEY);
+    lastWritten = value;
   },
-  removeItem: (name) => deviceStorage.removeItem(name),
+  removeItem: (name) => {
+    lastWritten = null;
+    return deviceStorage.removeItem(name);
+  },
 };
 
 export const useProgress = create<ProgressState>()(

@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { ArrowRight, CalendarDays, CircleCheck, Clock, Lock, Play, RotateCcw, Settings, Target, Trophy } from '@/src/components/ui/icons';
-import { useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -374,8 +374,11 @@ function ResumeProgress({ run, light }: { run: LessonRuntime; light?: boolean })
   );
 }
 
-/** Restarting a lesson lives in the lesson's own header, so each card has a single action. */
-function LessonCard({ lesson, done, run }: { lesson: LessonMeta; done: boolean; run?: LessonRuntime }) {
+/**
+ * Restarting a lesson lives in the lesson's own header, so each card has a single action. Memoized: Home stays mounted
+ * under an open lesson and re-renders on every saved step, but only the card whose `run` changed needs to.
+ */
+const LessonCard = memo(function LessonCard({ lesson, done, run }: { lesson: LessonMeta; done: boolean; run?: LessonRuntime }) {
   const inProgress = !!run && run.step > 0;
   const action = inProgress ? 'Resume' : done ? 'Replay' : 'Start';
 
@@ -430,7 +433,7 @@ function LessonCard({ lesson, done, run }: { lesson: LessonMeta; done: boolean; 
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   column: { maxWidth: MAX_CONTENT_WIDTH, width: '100%', alignSelf: 'center' },

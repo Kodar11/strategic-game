@@ -136,11 +136,15 @@ export function startAppData(): Promise<void> {
     try {
       const [catalog, userId] = await Promise.all([content.fetchCatalog(), ensureUser()]);
       installCatalog(catalog);
-      await loadCategories(catalog);
+      // Categories don't depend on progress, so they load alongside it rather than as one more round trip first.
+      // loadCategories never rejects.
+      const categoriesLoaded = loadCategories(catalog);
       // Changes saved before the last shutdown go first, so the progress loaded next includes them.
       await outbox.restore(userId);
       if (!(await outbox.drain())) throw new DataError('network', 'pending progress changes could not be sent');
-      useProgress.getState().hydrate(await progress.load());
+      const saved = await progress.load();
+      await categoriesLoaded;
+      useProgress.getState().hydrate(saved);
       startSync();
       useAppData.setState({ status: 'ready' });
       // Not awaited: the Daily Challenge history (for the calendar and the profile) loads in the background, and a

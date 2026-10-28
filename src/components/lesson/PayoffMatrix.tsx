@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { type LayoutChangeEvent, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { AppText } from '@/src/components/ui/AppText';
 import { type MatrixGame, bestReplyMarks } from '@/src/game/payoff-matrix';
@@ -20,11 +21,55 @@ export interface PayoffMatrixProps<R extends string, C extends string> {
   baseline?: MatrixGame<R, C>;
 }
 
-const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+/** Up to two decimals, trailing zeros dropped — so 0.95 reads 0.95, not a rounded 0.9. */
+const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, ''));
+
+const GAP = 6;
+const HEAD_H = 34;
+const MIN_TOUCH = 44;
+
+/** Sizes for the two ways a cell can show its payoff pair. */
+const MODES = {
+  // Side by side — "4 , 3" — for small tables with room to spare.
+  side: { variant: 'heading', ring: 36, charW: 11.5, cellH: 64 },
+  // Stacked — row player's payoff on top, column player's below — so wide tables still fit a phone.
+  stack: { variant: 'bodyStrong', ring: 28, charW: 9.5, cellH: 70 },
+} as const;
+
+type Mode = keyof typeof MODES;
+
+interface Layout {
+  mode: Mode;
+  rowHeadW: number;
+  /** Fixed cell width when the grid scrolls sideways; otherwise cells share the width. */
+  cellW?: number;
+  scroll: boolean;
+}
 
 /**
- * Two-player payoff table. Row player (blue) payoff is shown first, column player (orange) second.
- * Best replies are ringed and labelled in the legend; equilibria get a text tag, not just a colour.
+ * Picks the most readable layout that fits `width`: side by side if every cell has room for both values, else
+ * stacked, else stacked inside a sideways scroll with the row labels pinned. Text widths are estimated from
+ * character counts (tabular digits), which is enough to choose between the three.
+ */
+function matrixLayout(width: number, cols: number, longestValue: number, longestRowLabel: number): Layout {
+  const rowHeadW = Math.min(80, Math.max(28, Math.ceil(longestRowLabel * 7) + 6));
+  const perCell = (width - rowHeadW - cols * GAP) / cols;
+  const need = (m: Mode) => {
+    const v = Math.max(MODES[m].ring, longestValue * MODES[m].charW + 10);
+    return m === 'side' ? 2 * v + 18 : Math.max(MIN_TOUCH, v + 8);
+  };
+  if (perCell >= need('side')) return { mode: 'side', rowHeadW, scroll: false };
+  if (perCell >= need('stack')) return { mode: 'stack', rowHeadW, scroll: false };
+  return { mode: 'stack', rowHeadW, cellW: Math.max(need('stack'), 52), scroll: true };
+}
+
+/** "You: café" already names its player; "3" does not. */
+const named = (name: string, label: string) => (label.toLowerCase().startsWith(name.toLowerCase()) ? label : `${name} ${label}`);
+
+/**
+ * Two-player payoff table. Row player (blue) payoff is shown first — or on top when cells are stacked — and the
+ * column player (orange) second. Best replies are ringed; equilibria and the actual outcome are outlined in the
+ * cell and named in the notes below it, so no annotation text has to fit inside a cell.
  */
 export function PayoffMatrix<R extends string, C extends string>({
   game,
@@ -38,44 +83,54 @@ export function PayoffMatrix<R extends string, C extends string>({
   showBestReplies,
   baseline,
 }: PayoffMatrixProps<R, C>) {
-  const marks = bestReplyMarks(game);
+  const window = useWindowDimensions();
+  // A first guess (screen minus lesson and card padding) avoids a visible re-layout; onLayout then gives the real width.
+  const [measured, setMeasured] = useState<number | null>(null);
+  const width = measured ?? Math.min(window.width, 560) - 64;
+  const marks = useMemo(() => bestReplyMarks(game), [game]);
+  const layout = useMemo(() => {
+    const longestValue = Math.max(...game.payoffs.flat(2).map((n) => fmt(n).length));
+    const longestRowLabel = Math.max(...game.rows.map((r) => rowLabels[r].length));
+    return matrixLayout(width, game.cols.length, longestValue, Math.min(longestRowLabel, 12));
+  }, [game, rowLabels, width]);
+  const m = MODES[layout.mode];
 
-  return (
-    <View accessibilityLabel={`Payoff table. ${rowName} payoff first, ${colName} payoff second.`}>
-      <View style={styles.row}>
-        <View style={styles.corner}>
-          <AppText variant="caption" color={colors.primaryText} numberOfLines={1}>
-            {rowName} ↓
-          </AppText>
-          <AppText variant="caption" color={colors.rivalText} numberOfLines={1}>
-            {colName} →
-          </AppText>
-        </View>
+  const onLayout = (e: LayoutChangeEvent) => {
+    const w = Math.round(e.nativeEvent.layout.width);
+    if (w !== measured) setMeasured(w);
+  };
+
+  const equilibria = showBestReplies
+    ? game.rows.flatMap((r, ri) => game.cols.filter((_, ci) => marks[ri][ci][0] && marks[ri][ci][1]).map((c) => ({ row: r, col: c })))
+    : [];
+  const cellLabel = (row: R, col: C) => `${named(rowName, rowLabels[row])} · ${named(colName, colLabels[col])}`;
+  const outcomePayoff = outcome ? game.payoffs[game.rows.indexOf(outcome.row)][game.cols.indexOf(outcome.col)] : null;
+
+  const grid = (
+    <View>
+      <View style={[styles.gridRow, { height: HEAD_H }]}>
         {game.cols.map((c) => (
-          <View key={c} style={styles.colHead}>
-            <AppText variant="caption" color={colors.rivalText} align="center">
+          <View key={c} style={[styles.colHead, layout.cellW ? { width: layout.cellW } : styles.flexCell]}>
+            <AppText variant="caption" color={colors.rivalText} align="center" numberOfLines={2}>
               {colLabels[c]}
             </AppText>
           </View>
         ))}
       </View>
       {game.rows.map((r, ri) => (
-        <View key={r} style={styles.row}>
-          <View style={styles.rowHead}>
-            <AppText variant="caption" color={colors.primaryText}>
-              {rowLabels[r]}
-            </AppText>
-          </View>
+        <View key={r} style={[styles.gridRow, { height: m.cellH, marginTop: GAP }]}>
           {game.cols.map((c, ci) => {
             const [a, b] = game.payoffs[ri][ci];
             const base = baseline?.payoffs[ri][ci];
             const isOutcome = outcome?.row === r && outcome?.col === c;
             const isSelected = selected?.row === r && selected?.col === c;
             const [rowBR, colBR] = marks[ri][ci];
-            const isEq = showBestReplies && rowBR && colBR;
+            const isEq = !!showBestReplies && rowBR && colBR;
             return (
               <MatrixCell
                 key={c}
+                width={layout.cellW}
+                mode={layout.mode}
                 label={`${rowLabels[r]} and ${colLabels[c]}: ${rowName} ${fmt(a)}, ${colName} ${fmt(b)}${isEq ? ', equilibrium' : ''}${isOutcome ? ', what happened' : ''}`}
                 a={a}
                 b={b}
@@ -85,26 +140,98 @@ export function PayoffMatrix<R extends string, C extends string>({
                 ringB={!!showBestReplies && colBR}
                 outcome={isOutcome}
                 selected={isSelected}
-                equilibrium={!!isEq}
+                equilibrium={isEq}
                 onPress={onCellPress ? () => onCellPress(r, c) : undefined}
               />
             );
           })}
         </View>
       ))}
-      {showBestReplies ? (
-        <View style={styles.legend}>
-          <View style={styles.legendRing} />
-          <AppText variant="caption" color={colors.textMuted} style={{ flex: 1 }}>
-            Ringed = best reply to the other side&apos;s choice. Both ringed = equilibrium.
+    </View>
+  );
+
+  return (
+    <View onLayout={onLayout} style={{ gap: space.sm }}>
+      <View style={styles.key} accessibilityLabel={`Payoff table. ${rowName} payoff ${layout.mode === 'stack' ? 'on top' : 'first'}, ${colName} payoff ${layout.mode === 'stack' ? 'below' : 'second'}.`}>
+        <KeyItem color={colors.primaryText} text={`${rowName} · rows · ${layout.mode === 'stack' ? 'top' : 'first'}`} />
+        <KeyItem color={colors.rivalText} text={`${colName} · columns · ${layout.mode === 'stack' ? 'bottom' : 'second'}`} />
+      </View>
+
+      <View style={{ flexDirection: 'row' }}>
+        {/* Row labels sit outside the (possibly scrolling) grid, at the same fixed heights, so they stay aligned. */}
+        <View style={{ width: layout.rowHeadW, marginRight: GAP }}>
+          <View style={{ height: HEAD_H }} />
+          {game.rows.map((r) => (
+            <View key={r} style={[styles.rowHead, { height: m.cellH, marginTop: GAP }]}>
+              <AppText variant="caption" color={colors.primaryText} numberOfLines={2}>
+                {rowLabels[r]}
+              </AppText>
+            </View>
+          ))}
+        </View>
+        {layout.scroll ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator style={{ flex: 1 }} contentContainerStyle={{ paddingRight: space.xs }}>
+            {grid}
+          </ScrollView>
+        ) : (
+          <View style={{ flex: 1 }}>{grid}</View>
+        )}
+      </View>
+
+      {layout.scroll ? (
+        <AppText variant="caption" color={colors.textFaint}>
+          Swipe the table sideways to see every column.
+        </AppText>
+      ) : null}
+
+      {outcome && outcomePayoff ? (
+        <View style={styles.note}>
+          <View style={[styles.swatch, { borderColor: colors.text }]} />
+          <AppText variant="caption" color={colors.textBody} style={{ flex: 1 }}>
+            <AppText variant="caption" weight="semibold" color={colors.text}>
+              What happened:{' '}
+            </AppText>
+            {cellLabel(outcome.row, outcome.col)} → {fmt(outcomePayoff[0])}, {fmt(outcomePayoff[1])}
           </AppText>
         </View>
+      ) : null}
+      {showBestReplies ? (
+        <>
+          <View style={styles.note}>
+            <View style={[styles.swatch, styles.swatchRing]} />
+            <AppText variant="caption" color={colors.textMuted} style={{ flex: 1 }}>
+              Ringed = best reply to the other side&apos;s choice.
+            </AppText>
+          </View>
+          <View style={styles.note}>
+            <View style={[styles.swatch, { borderColor: colors.insight, backgroundColor: colors.insightSoft }]} />
+            <AppText variant="caption" color={colors.textMuted} style={{ flex: 1 }}>
+              <AppText variant="caption" weight="semibold" color={colors.insight}>
+                {equilibria.length > 1 ? 'Equilibria' : 'Equilibrium'}:{' '}
+              </AppText>
+              {equilibria.length ? equilibria.map((e) => cellLabel(e.row, e.col)).join('; ') : 'none — no cell has both payoffs ringed.'}
+            </AppText>
+          </View>
+        </>
       ) : null}
     </View>
   );
 }
 
+function KeyItem({ color, text }: { color: string; text: string }) {
+  return (
+    <View style={styles.keyItem}>
+      <View style={[styles.keyDot, { backgroundColor: color }]} />
+      <AppText variant="caption" color={color} numberOfLines={1} style={{ flexShrink: 1 }}>
+        {text}
+      </AppText>
+    </View>
+  );
+}
+
 function MatrixCell({
+  width,
+  mode,
   label,
   a,
   b,
@@ -117,6 +244,8 @@ function MatrixCell({
   equilibrium,
   onPress,
 }: {
+  width?: number;
+  mode: Mode;
   label: string;
   a: number;
   b: number;
@@ -130,36 +259,35 @@ function MatrixCell({
   onPress?: () => void;
 }) {
   const border = selected ? colors.primary : outcome ? colors.text : equilibrium ? colors.insight : colors.border;
+  const fill = selected ? colors.primarySoft : equilibrium ? colors.insightSoft : colors.bgRaised;
   return (
     <Pressable
-      style={{ flex: 1 }}
+      style={width ? { width } : styles.flexCell}
       onPress={onPress}
       disabled={!onPress}
       accessibilityRole={onPress ? 'button' : undefined}
       accessibilityLabel={label}
       accessibilityState={onPress ? { selected } : undefined}>
-      <View style={[styles.cell, { borderColor: border }, selected && { backgroundColor: colors.primarySoft }]}>
-        <View style={styles.values}>
-          <Value n={a} ring={ringA} color={colors.primaryText} changed={aChanged} />
-          <AppText variant="small" color={colors.textFaint}>
-            ,
-          </AppText>
-          <Value n={b} ring={ringB} color={colors.rivalText} changed={bChanged} />
+      <View style={[styles.cell, { borderColor: border, backgroundColor: fill, borderWidth: outcome || selected ? 2 : 1.5 }]}>
+        <View style={mode === 'side' ? styles.valuesSide : styles.valuesStack}>
+          <Value n={a} ring={ringA} color={colors.primaryText} changed={aChanged} mode={mode} />
+          {mode === 'side' ? (
+            <AppText variant="small" color={colors.textFaint}>
+              ,
+            </AppText>
+          ) : null}
+          <Value n={b} ring={ringB} color={colors.rivalText} changed={bChanged} mode={mode} />
         </View>
-        {outcome || equilibrium ? (
-          <AppText variant="caption" color={outcome ? colors.text : colors.insight} align="center" style={{ fontSize: 10 }}>
-            {outcome ? 'What happened' : 'Equilibrium'}
-          </AppText>
-        ) : null}
       </View>
     </Pressable>
   );
 }
 
-function Value({ n, ring, color, changed }: { n: number; ring: boolean; color: string; changed: boolean }) {
+function Value({ n, ring, color, changed, mode }: { n: number; ring: boolean; color: string; changed: boolean; mode: Mode }) {
+  const m = MODES[mode];
   return (
-    <View style={[styles.value, ring && { borderColor: color }]}>
-      <AppText variant="heading" color={color} tabular weight={ring ? 'bold' : 'semibold'}>
+    <View style={[styles.value, { minWidth: m.ring, height: m.ring, borderRadius: m.ring / 2 }, ring && { borderColor: color }]}>
+      <AppText variant={m.variant} color={color} tabular weight={ring ? 'bold' : 'semibold'} numberOfLines={1}>
         {fmt(n)}
       </AppText>
       {changed ? <View style={styles.changedDot} accessibilityLabel="changed" /> : null}
@@ -168,32 +296,30 @@ function Value({ n, ring, color, changed }: { n: number; ring: boolean; color: s
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: space.sm, marginBottom: space.sm, alignItems: 'stretch' },
-  corner: { width: 76, justifyContent: 'flex-end', paddingBottom: 2 },
-  colHead: { flex: 1, justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 2 },
-  rowHead: { width: 76, justifyContent: 'center' },
+  key: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space.md, rowGap: 2 },
+  keyItem: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%' },
+  keyDot: { width: 8, height: 8, borderRadius: 4 },
+  gridRow: { flexDirection: 'row', gap: GAP },
+  flexCell: { flex: 1 },
+  colHead: { justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 2 },
+  rowHead: { justifyContent: 'center' },
   cell: {
-    minHeight: 72,
+    flex: 1,
     borderRadius: radius.md,
-    borderWidth: 1.5,
-    backgroundColor: colors.bgRaised,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: space.sm,
-    gap: 2,
   },
-  values: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  valuesSide: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  valuesStack: { alignItems: 'center', gap: 2 },
   value: {
-    minWidth: 38,
-    height: 38,
     paddingHorizontal: 4,
-    borderRadius: 19,
     borderWidth: 1.5,
     borderColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
   changedDot: { position: 'absolute', top: 1, right: 1, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.insight },
-  legend: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.xs },
-  legendRing: { width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: colors.textMuted },
+  note: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
+  swatch: { width: 16, height: 16, borderRadius: 5, borderWidth: 1.5, marginTop: 0 },
+  swatchRing: { borderRadius: 8, borderColor: colors.textMuted },
 });

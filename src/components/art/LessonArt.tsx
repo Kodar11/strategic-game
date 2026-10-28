@@ -1,4 +1,4 @@
-import { type ReactNode, useId } from 'react';
+import { type ReactNode, memo, useId } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
@@ -18,7 +18,7 @@ import { SceneArt } from './SceneArt';
  * - No text, numbers or UI in the art; one focal point per image.
  * Lessons without art fall back to their environment plate (`SceneArt`).
  */
-export function LessonArt({ lesson, height = 104, style }: { lesson: LessonId; height?: number; style?: StyleProp<ViewStyle> }) {
+function LessonArtView({ lesson, height = 104, style }: { lesson: LessonId; height?: number; style?: StyleProp<ViewStyle> }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const id = (n: string) => `${n}${uid}`;
   const Art = ART[lesson];
@@ -730,3 +730,6 @@ const ART: Partial<Record<LessonId, (p: ArtProps) => ReactNode>> = {
 
 /** Lessons that have their own thumbnail (for tests and the contact sheet). */
 export const LESSONS_WITH_ART = Object.keys(ART) as LessonId[];
+
+// Memoized: a pure drawing of primitive props, re-rendered otherwise whenever a parent screen updates.
+export const LessonArt = memo(LessonArtView);

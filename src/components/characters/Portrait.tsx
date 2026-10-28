@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useEffect, useId } from 'react';
+import { memo, useEffect, useId } from 'react';
 import { View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, ClipPath, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
@@ -22,7 +22,7 @@ export interface PortraitProps {
  * otherwise a consistent vector rendering of the character spec with cinematic blue/orange rim light.
  * A small spring reaction plays whenever the expression changes.
  */
-export function Portrait({ character, expression = 'neutral', size = 56, ring, mirrored }: PortraitProps) {
+function PortraitView({ character, expression = 'neutral', size = 56, ring, mirrored }: PortraitProps) {
   const spec = CAST[character];
   const reduced = useMotionReduced();
   const scale = useSharedValue(1);
@@ -312,3 +312,6 @@ function Outfit({ spec }: { spec: CharacterSpec }) {
       return <Path d="M50 84 C53 90 67 90 70 84 C65 87 55 87 50 84 Z" fill={spec.clothingShade} />;
   }
 }
+
+// Memoized: a pure drawing of primitive props, re-rendered otherwise whenever a parent screen updates.
+export const Portrait = memo(PortraitView);

@@ -30,6 +30,22 @@ function isPrivilegedKey(k: string): boolean {
   }
 }
 
+/**
+ * supabase-js sets no timeout, so a connection that stalls (weak mobile signal) would leave start-up loading forever
+ * instead of offering "Try again". Covers the wait for a response; aborted requests surface as transient network
+ * errors, which the outbox retries.
+ */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+const fetchWithTimeout: typeof fetch = (input, init) => {
+  const controller = new AbortController();
+  const outer = init?.signal;
+  if (outer?.aborted) controller.abort();
+  else outer?.addEventListener('abort', () => controller.abort());
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+};
+
 let client: SupabaseClient<Database> | null = null;
 
 export function supabase(): SupabaseClient<Database> {
@@ -43,6 +59,7 @@ export function supabase(): SupabaseClient<Database> {
       persistSession: !isServer,
       detectSessionInUrl: false,
     },
+    global: { fetch: fetchWithTimeout },
   });
   // Refresh tokens only while the app is in the foreground (Supabase's guidance for React Native).
   if (Platform.OS !== 'web') {

@@ -1,10 +1,11 @@
+import { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { colors, palette } from '@/src/theme/tokens';
 
 /** Atmospheric background: deep navy with a soft blue key light and a faint orange rim light. */
-export function Backdrop({ warm = 0.12 }: { warm?: number }) {
+function BackdropView({ warm = 0.12 }: { warm?: number }) {
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} pointerEvents="none">
       <Svg width="100%" height="100%" preserveAspectRatio="none">
@@ -24,3 +25,6 @@ export function Backdrop({ warm = 0.12 }: { warm?: number }) {
     </View>
   );
 }
+
+// Memoized: a pure drawing of primitive props, re-rendered otherwise whenever a parent screen updates.
+export const Backdrop = memo(BackdropView);
