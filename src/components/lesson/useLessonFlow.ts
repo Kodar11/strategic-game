@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import type { z } from 'zod';
 
 import type { LessonId } from '@/src/content/lessons';
@@ -6,8 +7,16 @@ import type { NewAttempt } from '@/src/features/learning/records';
 import { useProgress } from '@/src/store/progress';
 
 /**
+ * How long after a change its resume point is saved. The save fans out to every screen that shows lesson progress and
+ * to the sync queue, so it runs just after the tap's frame rather than inside it, and a burst of changes (a slider
+ * drag, quick taps) is saved once.
+ */
+const SAVE_DELAY_MS = 250;
+
+/**
  * Runtime state for one lesson: current step plus lesson-specific data.
- * Saved after every change so leaving mid-lesson resumes where the learner was.
+ * Saved shortly after every change — and at once when the lesson is left or the app goes to the background — so
+ * leaving mid-lesson resumes where the learner was.
  * Persisted data is validated with the lesson's schema; anything invalid restarts the lesson cleanly.
  */
 export function useLessonFlow<S extends z.ZodType>(
@@ -46,9 +55,24 @@ export function useLessonFlow<S extends z.ZodType>(
     if (records) recordAttempts(records(state.data));
   }, [records, recordAttempts, state.data]);
 
+  const pendingSave = useRef<(() => void) | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelSave = useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    pendingSave.current = null;
+  }, []);
+  const flushSave = useCallback(() => {
+    const save = pendingSave.current;
+    cancelSave();
+    save?.();
+  }, [cancelSave]);
+
   // Reaching the final step (only possible after every gated step) completes the lesson and clears its runtime.
   useEffect(() => {
     if (state.step === totalSteps - 1) {
+      // A save still waiting would put back the runtime that completing the lesson clears.
+      cancelSave();
       if (!completedRef.current) {
         completedRef.current = true;
         markComplete(lessonId);
@@ -56,8 +80,22 @@ export function useLessonFlow<S extends z.ZodType>(
       return;
     }
     completedRef.current = false;
-    saveRuntime(lessonId, state.step, totalSteps, state.data);
-  }, [lessonId, markComplete, saveRuntime, state, totalSteps]);
+    pendingSave.current = () => saveRuntime(lessonId, state.step, totalSteps, state.data);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(flushSave, SAVE_DELAY_MS);
+  }, [cancelSave, flushSave, lessonId, markComplete, saveRuntime, state, totalSteps]);
+
+  // Never lose the latest step: save it at once when the lesson closes or the app leaves the foreground (the sync
+  // layer sends what is queued at that moment).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') flushSave();
+    });
+    return () => {
+      sub.remove();
+      flushSave();
+    };
+  }, [flushSave]);
 
   const update = useCallback((patch: Partial<Data> | ((d: Data) => Partial<Data>)) => {
     setState((s) => ({ ...s, data: { ...(s.data as object), ...(typeof patch === 'function' ? patch(s.data) : patch) } as Data }));

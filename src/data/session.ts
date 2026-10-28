@@ -66,9 +66,10 @@ function startSync(): void {
     if (!next.hydrated || !prev.hydrated) return;
     outbox.enqueue(diffProgress(progressOf(prev), progressOf(next), next.resets !== prev.resets));
   });
-  // Send what's pending before the app is backgrounded (it may not come back).
+  // Send what's pending before the app is backgrounded (it may not come back). Drained a microtask later, so changes
+  // other 'change' listeners save at this moment (an open lesson's latest step) are in the queue first.
   const offApp = AppState.addEventListener('change', (state) => {
-    if (state !== 'active') void outbox.drain();
+    if (state !== 'active') queueMicrotask(() => void outbox.drain());
   });
   unsubscribe = () => {
     offStore();

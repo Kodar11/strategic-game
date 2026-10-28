@@ -16,7 +16,7 @@ import { Button, IconButton } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Card';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { type Category, type CategoryIndex, categoryProgress, lessonCategories, lessonsInCategory } from '@/src/content/categories';
-import { allLessons, type LessonId, type LessonMeta, allModules, type ModuleMeta } from '@/src/content/lessons';
+import { allLessons, getLesson, type LessonId, type LessonMeta, allModules, type ModuleMeta } from '@/src/content/lessons';
 import { allAssessments, type Assessment, getAssessment, moduleCheckpoint, splitAssessmentTitle } from '@/src/features/assessments/content';
 import { type AssessmentRun, finalUnlocked } from '@/src/features/assessments/scoring';
 import { useDaily } from '@/src/data/daily-session';
@@ -33,6 +33,20 @@ function openLesson(id: LessonId) {
   router.push({ pathname: '/lesson/[lessonId]', params: { lessonId: id } });
 }
 
+/** The most recently touched unfinished lesson (the first in curriculum order on a tie). */
+function resumeLessonId(runtime: Partial<Record<LessonId, LessonRuntime>>): LessonId | null {
+  let best: LessonId | null = null;
+  let at = -Infinity;
+  for (const l of allLessons()) {
+    const r = runtime[l.id];
+    if (r && r.step > 0 && r.updatedAt > at) {
+      best = l.id;
+      at = r.updatedAt;
+    }
+  }
+  return best;
+}
+
 function openAssessment(id: string) {
   router.push({ pathname: '/checkpoint/[assessmentId]', params: { assessmentId: id } });
 }
@@ -42,7 +56,9 @@ export default function Home() {
   const enter = useEnter();
   const hydrated = useProgress((s) => s.hydrated);
   const completed = useProgress((s) => s.completed);
-  const runtime = useProgress((s) => s.runtime);
+  // Only which lesson to resume, not the runtime map itself: an open lesson saves its step on every interaction while
+  // Home stays mounted underneath it. The cards that show a lesson's progress read their own entry.
+  const resumeId = useProgress((s) => resumeLessonId(s.runtime));
   const played = useProgress((s) => s.scenarioDone.length);
   const assessmentRuns = useProgress((s) => s.assessmentRuns);
   // null = "All": the module view, exactly as before categories existed.
@@ -68,9 +84,7 @@ export default function Home() {
   const categoryDone = activeCategory ? categoryProgress(categories!, allLessons(), completed).get(activeCategory.id) : undefined;
 
   // Resume the most recently touched unfinished lesson; otherwise suggest the first lesson not yet completed.
-  const resume = allLessons().filter((l) => runtime[l.id] && runtime[l.id]!.step > 0).sort(
-    (a, b) => runtime[b.id]!.updatedAt - runtime[a.id]!.updatedAt,
-  )[0];
+  const resume = resumeId ? getLesson(resumeId) : undefined;
   const suggested = resume ?? allLessons().find((l) => !completed.includes(l.id));
   const doneCount = completed.length;
 
@@ -119,27 +133,7 @@ export default function Home() {
 
           {suggested ? (
             <Animated.View entering={enter(80)}>
-              <Pressable
-                onPress={() => openLesson(suggested.id)}
-                accessibilityRole="button"
-                accessibilityLabel={`${resume ? 'Resume' : 'Start'} lesson ${suggested.number}, ${suggested.title}${resume ? `, step ${runtime[resume.id]!.step + 1} of ${runtime[resume.id]!.total}` : ''}`}
-                style={({ pressed }) => [styles.resume, pressed && { backgroundColor: colors.primaryPressed }]}>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <AppText variant="caption" color="#DBEAFE">
-                    {resume ? 'Pick up where you left off' : doneCount === 0 ? 'Start here' : 'Up next'}
-                  </AppText>
-                  <AppText variant="heading" color="#fff">
-                    {suggested.number}. {suggested.title}
-                  </AppText>
-                  {resume ? <ResumeProgress run={runtime[resume.id]!} light /> : null}
-                </View>
-                <View style={styles.resumePill}>
-                  <Play size={14} color={colors.primary} fill={colors.primary} />
-                  <AppText variant="small" weight="semibold" color={colors.primary}>
-                    {resume ? 'Resume' : 'Start'}
-                  </AppText>
-                </View>
-              </Pressable>
+              <SuggestedCard lesson={suggested} resume={!!resume} firstLesson={doneCount === 0} />
             </Animated.View>
           ) : null}
 
@@ -178,7 +172,7 @@ export default function Home() {
             <View style={{ gap: space.md }}>
               <CategoryHeader category={activeCategory} done={categoryDone?.done ?? 0} total={categoryDone?.total ?? 0} />
               {lessonsInCategory(categories!, activeCategory.id, allLessons()).map((lesson) => (
-                <LessonCard key={lesson.id} lesson={lesson} done={completed.includes(lesson.id)} run={runtime[lesson.id]} />
+                <LessonCard key={lesson.id} lesson={lesson} done={completed.includes(lesson.id)} />
               ))}
             </View>
           ) : (
@@ -187,7 +181,7 @@ export default function Home() {
               <Animated.View key={m.id} entering={enter(120 + mi * 60)} style={{ gap: space.md }}>
                 <ModuleHeader module={m} done={allLessons().filter((l) => l.module === m.id && completed.includes(l.id)).length} total={allLessons().filter((l) => l.module === m.id).length} />
                 {allLessons().filter((l) => l.module === m.id).map((lesson) => (
-                  <LessonCard key={lesson.id} lesson={lesson} done={completed.includes(lesson.id)} run={runtime[lesson.id]} />
+                  <LessonCard key={lesson.id} lesson={lesson} done={completed.includes(lesson.id)} />
                 ))}
                 <AssessmentCard a={moduleCheckpoint(m.id)} run={assessmentRuns[m.id]} />
               </Animated.View>
@@ -374,11 +368,41 @@ function ResumeProgress({ run, light }: { run: LessonRuntime; light?: boolean })
   );
 }
 
+/** The Resume / Start card at the top of Home. It reads its own lesson's runtime, so only it updates as steps are saved. */
+function SuggestedCard({ lesson, resume, firstLesson }: { lesson: LessonMeta; resume: boolean; firstLesson: boolean }) {
+  const saved = useProgress((s) => s.runtime[lesson.id]);
+  const run = resume ? saved : undefined;
+  return (
+    <Pressable
+      onPress={() => openLesson(lesson.id)}
+      accessibilityRole="button"
+      accessibilityLabel={`${resume ? 'Resume' : 'Start'} lesson ${lesson.number}, ${lesson.title}${run ? `, step ${run.step + 1} of ${run.total}` : ''}`}
+      style={({ pressed }) => [styles.resume, pressed && { backgroundColor: colors.primaryPressed }]}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <AppText variant="caption" color="#DBEAFE">
+          {resume ? 'Pick up where you left off' : firstLesson ? 'Start here' : 'Up next'}
+        </AppText>
+        <AppText variant="heading" color="#fff">
+          {lesson.number}. {lesson.title}
+        </AppText>
+        {run ? <ResumeProgress run={run} light /> : null}
+      </View>
+      <View style={styles.resumePill}>
+        <Play size={14} color={colors.primary} fill={colors.primary} />
+        <AppText variant="small" weight="semibold" color={colors.primary}>
+          {resume ? 'Resume' : 'Start'}
+        </AppText>
+      </View>
+    </Pressable>
+  );
+}
+
 /**
  * Restarting a lesson lives in the lesson's own header, so each card has a single action. Memoized: Home stays mounted
- * under an open lesson and re-renders on every saved step, but only the card whose `run` changed needs to.
+ * under an open lesson, and each card reads its own runtime entry, so a saved step re-renders only that lesson's card.
  */
-const LessonCard = memo(function LessonCard({ lesson, done, run }: { lesson: LessonMeta; done: boolean; run?: LessonRuntime }) {
+const LessonCard = memo(function LessonCard({ lesson, done }: { lesson: LessonMeta; done: boolean }) {
+  const run = useProgress((s) => s.runtime[lesson.id]);
   const inProgress = !!run && run.step > 0;
   const action = inProgress ? 'Resume' : done ? 'Replay' : 'Start';
 
