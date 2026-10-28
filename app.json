@@ -1,20 +1,24 @@
 {
   "expo": {
-    "name": "Strategic Game",
+    "name": "Tactiqo",
     "slug": "strategic-game",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "strategicgame",
+    "scheme": [
+      "tactiqo",
+      "strategicgame"
+    ],
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tactiqo.app"
     },
     "android": {
+      "package": "com.tactiqo.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#081220",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false

@@ -15,10 +15,11 @@ describe('share and invite text', () => {
     assert.doesNotMatch(t, /seed|[0-9a-f]{8}-[0-9a-f]{4}|user/i);
     assert.match(resultShareText('rps', 'counter', 'easy', 'win', { player: 20, bot: 14 }), /^I beat The Counter \(Easy\) at Rock, Paper, Scissors, 20–14 on points\./);
     assert.match(resultShareText('two-thirds', 'deep', 'medium', 'loss', { player: 41, bot: 3 }), /41 points out of 100/);
+    assert.match(t, /Played on Tactiqo\.$/);
   });
 
   it('invites without claiming anything the friend hasn’t done', () => {
-    assert.equal(inviteText('stag-hunt', 'conditional', 'medium', null), 'I challenge you to Stag Hunt: same opponent — The Conditional Partner (Medium) — and the same luck for both of us. Can you beat it?');
+    assert.equal(inviteText('stag-hunt', 'conditional', 'medium', null), 'I challenge you to Stag Hunt on Tactiqo: same opponent — The Conditional Partner (Medium) — and the same luck for both of us. Can you beat it?');
     assert.match(inviteText('rps', 'counter', 'hard', 27), /I scored 27\./);
   });
 });

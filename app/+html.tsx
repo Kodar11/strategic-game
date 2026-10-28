@@ -1,6 +1,8 @@
 import { ScrollViewStyleReset } from 'expo-router/html';
 import type { ReactNode } from 'react';
 
+import { APP_NAME } from '@/src/brand';
+
 // This file is web-only and used to configure the root HTML for every
 // web page during static rendering.
 // The contents of this function only run in Node.js environments and
@@ -12,6 +14,8 @@ export default function Root({ children }: { children: ReactNode }) {
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <title>{APP_NAME}</title>
+        <meta name="theme-color" content="#081220" />
 
         {/*
           Disable body scrolling on web. This makes ScrollView components work closer to how they do on native.

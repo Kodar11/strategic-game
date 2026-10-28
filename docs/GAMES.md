@@ -157,7 +157,7 @@ characters); it also means names in other scripts aren't possible yet.
 `https://<host>/challenge/<token>`: anyone can open them, and the web build plays the challenge. Tokens can't be
 pre-rendered, so the static host must serve `challenge/[token].html` for `/challenge/*` (a rewrite rule; game pages
 are pre-rendered per game). Without it, links use
-the app scheme `strategicgame://challenge/<token>`, which opens the installed app and does nothing for someone
+the app scheme `tactiqo://challenge/<token>` (older `strategicgame://` links still open the app), which opens the installed app and does nothing for someone
 without it. Opening the installed app from an https link (Android App Links / iOS Universal Links) needs the domain
 verified in `app.json` and an `assetlinks.json` / `apple-app-site-association` on the host — not set up yet.
 

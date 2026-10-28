@@ -9,14 +9,15 @@ import { GameError } from '@/src/data/games';
  *
  * Links: with EXPO_PUBLIC_WEB_URL set (where the web build is hosted), invites use `https://<host>/challenge/<token>`,
  * which works for anyone — the web build plays the challenge. Otherwise they use the app's scheme
- * (`strategicgame://challenge/<token>`), which opens the installed app and does nothing without it.
+ * (`tactiqo://challenge/<token>`), which opens the installed app and does nothing without it. Links sent before the
+ * rename (`strategicgame://…`) still open the app: app.json keeps that scheme as a second one.
  */
 
 const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL;
 
 export function challengeLink(token: string): string {
   if (WEB_URL) return `${WEB_URL.replace(/\/+$/, '')}/challenge/${token}`;
-  return Linking.createURL(`/challenge/${token}`);
+  return Linking.createURL(`/challenge/${token}`, { scheme: 'tactiqo' });
 }
 
 /** What we can honestly say happened. Neither platform reports whether a message was actually sent. */

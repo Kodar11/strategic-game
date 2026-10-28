@@ -1,3 +1,4 @@
+import { APP_NAME } from '../brand.ts';
 import { DIFFICULTY_LABEL, GAMES, personality } from './catalog.ts';
 import type { Difficulty, GameId, Outcome, Totals } from './core.ts';
 
@@ -30,12 +31,12 @@ export function resultShareText(game: GameId, bot: string, difficulty: Difficult
         : outcome === 'draw'
           ? `I drew with ${who} at ${g.title}, ${scoreLine(game, totals)}.`
           : `${who} beat me at ${g.title}, ${scoreLine(game, totals)}.`;
-  return `${head} ${g.concept}`;
+  return `${head} ${g.concept} Played on ${APP_NAME}.`;
 }
 
 export function inviteText(game: GameId, bot: string, difficulty: Difficulty, myScore: number | null): string {
   const g = GAMES[game];
   const who = `${personality(game, bot)?.name ?? 'a bot'} (${DIFFICULTY_LABEL[difficulty]})`;
   const mine = myScore === null ? '' : ` I scored ${myScore}.`;
-  return `I challenge you to ${g.title}: same opponent — ${who} — and the same luck for both of us.${mine} Can you beat it?`;
+  return `I challenge you to ${g.title} on ${APP_NAME}: same opponent — ${who} — and the same luck for both of us.${mine} Can you beat it?`;
 }

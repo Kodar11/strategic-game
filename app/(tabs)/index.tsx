@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { ArrowRight, CalendarDays, CircleCheck, Clock, Lock, Play, RotateCcw, Settings, Target, Trophy } from '@/src/components/ui/icons';
 import { useCallback, useRef, useState } from 'react';
@@ -5,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { APP_NAME } from '@/src/brand';
 import { LessonArt } from '@/src/components/art/LessonArt';
 import { Portrait } from '@/src/components/characters/Portrait';
 import { useEnter } from '@/src/components/lesson/motion';
@@ -23,6 +25,9 @@ import { allScenarios } from '@/src/features/scenarios';
 import { type LessonRuntime, useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, shadow, space } from '@/src/theme/tokens';
 import { useMotionReduced } from '@/src/utils/feedback';
+
+/** The brain-puzzle mark on a transparent background (the same artwork as the splash screen). */
+const LOGO = require('@/assets/images/splash-icon.png');
 
 function openLesson(id: LessonId) {
   router.push({ pathname: '/lesson/[lessonId]', params: { lessonId: id } });
@@ -79,13 +84,10 @@ export default function Home() {
         contentContainerStyle={{ paddingTop: insets.top + space.sm, paddingBottom: insets.bottom + space.xxl, paddingHorizontal: space.lg }}>
         <View style={styles.column} onLayout={(e) => (columnY.current = e.nativeEvent.layout.y)}>
           <View style={styles.topBar}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-              <View style={styles.logo}>
-                <View style={[styles.logoHalf, { backgroundColor: colors.primary }]} />
-                <View style={[styles.logoHalf, { backgroundColor: colors.rival }]} />
-              </View>
-              <AppText variant="overline" color={colors.text}>
-                Strategic
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }} accessible accessibilityRole="header" accessibilityLabel={APP_NAME}>
+              <Image source={LOGO} style={styles.logo} contentFit="contain" />
+              <AppText variant="heading" color={colors.text}>
+                {APP_NAME}
               </AppText>
             </View>
             <View style={{ flexDirection: 'row', gap: space.xs }}>
@@ -433,8 +435,7 @@ function LessonCard({ lesson, done, run }: { lesson: LessonMeta; done: boolean; 
 const styles = StyleSheet.create({
   column: { maxWidth: MAX_CONTENT_WIDTH, width: '100%', alignSelf: 'center' },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.sm },
-  logo: { width: 22, height: 22, borderRadius: 6, overflow: 'hidden', flexDirection: 'row', transform: [{ rotate: '45deg' }] },
-  logoHalf: { flex: 1 },
+  logo: { width: 30, height: 30 },
   hero: { gap: space.sm, marginBottom: space.xl },
   cast: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: space.xs },
   castItem: {},

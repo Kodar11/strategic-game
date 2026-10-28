@@ -4,11 +4,13 @@ import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
 import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { useFonts } from 'expo-font';
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
+import Head from 'expo-router/head';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
+import { APP_NAME } from '@/src/brand';
 import { FontsReadyContext } from '@/src/components/ui/AppText';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { startAppData, useAppData } from '@/src/data/session';
@@ -52,6 +54,10 @@ export default function RootLayout() {
     <FontsReadyContext.Provider value={loaded && !error}>
       <ThemeProvider value={theme}>
         <StatusBar style="light" />
+        {/* The browser tab title on web; does nothing on native. */}
+        <Head>
+          <title>{APP_NAME}</title>
+        </Head>
         {data.status === 'ready' ? (
           <AppStack reduced={reduced} />
         ) : (

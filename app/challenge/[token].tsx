@@ -21,7 +21,7 @@ import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 const TOKEN = /^[0-9a-f]{20}$/;
 
 /**
- * Where an invite link lands (`strategicgame://challenge/<token>` or `<web host>/challenge/<token>`): the game, who
+ * Where an invite link lands (`tactiqo://challenge/<token>`, older `strategicgame://` links, or `<web host>/challenge/<token>`): the game, who
  * sent it, and Play. Opening it again resumes or shows your result. Malformed, unknown and expired links get a
  * clear message and a way into the Games tab. This screen sits above the tabs, so Back goes to the app.
  */

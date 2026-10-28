@@ -4,6 +4,7 @@ import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Vi
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { APP_NAME } from '@/src/brand';
 import { useEnter } from '@/src/components/lesson/motion';
 import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
@@ -139,7 +140,7 @@ function StartStep({ onFinish }: { onFinish: (startLesson: boolean) => void }) {
         <AppText variant="display" accessibilityRole="header">
           You’re all set
         </AppText>
-        <AppText color={colors.textMuted}>Tactiqo teaches strategic thinking through short games: make a call, see what happens, then find out why.</AppText>
+        <AppText color={colors.textMuted}>{APP_NAME} teaches strategic thinking through short games: make a call, see what happens, then find out why.</AppText>
       </View>
       <View style={{ gap: space.sm }}>
         <Button label="Play your first game" icon={Play} iconPosition="left" onPress={() => onFinish(true)} />
