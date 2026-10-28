@@ -91,6 +91,18 @@ export class Outbox {
     this.timer = null;
   }
 
+  /** Drop every pending change and the saved copy, e.g. once the account they belong to has been deleted. */
+  async clear(): Promise<void> {
+    this.stop();
+    this.queue = [];
+    this.owner = null;
+    this.failures = 0;
+    await this.persist();
+    this.waiters.splice(0).forEach((w) => w());
+    this.status = { pending: 0, state: 'idle', message: null };
+    this.o.onStatus?.(this.status);
+  }
+
   get pending(): number {
     return this.queue.length;
   }

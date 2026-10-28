@@ -8,7 +8,6 @@ The app ships with **vector fallback art** so it is complete without any raster 
 
 No UI text, numbers or choices are baked into artwork. Everything readable is native text.
 
-Narration audio is documented separately in [AUDIO.md](AUDIO.md).
 
 ## Swapping in approved illustrations
 

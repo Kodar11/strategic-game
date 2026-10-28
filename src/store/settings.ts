@@ -1,16 +1,20 @@
 export interface Settings {
   reduceMotion: boolean;
   haptics: boolean;
-  /** Spoken narration and character voices. On for new installs. */
-  narration: boolean;
+  /** The first-launch welcome (nickname, optional goal, first lesson) has been finished or skipped on this device. */
+  onboarded: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { reduceMotion: false, haptics: true, narration: true };
+export const DEFAULT_SETTINGS: Settings = { reduceMotion: false, haptics: true, onboarded: false };
 
-/** Keep only known boolean settings from a saved state; anything missing or malformed gets its default. */
+/**
+ * Keep only known boolean settings from a saved state; anything missing or malformed gets its default.
+ * A save from before onboarding existed belongs to someone who already uses the app, so it counts as onboarded.
+ */
 export function sanitizeSettings(saved: unknown): Settings {
-  const s = saved && typeof saved === 'object' ? (saved as Record<string, unknown>) : {};
-  const out = { ...DEFAULT_SETTINGS };
+  const isSave = !!saved && typeof saved === 'object';
+  const s = isSave ? (saved as Record<string, unknown>) : {};
+  const out = { ...DEFAULT_SETTINGS, onboarded: isSave };
   for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]) {
     if (typeof s[key] === 'boolean') out[key] = s[key] as boolean;
   }

@@ -7,9 +7,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEnter } from '@/src/components/lesson/motion';
 import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
-import { Button } from '@/src/components/ui/Button';
+import { Button, IconButton } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Card';
-import { ArrowRight, Clock, Crown, ListOrdered, Pencil, Play, RefreshCw, Trophy } from '@/src/components/ui/icons';
+import { ArrowRight, Clock, Crown, ListOrdered, Pencil, Play, RefreshCw, Settings, Trophy } from '@/src/components/ui/icons';
 import type { Competition, GamesOverview } from '@/src/data/games';
 import { useGames } from '@/src/data/games-session';
 import { DIFFICULTY_LABEL, GAMES, GAME_ORDER, personality } from '@/src/games/catalog';
@@ -45,16 +45,17 @@ export default function GamesScreen() {
       <Backdrop warm={0.18} />
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: insets.top + space.md, paddingBottom: space.huge }}>
         <View style={styles.column}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
-            <View style={{ flex: 1, gap: 2 }}>
-              <AppText variant="title" accessibilityRole="header">
+          <View style={{ gap: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+              <AppText variant="title" accessibilityRole="header" style={{ flex: 1 }}>
                 Games
               </AppText>
-              <AppText variant="small" color={colors.textMuted}>
-                Five strategic games against bots with personalities.
-              </AppText>
+              <NicknameChip name={overview.status === 'ready' ? overview.data.nickname : undefined} />
+              <IconButton icon={Settings} label="Settings" onPress={() => router.navigate('/settings')} />
             </View>
-            <NicknameChip name={overview.status === 'ready' ? overview.data.nickname : undefined} />
+            <AppText variant="small" color={colors.textMuted}>
+              Five strategic games against bots with personalities.
+            </AppText>
           </View>
 
           <Animated.View entering={enter(40)}>

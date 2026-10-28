@@ -13,8 +13,6 @@ import { moduleCheckpoint } from '@/src/features/assessments/content';
 import { challengesFor } from '@/src/features/challenges/content';
 import { isTried } from '@/src/features/challenges/progress';
 import { useProgress } from '@/src/store/progress';
-import type { ClipId } from '@/src/features/audio/clips';
-import { useNarrateOnMount } from '@/src/features/audio/useNarration';
 import { haptic, useMotionReduced } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
 import { useEnter } from './motion';
@@ -28,7 +26,6 @@ export function Completion({
   takeaway,
   remember,
   onReplay,
-  takeawayClip,
   recap,
   reflection,
   nextHook,
@@ -37,8 +34,6 @@ export function Completion({
   takeaway: string;
   remember: string[];
   onReplay: () => void;
-  /** Prof. Sen reads the takeaway when the lesson completes. */
-  takeawayClip?: ClipId;
   /** What this learner actually predicted and decided, built from lesson state. Never a judgement of the person. */
   recap?: string[];
   /** One question or small challenge to carry the idea into a new situation. */
@@ -47,7 +42,6 @@ export function Completion({
   nextHook?: string;
 }) {
   const enter = useEnter();
-  useNarrateOnMount(takeawayClip);
   const reduced = useMotionReduced();
   const next = nextLesson(lesson.id);
   // Optional practice in new situations. Dismissable, and never required to finish or leave the lesson.

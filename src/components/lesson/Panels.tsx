@@ -1,22 +1,17 @@
 import { CircleCheck, Info, Lightbulb, TriangleAlert } from '@/src/components/ui/icons';
 import { type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { Portrait } from '@/src/components/characters/Portrait';
 import { CAST, type CharacterId, type Expression } from '@/src/components/characters/cast';
 import { AppText } from '@/src/components/ui/AppText';
-import type { ClipId } from '@/src/features/audio/clips';
-import { narration } from '@/src/features/audio/narration';
-import { hasClipAudio, useNarrateOnMount } from '@/src/features/audio/useNarration';
 import { colors, radius, space } from '@/src/theme/tokens';
 import { useEnter } from './motion';
 import type { Verdict } from './verdict';
 
 /**
  * A character speaking. Kept short: characters clarify, they don't lecture.
- * With `clip`, the line is spoken once when it appears, and tapping the bubble replays it.
- * Without one (or before its audio exists) it renders exactly as plain dialogue.
  */
 export function Dialogue({
   character,
@@ -24,44 +19,25 @@ export function Dialogue({
   children,
   delay = 0,
   align = 'left',
-  clip,
-  clipKey,
 }: {
   character: CharacterId;
   expression?: Expression;
   children: ReactNode;
   delay?: number;
   align?: 'left' | 'right';
-  clip?: ClipId | null;
-  /** Dedupe key when the same clip can legitimately be spoken again on another screen. */
-  clipKey?: string;
 }) {
   const enter = useEnter();
   const spec = CAST[character];
   const right = align === 'right';
-  useNarrateOnMount(clip, clipKey);
-  const bubbleStyle = [styles.bubble, right ? styles.bubbleRight : styles.bubbleLeft];
-  const content = (
-    <>
-      <AppText variant="caption" color={spec.accent} style={{ marginBottom: 2 }}>
-        {spec.name}
-      </AppText>
-      {isTextLike(children) ? <AppText variant="body">{children}</AppText> : children}
-    </>
-  );
   return (
     <Animated.View entering={enter(delay)} style={[styles.dialogue, right && { flexDirection: 'row-reverse' }]}>
       <Portrait character={character} expression={expression} size={52} />
-      {hasClipAudio(clip) ? (
-        <Pressable
-          onPress={() => narration.replay(clip)}
-          accessibilityHint="Plays this line again"
-          style={({ pressed }) => [...bubbleStyle, pressed && { backgroundColor: colors.surfaceHigh }]}>
-          {content}
-        </Pressable>
-      ) : (
-        <View style={bubbleStyle}>{content}</View>
-      )}
+      <View style={[styles.bubble, right ? styles.bubbleRight : styles.bubbleLeft]}>
+        <AppText variant="caption" color={spec.accent} style={{ marginBottom: 2 }}>
+          {spec.name}
+        </AppText>
+        {isTextLike(children) ? <AppText variant="body">{children}</AppText> : children}
+      </View>
     </Animated.View>
   );
 }
@@ -81,17 +57,13 @@ export function Panel({
   title,
   children,
   delay = 0,
-  clip,
 }: {
   tone?: PanelTone;
   title: string;
   children?: ReactNode;
   delay?: number;
-  /** Narrated once when the panel appears. Use NarrateOn instead for panels revealed by a learner action. */
-  clip?: ClipId | null;
 }) {
   const enter = useEnter();
-  useNarrateOnMount(clip);
   const t = PANEL[tone];
   return (
     <Animated.View entering={enter(delay)} style={[styles.panel, { backgroundColor: t.bg, borderColor: t.border }]}>
@@ -134,9 +106,8 @@ export function FeedbackPanel({ verdict, title, children, delay }: { verdict: Ve
 }
 
 /** Screen heading block used at the top of each lesson step. */
-export function StepHeading({ kicker, title, body, clip }: { kicker?: string; title: string; body?: string; clip?: ClipId }) {
+export function StepHeading({ kicker, title, body }: { kicker?: string; title: string; body?: string }) {
   const enter = useEnter();
-  useNarrateOnMount(clip);
   return (
     <Animated.View entering={enter(0, 'fade')} style={{ gap: space.sm }}>
       {kicker ? (

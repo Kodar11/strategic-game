@@ -72,3 +72,4 @@ export { default as Sprout } from 'lucide-react-native/icons/sprout';
 export { default as Gauge } from 'lucide-react-native/icons/gauge';
 export { default as Layers } from 'lucide-react-native/icons/layers';
 export { default as Shuffle } from 'lucide-react-native/icons/shuffle';
+export { default as Trash } from 'lucide-react-native/icons/trash';

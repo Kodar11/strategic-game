@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ArrowLeft, ArrowRight, RotateCcw, Volume2, VolumeX, X } from '@/src/components/ui/icons';
+import { ArrowLeft, ArrowRight, RotateCcw, X } from '@/src/components/ui/icons';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, useAnimatedStyle, withTiming } from 'react-native-reanimated';
@@ -9,8 +9,6 @@ import { Backdrop } from '@/src/components/ui/Backdrop';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import type { LessonMeta } from '@/src/content/lessons';
-import { NarrationScope } from '@/src/features/audio/useNarration';
-import { useProgress } from '@/src/store/progress';
 import { haptic, useMotionReduced } from '@/src/utils/feedback';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
@@ -55,8 +53,6 @@ export function LessonShell({
   const current = steps[Math.min(step, steps.length - 1)];
   const isFinal = step === steps.length - 1;
   const canContinue = current.canContinue ?? true;
-  const narrationOn = useProgress((s) => s.settings.narration);
-  const setSetting = useProgress((s) => s.setSetting);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ y: 0, animated: false });
@@ -77,72 +73,65 @@ export function LessonShell({
   };
 
   return (
-    <NarrationScope step={current.key}>
-      <View style={styles.root}>
-        <Backdrop warm={0.08} />
-        <View style={[styles.header, { paddingTop: insets.top + space.sm }]}>
-          <View style={styles.headerRow}>
-            <IconButton icon={X} label="Leave lesson. Your progress is saved." onPress={exitLesson} />
-            <View style={{ flex: 1 }}>
-              <AppText variant="caption" color={colors.textMuted} numberOfLines={1}>
-                Lesson {lesson.number} · {lesson.title}
-              </AppText>
-              <View
-                style={styles.track}
-                accessible
-                accessibilityRole="progressbar"
-                accessibilityLabel={`Step ${step + 1} of ${steps.length}`}
-                accessibilityValue={{ min: 1, max: steps.length, now: step + 1 }}>
-                <Animated.View style={[styles.fill, progress]} />
-              </View>
-            </View>
-            <AppText variant="caption" color={colors.textMuted} tabular style={{ minWidth: 32, textAlign: 'right' }}>
-              {step + 1}/{steps.length}
+    <View style={styles.root}>
+      <Backdrop warm={0.08} />
+      <View style={[styles.header, { paddingTop: insets.top + space.sm }]}>
+        <View style={styles.headerRow}>
+          <IconButton icon={X} label="Leave lesson. Your progress is saved." onPress={exitLesson} />
+          <View style={{ flex: 1 }}>
+            <AppText variant="caption" color={colors.textMuted} numberOfLines={1}>
+              Lesson {lesson.number} · {lesson.title}
             </AppText>
-            {onRestart && step > 0 && !isFinal ? <IconButton icon={RotateCcw} label="Start over from the first step" onPress={onRestart} /> : null}
-            <IconButton
-              icon={narrationOn ? Volume2 : VolumeX}
-              label={narrationOn ? 'Mute narration' : 'Unmute narration'}
-              onPress={() => setSetting('narration', !narrationOn)}
-            />
+            <View
+              style={styles.track}
+              accessible
+              accessibilityRole="progressbar"
+              accessibilityLabel={`Step ${step + 1} of ${steps.length}`}
+              accessibilityValue={{ min: 1, max: steps.length, now: step + 1 }}>
+              <Animated.View style={[styles.fill, progress]} />
+            </View>
+          </View>
+          <AppText variant="caption" color={colors.textMuted} tabular style={{ minWidth: 32, textAlign: 'right' }}>
+            {step + 1}/{steps.length}
+          </AppText>
+          {onRestart && step > 0 && !isFinal ? <IconButton icon={RotateCcw} label="Start over from the first step" onPress={onRestart} /> : null}
+        </View>
+      </View>
+
+      <ScrollView
+        ref={scrollRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.body, { paddingBottom: space.xxxl }]}
+        keyboardShouldPersistTaps="handled">
+        <Animated.View key={current.key} entering={reduced ? undefined : FadeIn.duration(220)} style={styles.content}>
+          {current.render()}
+        </Animated.View>
+      </ScrollView>
+
+      {!isFinal ? (
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space.lg) }]}>
+          <View style={styles.footerInner}>
+            {!canContinue && current.blockedHint ? (
+              <AppText variant="small" color={colors.textMuted} align="center" style={{ marginBottom: space.sm }}>
+                {current.blockedHint}
+              </AppText>
+            ) : null}
+            <View style={styles.footerRow}>
+              {step > 0 && !current.hideBack ? (
+                <Button label="Back" variant="secondary" icon={ArrowLeft} iconPosition="left" onPress={() => goTo(step - 1)} style={{ minWidth: 104 }} />
+              ) : null}
+              <Button
+                label={current.cta ?? 'Continue'}
+                icon={ArrowRight}
+                onPress={advance}
+                disabled={!canContinue}
+                style={{ flex: 1 }}
+              />
+            </View>
           </View>
         </View>
-
-        <ScrollView
-          ref={scrollRef}
-          style={{ flex: 1 }}
-          contentContainerStyle={[styles.body, { paddingBottom: space.xxxl }]}
-          keyboardShouldPersistTaps="handled">
-          <Animated.View key={current.key} entering={reduced ? undefined : FadeIn.duration(220)} style={styles.content}>
-            {current.render()}
-          </Animated.View>
-        </ScrollView>
-
-        {!isFinal ? (
-          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space.lg) }]}>
-            <View style={styles.footerInner}>
-              {!canContinue && current.blockedHint ? (
-                <AppText variant="small" color={colors.textMuted} align="center" style={{ marginBottom: space.sm }}>
-                  {current.blockedHint}
-                </AppText>
-              ) : null}
-              <View style={styles.footerRow}>
-                {step > 0 && !current.hideBack ? (
-                  <Button label="Back" variant="secondary" icon={ArrowLeft} iconPosition="left" onPress={() => goTo(step - 1)} style={{ minWidth: 104 }} />
-                ) : null}
-                <Button
-                  label={current.cta ?? 'Continue'}
-                  icon={ArrowRight}
-                  onPress={advance}
-                  disabled={!canContinue}
-                  style={{ flex: 1 }}
-                />
-              </View>
-            </View>
-          </View>
-        ) : null}
-      </View>
-    </NarrationScope>
+      ) : null}
+    </View>
   );
 }
 

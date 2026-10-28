@@ -43,7 +43,7 @@ export function proposalOutcome(rules: IncentiveRules = PROPOSAL): ProposalPredi
   return o.predicted.row;
 }
 
-/** Explanation of the proposal's effect, quoted from the engine. Shared with the narration manifest. */
+/** Explanation of the proposal's effect, quoted from the engine. */
 export function proposalExplanation(rules: IncentiveRules = PROPOSAL): string {
   const o = evaluatePolicy(rules);
   const adv = cutAdvantage(rules);

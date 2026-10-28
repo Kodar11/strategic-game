@@ -6,14 +6,13 @@ import { payoffAt, rowBestResponses } from '../../../game/payoff-matrix.ts';
 
 /**
  * Lesson 1 wording that depends on what the learner did. Pure functions of lesson state and the payoff
- * table, shared by the screen, the narration manifest and the tests — so feedback can't drift from the model.
+ * table, shared by the screen and the tests — so feedback can't drift from the model.
  */
 
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 /**
- * Dr. Meera's explanation of the week's outcome. Shared by the lesson screen and the narration manifest,
- * so the spoken clip always says what the screen shows.
+ * Dr. Meera's explanation of the week's outcome, as the lesson screen shows it.
  */
 export function explainOutcome(you: PriceAction, rival: PriceAction, [a, b]: readonly [number, number]): string {
   if (you === 'cut' && rival === 'cut') {

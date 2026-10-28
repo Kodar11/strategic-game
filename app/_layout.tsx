@@ -76,6 +76,7 @@ function AppStack({ reduced }: { reduced: boolean }) {
         animation: reduced ? 'fade' : 'slide_from_right',
       }}>
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="onboarding" options={{ gestureEnabled: false, animation: 'fade' }} />
       <Stack.Screen name="lesson/[lessonId]" />
       <Stack.Screen name="challenges/index" />
       <Stack.Screen name="challenges/[lessonId]" />

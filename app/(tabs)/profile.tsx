@@ -4,9 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
-import { Button } from '@/src/components/ui/Button';
+import { Button, IconButton } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
-import { ChartNoAxesColumn } from '@/src/components/ui/icons';
+import { ChartNoAxesColumn, Settings } from '@/src/components/ui/icons';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { GameRecordCard } from '@/src/features/games/ui/GameRecordCard';
 import { GoalControl, LearningSnapshot, NextStepCard, ObservationCard, SkillAreaRow } from '@/src/features/learning/ui/ProfileParts';
@@ -30,11 +30,17 @@ export default function ProfileScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Backdrop />
-      <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: insets.top + space.md, paddingBottom: insets.bottom + space.xxl }}>
-        <View style={styles.column}>
-          <AppText variant="title" accessibilityRole="header">
+      {/* Pinned above the scroll, so Settings stays in reach on a long profile */}
+      <View style={[styles.header, { paddingTop: insets.top + space.md }]}>
+        <View style={[styles.column, styles.headerRow]}>
+          <AppText variant="title" accessibilityRole="header" style={{ flex: 1 }}>
             Your strategic thinking
           </AppText>
+          <IconButton icon={Settings} label="Settings" onPress={() => router.navigate('/settings')} />
+        </View>
+      </View>
+      <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: space.sm, paddingBottom: insets.bottom + space.xxl }}>
+        <View style={styles.column}>
 
           <LearningSnapshot snapshot={summary.snapshot} />
           {summary.observation ? <ObservationCard observation={summary.observation} /> : null}
@@ -70,4 +76,6 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   column: { maxWidth: MAX_CONTENT_WIDTH, width: '100%', alignSelf: 'center', gap: space.lg },
+  header: { paddingHorizontal: space.lg, paddingBottom: space.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
 });

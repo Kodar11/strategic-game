@@ -1,10 +1,12 @@
+import { router } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
-import { useContext } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FontsReadyContext } from '@/src/components/ui/AppText';
 import { BookOpen, Gamepad2, type LucideIcon, UserRound } from '@/src/components/ui/icons';
+import { useProgress } from '@/src/store/progress';
 import { colors, fonts, radius } from '@/src/theme/tokens';
 
 /**
@@ -16,6 +18,7 @@ import { colors, fonts, radius } from '@/src/theme/tokens';
 export default function TabsLayout() {
   const fontsReady = useContext(FontsReadyContext);
   const insets = useSafeAreaInsets();
+  useFirstLaunchWelcome();
   return (
     <Tabs
       screenOptions={{
@@ -33,6 +36,26 @@ export default function TabsLayout() {
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarAccessibilityLabel: 'Your strategic thinking profile and game record', tabBarIcon: ({ focused }) => <TabIcon icon={UserRound} focused={focused} /> }} />
     </Tabs>
   );
+}
+
+/**
+ * Opens the welcome above the tabs on a device that hasn't finished it, once the saved settings have loaded (so a
+ * returning user is never shown it). Pushed rather than redirected, so the tabs are underneath when it closes.
+ */
+function useFirstLaunchWelcome() {
+  const [settingsLoaded, setSettingsLoaded] = useState(() => useProgress.persist.hasHydrated());
+  const onboarded = useProgress((s) => s.settings.onboarded);
+  const opened = useRef(false);
+
+  useEffect(() => (settingsLoaded ? undefined : useProgress.persist.onFinishHydration(() => setSettingsLoaded(true))), [settingsLoaded]);
+
+  useEffect(() => {
+    // Re-armed once finished, so it opens again for the new player after an account is deleted.
+    if (onboarded) opened.current = false;
+    if (!settingsLoaded || onboarded || opened.current) return;
+    opened.current = true;
+    router.push('/onboarding');
+  }, [settingsLoaded, onboarded]);
 }
 
 /** The active tab gets a soft pill behind its icon, so it reads at a glance without relying on colour alone. */

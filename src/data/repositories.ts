@@ -41,7 +41,8 @@ export type RpcName =
   | 'create_challenge'
   | 'get_challenge'
   | 'record_practice_game'
-  | 'get_my_games';
+  | 'get_my_games'
+  | 'delete_my_account';
 
 export interface Rpc {
   /** Resolve with the function's JSON result, or throw the database / network error. */

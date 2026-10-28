@@ -89,7 +89,7 @@ export default function Home() {
               </AppText>
             </View>
             <View style={{ flexDirection: 'row', gap: space.xs }}>
-              <IconButton icon={Settings} label="Settings" onPress={() => router.push('/settings')} />
+              <IconButton icon={Settings} label="Settings" onPress={() => router.navigate('/settings')} />
             </View>
           </View>
 

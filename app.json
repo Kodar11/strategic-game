@@ -37,20 +37,18 @@
       "expo-image",
       "expo-font",
       "expo-localization",
-      [
-        "expo-audio",
-        {
-          "microphonePermission": false,
-          "recordAudioAndroid": false,
-          "enableBackgroundPlayback": false,
-          "enableBackgroundRecording": false
-        }
-      ],
       "expo-asset",
       "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a7b32035-6a51-453d-b746-e9b44d78ac92"
+      }
+    },
+    "owner": "yuvan11"
   }
 }

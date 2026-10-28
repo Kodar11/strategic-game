@@ -6,13 +6,15 @@ import { type Catalog, installCatalog } from '@/src/content/catalog';
 import { installCategories } from '@/src/content/categories';
 import { monthOf } from '@/src/features/daily/dates';
 import { useProgress } from '@/src/store/progress';
-import type { ProgressData } from '@/src/store/progress-state';
+import { EMPTY_PROGRESS, type ProgressData } from '@/src/store/progress-state';
 import { diffProgress } from './changes';
 import { useDaily } from './daily-session';
 import { DataError, toDataError } from './errors';
 import { Outbox, type OutboxStatus } from './outbox';
+import { accountRepository } from './account';
+import { useGames } from './games-session';
 import { categoryRepository, contentRepository, progressRepository } from './repositories';
-import { ensureUser, supabaseRpc } from './supabase';
+import { ensureUser, supabase, supabaseRpc } from './supabase';
 
 /**
  * The app's connection to its data: start-up (content, session, progress) and the write-back of every progress
@@ -87,6 +89,40 @@ async function loadCategories(catalog: Catalog): Promise<void> {
     if (__DEV__) console.warn(`[data] categories not loaded: ${toDataError(e).detail}`);
     installCategories(null);
   }
+}
+
+const account = accountRepository(supabaseRpc);
+
+/**
+ * Delete the signed-in account on the server, then start over on this device as a new anonymous player.
+ * Progress sync pauses while the request runs, so nothing is written for an account being deleted. If the request
+ * fails nothing local changes, sync resumes, and the DataError is rethrown: the account still exists.
+ */
+export async function deleteAccount(): Promise<void> {
+  const { data, error } = await supabase().auth.getSession();
+  if (error || !data.session) throw new DataError('auth', error?.message ?? 'no session to delete');
+
+  unsubscribe?.();
+  unsubscribe = null;
+  outbox.stop();
+  try {
+    await account.deleteMyAccount();
+  } catch (e) {
+    startSync();
+    void outbox.drain();
+    throw e;
+  }
+
+  // The account is gone: forget everything this device held for it. Device preferences (motion, haptics) stay.
+  await outbox.clear();
+  await supabase().auth.signOut({ scope: 'local' });
+  useProgress.setState({ ...EMPTY_PROGRESS, hydrated: false });
+  useProgress.getState().setSetting('onboarded', false);
+  useGames.setState({ overview: { status: 'idle' }, weekly: {}, global: { status: 'idle' }, hall: { status: 'idle' }, mine: { status: 'idle' } });
+  useDaily.setState({ months: {}, history: null, todayConfirmed: false });
+
+  // The usual start-up signs in a new anonymous player; the tabs then open the welcome again.
+  await startAppData();
 }
 
 let starting: Promise<void> | null = null;

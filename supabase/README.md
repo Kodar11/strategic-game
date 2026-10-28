@@ -28,6 +28,8 @@ Run any migration in `migrations/` that the project doesn't have yet, in filenam
 
 - `20261028120000_rps_opponent_reads.sql`: Rock, Paper, Scissors mystery/chosen opponents and reads in the practice log (three nullable columns on `game_practice_results`; replaces `record_practice_game` and `get_my_games`). Until it is applied, the app still works but logs practice without them.
 
+- `20261028140000_delete_account.sql`: Settings → Delete account. Adds `public.delete_my_account()`, which deletes the caller's own `auth.users` row (identity from the JWT only; signed-in users only) and, through the existing `on delete cascade` keys, all of that player's rows. It also changes `game_matches.challenge_id` to `on delete cascade`, so other players' matches on a deleted player's friend challenge go with the challenge instead of blocking the deletion. Until it is applied, Delete account fails with an error and deletes nothing.
+
 None of them changes existing data; the last one only adds nullable columns. To remove the games migration (it only adds objects): drop its functions, then its tables in reverse dependency order (`competition_results`, `game_matches`, `game_practice_results`, `game_challenges`, `game_competitions`, `player_profiles`, `game_definitions`), then the `game_engine` schema — this deletes all game data.
 
 ## Daily work

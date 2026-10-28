@@ -33,8 +33,6 @@ import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
 import { Segmented } from '@/src/components/ui/Segmented';
 import { Slider } from '@/src/components/ui/Slider';
 import type { LessonMeta } from '@/src/content/lessons';
-import { pricingRevealClips, pricingWhyClip } from '@/src/features/audio/reactions';
-import { NarrateOn } from '@/src/features/audio/useNarration';
 import { BASE_CUT_ADVANTAGE, BASE_PRICING_GAME, PENALTY_RANGE, type PriceAction, applyCutPenalty, rivalPolicy } from '@/src/game/incentives';
 import { payoffAt, rowBestResponses } from '@/src/game/payoff-matrix';
 import { useMotionReduced } from '@/src/utils/feedback';
@@ -105,7 +103,6 @@ const TRANSFER: TransferOption[] = [
     id: 'both-advertise',
     label: 'Both advertise heavily',
     verdict: 'strong',
-    clip: 'l1.transfer.both-advertise',
     feedback:
       'Whatever the other shop does, heavy ads win you customers or protect the ones you have — so each shop spends. Together they pay for ads that mostly cancel out.',
   },
@@ -113,7 +110,6 @@ const TRANSFER: TransferOption[] = [
     id: 'both-hold',
     label: 'Both hold back, since the ads mostly cancel out',
     verdict: 'misconception',
-    clip: 'l1.transfer.both-hold',
     feedback:
       'Holding back is better for the pair, but each shop gains by quietly advertising while the other holds back. Without something that changes those incentives, the good outcome is fragile.',
   },
@@ -121,7 +117,6 @@ const TRANSFER: TransferOption[] = [
     id: 'repeat',
     label: 'It depends on whether they face each other month after month',
     verdict: 'defensible',
-    clip: 'l1.transfer.repeat',
     feedback:
       'A fair point the one-month picture leaves out. Facing each other every month lets the shops reward restraint and punish ads. But within any single month, each still gains by advertising.',
   },
@@ -129,7 +124,6 @@ const TRANSFER: TransferOption[] = [
     id: 'first-mover',
     label: 'Whoever decides first sets the outcome',
     verdict: 'misconception',
-    clip: 'l1.transfer.first-mover',
     feedback:
       'They decide at the same time without seeing each other, so there is no first move to react to. Each has to reason about the other instead.',
   },
@@ -166,7 +160,7 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
           <Animated.View entering={enter(0, 'fade')} style={{ borderRadius: 20, overflow: 'hidden' }}>
             <SceneArt scene="market" height={180} />
           </Animated.View>
-          <StepHeading kicker={`Lesson ${lesson.number}`} title="Two apps. One city." body="Food delivery here comes down to two companies. You run one of them." clip="l1.intro.heading" />
+          <StepHeading kicker={`Lesson ${lesson.number}`} title="Two apps. One city." body="Food delivery here comes down to two companies. You run one of them." />
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             <Card style={{ flex: 1, gap: space.sm, borderTopWidth: 3, borderTopColor: colors.primary }}>
               <CompanyBadge side="you" />
@@ -181,7 +175,7 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
               </AppText>
             </Card>
           </View>
-          <Dialogue character="sen" expression="neutral" delay={150} clip="l1.intro.sen">
+          <Dialogue character="sen" expression="neutral" delay={150}>
             Every Monday both companies set prices for the week. Neither sees the other&apos;s choice until the week begins.
           </Dialogue>
         </>
@@ -193,10 +187,10 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
       render: () => (
         <>
           <StepHeading title="What's at stake" body="Each company wants the most profit for itself. In this model, that's its only goal." />
-          <Dialogue character="kavya" expression="thinking" clip="l1.stakes.kavya">
+          <Dialogue character="kavya" expression="thinking">
             Honestly? If one app is cheaper this week, I&apos;m ordering from that one.
           </Dialogue>
-          <Dialogue character="rohan" expression="confident" align="right" delay={120} clip="l1.stakes.rohan">
+          <Dialogue character="rohan" expression="confident" align="right" delay={120}>
             I&apos;ll do whatever earns FoodKart the most. Nothing personal.
           </Dialogue>
           <Panel tone="info" title="How the week is scored" delay={200}>
@@ -291,7 +285,7 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
               You can replay the lesson to try the other option.
             </Panel>
           ) : (
-            <Dialogue character="aarav" expression="thinking" clip="l1.decide.aarav">
+            <Dialogue character="aarav" expression="thinking">
               What would I do if I knew Rohan&apos;s choice? Does it change if he picks the other one?
             </Dialogue>
           )}
@@ -321,7 +315,7 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
           <>
             <StepHeading kicker="What if?" title="Was it this week, or the table?" />
             {outcome && outcomePay ? (
-              <Dialogue character="meera" expression="explaining" clip={pricingWhyClip(outcome.row, outcome.col)}>
+              <Dialogue character="meera" expression="explaining">
                 {explainOutcome(outcome.row, outcome.col, outcomePay)}
               </Dialogue>
             ) : null}
@@ -360,7 +354,6 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
         const rf = data.predictReason ? reasonFeedback(data.predictReason) : null;
         return (
           <>
-            <NarrateOn clip="l1.matrix.dominant" trigger={data.showBR} />
             <StepHeading kicker="The payoff table" title="Every outcome on one screen" body="Each cell is one possible week. Your profit first, FoodKart's second. Tap a cell to read it." />
             <Card>
               <PayoffMatrix
@@ -434,10 +427,10 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
                 </AppText>
               </Card>
             </View>
-            <Dialogue character="sen" expression="explaining" clip="l1.trap.sen">
+            <Dialogue character="sen" expression="explaining">
               Each company made the sensible choice for itself, and together they landed somewhere worse. This shape of game is called the Prisoner&apos;s Dilemma.
             </Dialogue>
-            <Dialogue character="rohan" expression="confident" align="right" delay={120} clip="l1.trap.rohan">
+            <Dialogue character="rohan" expression="confident" align="right" delay={120}>
               Let&apos;s stop this. Next week, we both keep prices. Deal?
             </Dialogue>
             <View style={{ gap: space.sm }}>
@@ -532,7 +525,6 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
                 ) : null}
               </>
             ) : null}
-            <NarrateOn clip="l1.penalty.flip" trigger={data.foundFlip} />
             {data.foundFlip && gf ? (
               <>
                 <FeedbackPanel verdict={gf.verdict} title="Your prediction">
@@ -559,10 +551,10 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
       render: () => (
         <>
           <StepHeading title="Is a penalty a good idea?" body="The model says what the penalty does to the companies' incentives. Whether that's desirable is a different question." />
-          <Dialogue character="kavya" expression="concerned" clip="l1.caveat.kavya">
+          <Dialogue character="kavya" expression="concerned">
             Wait — the price war was good for me. If cutting is penalised, I pay more.
           </Dialogue>
-          <Dialogue character="arjun" expression="thinking" align="right" delay={100} clip="l1.caveat.arjun">
+          <Dialogue character="arjun" expression="thinking" align="right" delay={100}>
             And someone has to detect cuts and enforce the penalty. That costs something too.
           </Dialogue>
           <Panel tone="insight" title="Read the model carefully" delay={180}>
@@ -603,7 +595,6 @@ export default function CooperationTrap({ lesson }: { lesson: LessonMeta }) {
         <Completion
           lesson={lesson}
           takeaway="When each side has a dominant strategy, individually rational choices can still leave everyone worse off."
-          takeawayClip="l1.done.takeaway"
           remember={[
             'Ask: is one choice best no matter what the other side does?',
             'Compare the predicted outcome with what both would prefer.',
@@ -643,7 +634,6 @@ function Reveal({
 }) {
   const reduced = useMotionReduced();
   const [shown, setShown] = useState(reduced);
-  const lines = pricingRevealClips(you, rival);
   const check = predicted ? predictionCheck(predicted, rival) : null;
   useEffect(() => {
     if (reduced) return;
@@ -657,14 +647,14 @@ function Reveal({
       {shown ? (
         <>
           <OutcomeBoard you={you} rival={rival} payoffs={payoffs} />
-          <Dialogue character="rohan" expression={rival === 'cut' && you === 'maintain' ? 'satisfied' : rival === 'cut' ? 'frustrated' : 'neutral'} delay={250} align="right" clip={lines.rohan}>
+          <Dialogue character="rohan" expression={rival === 'cut' && you === 'maintain' ? 'satisfied' : rival === 'cut' ? 'frustrated' : 'neutral'} delay={250} align="right">
             {rival === 'cut' && you === 'maintain'
               ? 'Thanks for keeping your prices up.'
               : rival === 'cut'
                 ? 'So we both cut. That stings.'
                 : 'Interesting week.'}
           </Dialogue>
-          <Dialogue character="aarav" expression={you === 'maintain' && rival === 'cut' ? 'frustrated' : 'confused'} delay={400} clip={lines.aarav}>
+          <Dialogue character="aarav" expression={you === 'maintain' && rival === 'cut' ? 'frustrated' : 'confused'} delay={400}>
             {you === 'maintain' && rival === 'cut' ? 'He undercut me. Could I have seen that coming?' : 'We both did the "smart" thing. So why does it feel like we lost?'}
           </Dialogue>
           {predicted && check ? (

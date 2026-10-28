@@ -29,8 +29,6 @@ import { Button } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { Slider } from '@/src/components/ui/Slider';
 import type { LessonMeta } from '@/src/content/lessons';
-import { roundResultClip } from '@/src/features/audio/reactions';
-import { NarrateOn } from '@/src/features/audio/useNarration';
 import {
   MAX_GUESS,
   MAX_PER_TYPE,
@@ -114,7 +112,6 @@ const TRANSFER: TransferOption[] = [
     id: 'model',
     label: 'First estimate how many people will follow that advice',
     verdict: 'strong',
-    clip: 'l2.transfer.model',
     feedback:
       'The advice only works if few people follow it. If most do, 9:30 becomes the new jam. The best time depends on how many steps ahead the rest of the crowd is thinking.',
   },
@@ -122,21 +119,18 @@ const TRANSFER: TransferOption[] = [
     id: 'advice',
     label: 'Leave at 9:30, as the advice says',
     verdict: 'misconception',
-    clip: 'l2.transfer.advice',
     feedback: 'That is one step of reasoning — beating last year’s crowd. But everyone read the same advice, so you may be joining this year’s crowd instead.',
   },
   {
     id: 'ten',
     label: 'Stay until 10 — everyone else will have left at 9:30',
     verdict: 'defensible',
-    clip: 'l2.transfer.ten',
     feedback: 'One step further, and it can work — but only if most people really do leave early. If the advice didn’t spread widely, 10 pm is the old jam again.',
   },
   {
     id: 'earliest',
     label: 'Leave as early as possible to out-think everyone',
     verdict: 'misconception',
-    clip: 'l2.transfer.earliest',
     feedback: 'You would beat the traffic and miss the festival. Reasoning further than the crowd costs you something — like picking 0 in the number game.',
   },
 ];
@@ -174,11 +168,11 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
           <Animated.View entering={enter(0, 'fade')} style={{ borderRadius: 20, overflow: 'hidden' }}>
             <SceneArt scene="crowd" height={170} />
           </Animated.View>
-          <StepHeading kicker={`Lesson ${lesson.number}`} title="Guess two-thirds of the average" body="You and ten other players each secretly pick a whole number from 0 to 100." clip="l2.intro.heading" />
-          <Dialogue character="sen" expression="explaining" clip="l2.intro.sen">
+          <StepHeading kicker={`Lesson ${lesson.number}`} title="Guess two-thirds of the average" body="You and ten other players each secretly pick a whole number from 0 to 100." />
+          <Dialogue character="sen" expression="explaining">
             The target is two-thirds of everyone&apos;s average pick — yours included. Closest to the target wins.
           </Dialogue>
-          <Dialogue character="maya" expression="confident" align="right" delay={120} clip="l2.intro.maya">
+          <Dialogue character="maya" expression="confident" align="right" delay={120}>
             I&apos;m in. The question is what the rest of you will do.
           </Dialogue>
           <AppText variant="caption" color={colors.textMuted}>
@@ -202,7 +196,7 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
               Whoever picked closest to 40 wins. If several are equally close, they share the win.
             </AppText>
           </Card>
-          <Dialogue character="aarav" expression="curious" clip="l2.example.aarav">
+          <Dialogue character="aarav" expression="curious">
             So I&apos;m not guessing a number — I&apos;m guessing what everyone else will guess.
           </Dialogue>
         </>
@@ -271,7 +265,7 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
             title="Same crowd, one step wiser"
             body={`Everyone saw that last target of ${round1 ? round1.target.toFixed(1) : '—'}. In this simulation, each player now reasons exactly one step deeper than before.`}
           />
-          <Dialogue character="maya" expression="thinking" align="right" clip="l2.guess2.maya">
+          <Dialogue character="maya" expression="thinking" align="right">
             If they all expect a lower target, the target itself moves lower. Where does it stop?
           </Dialogue>
           <NumberPicker value={data.guess2} onChange={(v) => update({ guess2: v })} locked={data.committed2} />
@@ -318,7 +312,7 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
               </Animated.View>
             ))}
           </View>
-          <Dialogue character="meera" expression="explaining" clip="l2.types.meera">
+          <Dialogue character="meera" expression="explaining">
             Each extra step multiplies the previous guess by ⅔: 50 → {levelKGuess(1)} → {levelKGuess(2)} → {levelKGuess(3)}. This is called level-k reasoning.
           </Dialogue>
         </>
@@ -389,7 +383,6 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
               The target can be at most ⅔ × 100 ≈ 66.7, so no rational player picks above it. If everyone knows that, the target is at most ⅔ × 66.7 ≈ 44.4 — and so on.
             </AppText>
           ) : null}
-          <NarrateOn clip="l2.theory.zero" trigger={data.elim >= 3} />
           {data.elim >= 3 ? (
             <>
               <Panel tone="insight" title="Theory predicts 0. Real crowds don't play 0.">
@@ -440,7 +433,6 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
         <Completion
           lesson={lesson}
           takeaway="Your best move depends on how deeply others think — not on how deeply you can think."
-          takeawayClip="l2.done.takeaway"
           remember={[
             'Model the people you are actually playing with.',
             'Theory tells you where perfect reasoning leads; real players often stop earlier.',
@@ -519,7 +511,7 @@ function RoundResultView({ result, round }: { result: RoundResult; round: 1 | 2 
           Sum of all {playerCount} picks = {sumText}. Average = {sumText} ÷ {playerCount} = {average.toFixed(1)}. Target = ⅔ × {average.toFixed(1)} = {target.toFixed(1)}.
         </AppText>
       </Card>
-      <Dialogue character="meera" expression={won ? 'satisfied' : 'explaining'} clip={roundResultClip(result)} clipKey={`l2.result${round}`}>
+      <Dialogue character="meera" expression={won ? 'satisfied' : 'explaining'}>
         {won
           ? `Your ${learner.guess} landed ${learner.distance.toFixed(1)} from the target. You read this crowd well.`
           : `You picked ${learner.guess}. The closest pick was ${winning.guess}, just ${winning.distance.toFixed(1)} away. ${

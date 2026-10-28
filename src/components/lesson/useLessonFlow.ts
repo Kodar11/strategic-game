@@ -3,7 +3,6 @@ import type { z } from 'zod';
 
 import type { LessonId } from '@/src/content/lessons';
 import type { NewAttempt } from '@/src/features/learning/records';
-import { narration } from '@/src/features/audio/narration';
 import { useProgress } from '@/src/store/progress';
 
 /**
@@ -70,8 +69,6 @@ export function useLessonFlow<S extends z.ZodType>(
   );
 
   const restart = useCallback(() => {
-    // A replayed lesson is heard again from the start.
-    narration.forgetHeard();
     setState({ step: 0, data: initial });
     // `initial` is a module-level constant for each lesson.
     // eslint-disable-next-line react-hooks/exhaustive-deps

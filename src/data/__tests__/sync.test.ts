@@ -285,6 +285,23 @@ describe('Outbox', () => {
     await stranger.restore('u2');
     assert.equal(stranger.pending, 0);
   });
+
+  it('clear drops pending changes and the saved copy, and sends nothing (an account was deleted)', async () => {
+    const storage = memoryStorage();
+    const t = flaky(Infinity);
+    const statuses: OutboxStatus[] = [];
+    const o = track(new Outbox({ send: t.send, classify, storage, debounceMs: 1e9, onStatus: (s) => statuses.push(s) }));
+    await o.restore('u1');
+    o.enqueue({ lessonsCompleted: ['voting'] });
+    assert.equal(await o.drain(), false);
+    assert.ok(storage.peek());
+    await o.clear();
+    assert.equal(o.pending, 0);
+    assert.equal(storage.peek(), null);
+    assert.deepEqual(statuses.at(-1), { pending: 0, state: 'idle', message: null });
+    assert.ok(await o.drain());
+    assert.deepEqual(t.sent, []);
+  });
 });
 
 describe('Data errors', () => {
