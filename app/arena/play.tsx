@@ -27,6 +27,7 @@ import { CoachTip, ScoreStrip } from '@/src/features/arena/ui/parts';
 import { ReadPanel } from '@/src/features/arena/ui/ReadPanel';
 import { SignalBoard } from '@/src/features/arena/ui/SignalBoard';
 import { UltimatumGameBoard } from '@/src/features/arena/ui/UltimatumGameBoard';
+import { MatchReflection } from '@/src/features/reflections/ReflectionCard';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
 type Params = { game?: string; persona?: string; level?: string; length?: string; variant?: string };
@@ -164,6 +165,7 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
                 onChange={change}
                 onLibrary={() => router.navigate('/games')}
                 read={mystery && read.verdict ? { guess: read.guess, verdict: read.verdict } : null}
+                reflection={<MatchReflection game={game} record={state} />}
               />
             </View>
           ) : null}

@@ -9,6 +9,7 @@ import { Lightbulb, RotateCcw, Share2, Trophy, UserPlus } from '@/src/components
 import { gamesRepo } from '@/src/data/games-session';
 import { GAMES, personality, takeaway } from '@/src/games/catalog';
 import { inviteText, resultShareText } from '@/src/games/share-text';
+import { MatchReflection } from '@/src/features/reflections/ReflectionCard';
 import { haptic } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
 import { challengeLink, inviteFailure, shareResultMessage, shareText } from '../share';
@@ -102,6 +103,8 @@ export function ResultPanel({
       )}
 
       {children}
+
+      <MatchReflection game={view.game} record={view.rounds} />
 
       <View style={{ gap: space.sm }}>
         {onPlayAgain ? <Button label={playAgainLabel} icon={RotateCcw} iconPosition="left" onPress={onPlayAgain} /> : null}

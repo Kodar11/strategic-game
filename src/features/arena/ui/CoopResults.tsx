@@ -11,6 +11,7 @@ import { ARENA, LEVEL_LABEL } from '@/src/arena/catalog';
 import { LEVELS, type Level, type MatchResult } from '@/src/arena/core';
 import { COOP_NAME, type CoopState } from '@/src/arena/cooperation';
 import { coopInsights, coopLessons, coopOpponentReveal, coopStats } from '@/src/arena/cooperation-analysis';
+import { MatchReflection } from '@/src/features/reflections/ReflectionCard';
 import { haptic } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
 import type { ReadVerdict } from '@/src/arena/reads';
@@ -134,6 +135,8 @@ export function CoopResults({ state, result, newBest, onRematch, onChange, onLib
           {coopOpponentReveal(state)}
         </AppText>
       </View>
+
+      <MatchReflection game="cooperation" record={state} />
 
       <View style={{ gap: space.md }}>
         <Button label={read ? 'Rematch · new mystery opponent' : `Rematch ${name}`} icon={RotateCcw} iconPosition="left" onPress={onRematch} />

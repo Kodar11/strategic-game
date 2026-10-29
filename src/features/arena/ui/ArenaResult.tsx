@@ -31,6 +31,7 @@ export function ArenaResult({
   onChange,
   onLibrary,
   read,
+  reflection,
 }: {
   game: ArenaGameId;
   result: MatchResult;
@@ -43,6 +44,8 @@ export function ArenaResult({
   onLibrary: () => void;
   /** A mystery match's prediction: the guess (null if none) and its verdict. */
   read?: { guess: string | null; verdict: ReadVerdict } | null;
+  /** "A thought to take with you", shown just above the next-step controls. */
+  reflection?: React.ReactNode;
 }) {
   const enter = useEnter();
   useEffect(() => haptic.success(), []);
@@ -134,6 +137,8 @@ export function ArenaResult({
           </AppText>
         </View>
       )}
+
+      {reflection}
 
       <View style={{ gap: space.md }}>
         <Button label={read ? 'Play again · new mystery opponent' : 'Play again'} icon={read ? Shuffle : RotateCcw} iconPosition="left" onPress={onPlayAgain} />
