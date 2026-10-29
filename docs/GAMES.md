@@ -3,6 +3,7 @@
 Five replayable strategic games against bots, a weekly competition on one of them, leaderboards, a Hall of Fame, and
 shareable friend challenges. All of it is separate from the lessons, scenarios, practice challenges and the learning
 record: nothing here reads or writes lesson progress, and the Thinking Profile shows the game record as its own card.
+The five on-device Strategy Arena games listed below these on the Games tab are documented in [ARENA.md](ARENA.md).
 
 | Piece | Where |
 |---|---|

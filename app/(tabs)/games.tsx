@@ -17,6 +17,10 @@ import { ordinal, timeLeft, weekLabel } from '@/src/games/competition';
 import type { GameId } from '@/src/games/core';
 import { ENGINES } from '@/src/games/registry';
 import { GAME_TINT, GameArt } from '@/src/features/games/ui/GameArt';
+import { ARENA, ARENA_ORDER } from '@/src/arena/catalog';
+import type { ArenaGameId } from '@/src/arena/core';
+import { played, useArenaRecords } from '@/src/features/arena/records';
+import { ARENA_TINT, ArenaArt } from '@/src/features/arena/ui/parts';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
 function openGame(id: GameId) {
@@ -37,6 +41,7 @@ export default function GamesScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadOverview();
+      void useArenaRecords.getState().load();
     }, [loadOverview]),
   );
 
@@ -54,7 +59,7 @@ export default function GamesScreen() {
               <IconButton icon={Settings} label="Settings" onPress={() => router.navigate('/settings')} />
             </View>
             <AppText variant="small" color={colors.textMuted}>
-              Five strategic games against bots with personalities.
+              Ten strategic games against bots with personalities.
             </AppText>
           </View>
 
@@ -81,6 +86,20 @@ export default function GamesScreen() {
           {GAME_ORDER.map((id, i) => (
             <Animated.View key={id} entering={enter(120 + i * 40)}>
               <GameCard id={id} featured={overview.status === 'ready' && overview.data.competition?.game === id && overview.data.competition.phase === 'active'} />
+            </Animated.View>
+          ))}
+
+          <View style={{ gap: 2, marginTop: space.sm }}>
+            <AppText variant="heading" accessibilityRole="header">
+              Strategy Arena
+            </AppText>
+            <AppText variant="small" color={colors.textMuted}>
+              Five deeper games against the Investor, the Banker, the Deal Maker and the Opportunist. Played on your device.
+            </AppText>
+          </View>
+          {ARENA_ORDER.map((id, i) => (
+            <Animated.View key={id} entering={enter(320 + i * 40)}>
+              <ArenaCard id={id} />
             </Animated.View>
           ))}
         </View>
@@ -274,6 +293,37 @@ function BoardLink({ label, icon: Icon, onPress }: { label: string; icon: typeof
       <AppText variant="caption" color={colors.text} align="center">
         {label}
       </AppText>
+    </Pressable>
+  );
+}
+
+function ArenaCard({ id }: { id: ArenaGameId }) {
+  const g = ARENA[id];
+  const record = useArenaRecords((s) => s.games[id]);
+  const n = played(record);
+  const tally = record && n ? `${record.w}–${record.l}${record.d ? `–${record.d}` : ''}` : null;
+  return (
+    <Pressable
+      onPress={() => router.push({ pathname: '/arena/[gameId]', params: { gameId: id } })}
+      accessibilityRole="button"
+      accessibilityLabel={`${g.title}. ${g.tagline} ${g.question}${tally ? ` Your record: ${record!.w} won of ${n}.` : ''}`}
+      style={({ pressed }) => [styles.card, pressed && { backgroundColor: colors.surfaceHigh }]}>
+      <ArenaArt game={id} size={64} />
+      <View style={{ flex: 1, gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs, flexWrap: 'wrap' }}>
+          <AppText variant="bodyStrong">{g.title}</AppText>
+          {tally ? <Badge label={tally} /> : null}
+        </View>
+        <AppText variant="small" color={colors.textBody}>
+          {g.tagline}
+        </AppText>
+        <AppText variant="caption" color={ARENA_TINT[id].fg}>
+          {g.question}
+        </AppText>
+      </View>
+      <View style={styles.play}>
+        <Play size={16} color={colors.text} fill={colors.text} />
+      </View>
     </Pressable>
   );
 }
