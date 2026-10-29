@@ -1,31 +1,38 @@
 import { router } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
-import { Button, IconButton } from '@/src/components/ui/Button';
-import { Card, SectionLabel } from '@/src/components/ui/Card';
+import { IconButton } from '@/src/components/ui/Button';
+import { SectionLabel } from '@/src/components/ui/Card';
 import { ChartNoAxesColumn, Settings } from '@/src/components/ui/icons';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
+import { useEnter } from '@/src/components/lesson/motion';
 import { GameRecordCard } from '@/src/features/games/ui/GameRecordCard';
-import { GoalControl, LearningSnapshot, NextStepCard, ObservationCard, SkillAreaRow } from '@/src/features/learning/ui/ProfileParts';
-import { useProfile } from '@/src/features/learning/useProfile';
+import { AreaList, GrowthCard, LearningProgressCard, LinkRow, RecommendationCard, openArea } from '@/src/features/learning/ui/JourneyParts';
+import { GoalControl } from '@/src/features/learning/ui/ProfileParts';
+import { useJourney } from '@/src/features/learning/useProfile';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
 /**
- * Strategic Thinking Profile, in three layers:
- * 1. The glance: a learning snapshot, at most one evidence-based observation and one next step.
- * 2. The areas the learner has actually explored, each opening its own breakdown.
- * 3. "View detailed report" for first attempts, feedback, transfer, confidence and trends (app/report.tsx).
- * What is shown, and how cautiously, is decided in src/features/learning/summary.ts from the profile in
- * profile.ts; the thresholds are in evidence-policy.ts. The game record stays separate, below the learning.
+ * Strategic Thinking Profile — a deliberate summary, not a compressed report:
+ * 1. Learning progress: lessons completed, one bar, one sentence (opens the detailed report).
+ * 2. At most one growth observation, with its evidence (opens that area).
+ * 3. One recommended next step, with the optional goal.
+ * 4. All four areas, each opening its own breakdown.
+ * Everything deeper — accuracy, confidence, progress over time, every answer — is in app/report.tsx.
+ * Content comes from src/features/learning/journey.ts; thresholds from evidence-policy.ts. The game record stays
+ * separate at the foot and never feeds a learning measure.
  */
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { hydrated, profile, summary, goal } = useProfile();
+  const enter = useEnter();
+  const { hydrated, summary, goal, journey } = useJourney();
 
   if (!hydrated) return <MessageScreen loading />;
+  const { progress, growth, recommendation, areas } = journey;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -39,31 +46,31 @@ export default function ProfileScreen() {
           <IconButton icon={Settings} label="Settings" onPress={() => router.navigate('/settings')} />
         </View>
       </View>
-      <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: space.sm, paddingBottom: insets.bottom + space.xxl }}>
+      <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: space.md, paddingBottom: insets.bottom + space.xxl }}>
         <View style={styles.column}>
+          <Animated.View entering={enter(0, 'fade')}>
+            <LearningProgressCard progress={progress} onPress={() => router.push('/report')} />
+          </Animated.View>
 
-          <LearningSnapshot snapshot={summary.snapshot} />
-          {summary.observation ? <ObservationCard observation={summary.observation} /> : null}
-          <NextStepCard next={profile.next}>
-            <GoalControl goal={goal} />
-          </NextStepCard>
-
-          {summary.areas.length ? (
-            <View style={{ gap: space.xs }}>
-              <SectionLabel>What you’re exploring</SectionLabel>
-              <Card padded={false} style={{ overflow: 'hidden' }}>
-                {summary.areas.map((row, i) => (
-                  <SkillAreaRow key={row.id} row={row} last={i === summary.areas.length - 1} onPress={() => router.push({ pathname: '/report/[skill]', params: { skill: row.id } })} />
-                ))}
-              </Card>
-              <AppText variant="caption" color={colors.textMuted}>
-                Counts the first answer to each question you could work out from the information given.
-              </AppText>
-            </View>
+          {growth ? (
+            <Animated.View entering={enter(60, 'fade')}>
+              <GrowthCard growth={growth} onPress={() => openArea(growth.skill)} />
+            </Animated.View>
           ) : null}
 
+          <Animated.View entering={enter(120, 'fade')}>
+            <RecommendationCard rec={recommendation}>
+              <GoalControl goal={goal} />
+            </RecommendationCard>
+          </Animated.View>
+
+          <View>
+            <SectionLabel>Areas you’re exploring</SectionLabel>
+            <AreaList areas={areas} />
+          </View>
+
           {summary.hasActivity ? (
-            <Button label="View detailed report" variant="secondary" icon={ChartNoAxesColumn} iconPosition="left" onPress={() => router.push('/report')} />
+            <LinkRow icon={ChartNoAxesColumn} title="Detailed report" subtitle="Accuracy, confidence, progress over time and every answer" onPress={() => router.push('/report')} />
           ) : null}
 
           {/* Games: a separate, competitive record — never mixed into the learning measures above */}

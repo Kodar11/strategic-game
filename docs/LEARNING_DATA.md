@@ -10,6 +10,7 @@ The app keeps a small **learning record**: one entry per submitted answer, from 
 | `src/features/learning/profile.ts` | Every profile rule: skills, insights, confidence, first tries, practice, transfer, next step. |
 | `src/features/learning/evidence-policy.ts` | Every profile threshold, and the evidence levels (`none` / `activity` / `tentative` / `established`). |
 | `src/features/learning/summary.ts` | What the profile screens show, chosen from the profile: snapshot, one observation, explored areas, which report sections appear, one area in detail. |
+| `src/features/learning/journey.ts` | The learning journey the overview and report show: lesson and module progress, the four area cards, change within an area, one growth snapshot, one recommendation (with a game once everything is done), accuracy, confidence bands, progress over time and the answer history. Tested in `__tests__/journey.test.ts`. |
 | `src/features/challenges/content.ts` | Types and accessors for the 15 practice challenges and the per-lesson concept reviews. The challenges themselves are content in Supabase (`content_challenges`, `content_challenge_options`, `content_concept_reviews`). |
 | `src/features/challenges/progress.ts` | Challenge drafts, the atomic submit, retry, resume and summary rules. |
 | `src/features/learning/shareFile.ts` / `.web.ts` | Writing and sharing the export file (native share sheet / browser download). |
@@ -79,23 +80,33 @@ There are three challenges per lesson, 15 in all. Each has a short scenario, one
 
 ## Profile screens
 
-The profile has three layers:
+The profile has three layers. Activity (lessons, challenges answered) and agreement with the model (calculable first attempts) are always shown separately: finishing a lesson is never presented as evidence of skill.
 
-1. **The glance** (`app/(tabs)/profile.tsx`) has three parts:
-   - a learning snapshot: the learner's curriculum position, the areas explored and lessons completed, plus "N of M first attempts matched" once there are 4 or more;
-   - at most one observation;
-   - one next step, with the optional goal as an inline control.
-2. **What you're exploring** lists only the areas with activity. Each row shows a raw count and its evidence level in words, and opens `app/report/[skill].tsx`. That screen lists the first attempts behind the area, the retries (which are not counted), and the lessons that practise it.
-3. **View detailed report** (`app/report.tsx`) has these sections:
-   - learning activity;
-   - first attempts;
-   - learning after feedback;
-   - applying ideas to new situations;
-   - confidence and outcomes;
-   - over time;
-   - areas and their lessons.
+1. **The overview** (`app/(tabs)/profile.tsx`), in this order:
+   - **Learning progress**: lessons completed out of the total, one bar, one sentence from the real completion state (getting started, which module, nearly through, library complete), and finished modules as a quiet milestone. Opens the detailed report.
+   - **At most one growth snapshot** (`growthSnapshot`), in this priority: a supported improvement within an area; the existing observation (`pickObservation`: encouraging first, avoiding the next step's area); otherwise "you've started exploring …" (activity only). Its evidence is always visible, and tentative evidence is labelled "Early observation". Opens that area.
+   - **One recommendation** (`recommendation`): the existing next step (goal → weakest area → lesson in progress / next lesson → untried challenges). Challenges say how many ("Try 3 challenges"). When the next step would only be a replay — every lesson and challenge done — a game that exercises the least-practised area is suggested instead (`GAME_FOR_AREA`). The optional goal stays as an inline control.
+   - **Areas you're exploring**: all four areas, each with lessons completed (bar), one line about first attempts ("14 of 24 first attempts matched", "Early evidence" when tentative) and a chevron. Opens `app/report/[skill].tsx`.
+   - A link to the detailed report, then the game record (separate, never feeding a learning measure).
+2. **One area** (`app/report/[skill].tsx`): lessons completed and first attempts side by side, change within the area when there is enough evidence, the next thing to do in the area (`areaNext`), the five most recent first attempts, a link to all of them, and every lesson that practises the area.
+3. **The detailed report** (`app/report.tsx`):
+   - **Learning activity**: lessons (with a per-module breakdown), lessons in progress, challenges answered, predictions including replays, daily challenges counted.
+   - **Prediction accuracy**: comparable first attempts matched, a percentage only from 10, matched / partly / different, how many were excluded as unknowable and how many retries weren't counted, and a note that this is agreement with the model, not ability. "Learning after feedback" and "Ideas in new situations" expand inside it when they have enough evidence.
+   - **Progress over time**: a chart of match rate per block of first attempts, or one quiet line saying how many more answers it needs. The 4-week comparison expands below it.
+   - **Confidence and outcomes**: three confidence bands, each shown only with 3 or more answers, one sentence comparing the surest and least sure bands, and an explanation of correct vs confident vs calibrated.
+   - **Strategic areas**, then **Every answer** (`app/report/history.tsx`): each first attempt, newest first, filterable, expanding to the answer, confidence, what happened, any retries (listed, never counted) and a link to the lesson or challenges. `?skill=` limits it to one area.
 
-   A section appears only when its threshold below is met. It is left out, not shown empty. The existing insights appear inside the section they are about.
+**Journey thresholds** (`EVIDENCE` in evidence-policy.ts):
+
+| Measure | Shown only when… | Otherwise |
+|---|---|---|
+| Percentage next to "N of M" | 10 or more comparable first attempts | The count alone |
+| Progress-over-time chart | 15 or more comparable first attempts, in blocks of at least 5, at most 6 points | "Your progress over time will appear as you complete more practice — N more answers…" |
+| Chart direction | First and last block differ by 20 points or more | "held fairly steady" |
+| Change within an area | 4 or more first attempts in each half, and a gap of 25 points or more | "similar rates" (or nothing below 8 answers) |
+| Confidence comparison | 4 rated first attempts, 3 or more in both the surest and least sure band, and a gap of 20 points | A neutral sentence; never "lower your confidence" |
+
+The chart groups answers in the order they were given (by their real `lockedAt`) rather than by calendar week, so each point rests on the same number of answers even when many are given in one sitting. A remainder smaller than a block joins the last block instead of being drawn alone.
 
 **Evidence levels for a skill area:**
 

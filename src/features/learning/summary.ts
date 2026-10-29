@@ -186,6 +186,9 @@ export interface AreaDetail {
 
 const RESULT: Record<Evaluation, AttemptResult> = { correct: 'matched', partial: 'partly', 'reasonable-miss': 'reasonable', reasonable: 'reasonable', misconception: 'different' };
 
+/** How one answer compares with the model; answers about unknowable outcomes are never compared. */
+export const resultOf = (a: Pick<LearningAttempt, 'basis' | 'evaluation'>): AttemptResult => (a.basis === 'calculable' ? RESULT[a.evaluation] : 'not-compared');
+
 export function areaDetail(profile: Profile, skill: SkillArea, input: { attempts: readonly LearningAttempt[]; completed: readonly LessonId[] }): AreaDetail | null {
   const s = profile.skills.find((x) => x.id === skill);
   if (!s) return null;
@@ -196,7 +199,7 @@ export function areaDetail(profile: Profile, skill: SkillArea, input: { attempts
       question: itemMeta(a.prediction)?.question ?? 'Daily challenge',
       lesson: a.lesson,
       daily: a.prediction.startsWith('daily/'),
-      result: a.basis === 'calculable' ? RESULT[a.evaluation] : ('not-compared' as const),
+      result: resultOf(a),
       lockedAt: a.lockedAt,
     }))
     .reverse();

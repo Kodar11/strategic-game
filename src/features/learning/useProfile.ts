@@ -5,6 +5,7 @@ import { useDaily } from '@/src/data/daily-session';
 import { dailyEvidence } from '@/src/features/daily/evidence';
 import { useProgress } from '@/src/store/progress';
 import { buildProfile } from './profile';
+import { accuracy, areaCards, calibration, growthSnapshot, learningProgress, progressSeries, recommendation } from './journey';
 import { summariseProfile } from './summary';
 
 /**
@@ -31,5 +32,27 @@ export function useProfile() {
   const profile = useMemo(() => buildProfile({ attempts: learning, completed, inProgress, goal, daily }), [learning, completed, inProgress, goal, daily]);
   const summary = useMemo(() => summariseProfile(profile, completed), [profile, completed]);
 
-  return { hydrated, profile, summary, attempts: learning, completed, goal };
+  return { hydrated, profile, summary, attempts: learning, completed, inProgress, goal };
+}
+
+/**
+ * The profile plus everything the overview and detailed report show from it (journey.ts), computed once per change
+ * of the record or lesson progress rather than in each component.
+ */
+export function useJourney() {
+  const base = useProfile();
+  const { profile, summary, attempts, completed, inProgress } = base;
+  const journey = useMemo(
+    () => ({
+      progress: learningProgress(completed, inProgress),
+      areas: areaCards(profile, completed),
+      growth: growthSnapshot(profile, summary.nextArea),
+      recommendation: recommendation(profile, attempts),
+      accuracy: accuracy(profile, attempts),
+      calibration: calibration(profile),
+      series: progressSeries(profile),
+    }),
+    [profile, summary, attempts, completed, inProgress],
+  );
+  return { ...base, journey };
 }

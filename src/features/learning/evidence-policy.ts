@@ -27,6 +27,25 @@ export const EVIDENCE = {
   transfer: 2,
   /** Progress over time: two windows of this length, each needing this many answers before they are compared. */
   trend: { windowDays: 28, perPeriod: 5 },
+  /**
+   * A percentage next to "N of M". Below 10, one answer moves it by more than 10 points, so the count alone is
+   * clearer and less likely to be read as a score.
+   */
+  percent: 10,
+  /**
+   * The progress-over-time chart: calculable first attempts in time order, grouped into blocks of at least
+   * `perPoint` answers. It needs `minPoints` blocks (15 answers) — fewer is a pair of numbers, not a trend — and
+   * never draws more than `maxPoints`, so blocks grow as history grows. First and last block are only called
+   * different when their match rates differ by `minChange` or more.
+   */
+  series: { perPoint: 5, minPoints: 3, maxPoints: 6, minChange: 0.2 },
+  /**
+   * Change within one area: its earlier and later halves of calculable first attempts, each with at least
+   * `perHalf` answers. Only a gap of `minChange` or more is described as a change.
+   */
+  areaTrend: { perHalf: 4, minChange: 0.25 },
+  /** Confidence bands are only contrasted when their match rates differ by this much. */
+  calibrationGap: 0.2,
 } as const;
 
 export type EvidenceLevel = 'none' | 'activity' | 'tentative' | 'established';

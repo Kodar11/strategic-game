@@ -1,73 +1,114 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
-import { ChevronRight, CircleCheck, CircleDashed, CircleX, type LucideIcon, Minus } from '@/src/components/ui/icons';
+import { ChevronRight, CircleCheck, ListOrdered } from '@/src/components/ui/icons';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
-import { getLesson } from '@/src/content/lessons';
 import type { EvidenceLevel } from '@/src/features/learning/evidence-policy';
+import { answerHistory, areaNext, areaTrend } from '@/src/features/learning/journey';
 import { allSkills, type SkillArea } from '@/src/features/learning/records';
-import { type AttemptResult, areaDetail } from '@/src/features/learning/summary';
+import { areaDetail } from '@/src/features/learning/summary';
+import { LinkRow, ProgressBar, RESULT, RecommendationCard } from '@/src/features/learning/ui/JourneyParts';
 import { EvidenceCaption, ScreenHeader, openLesson } from '@/src/features/learning/ui/ProfileParts';
-import { useProfile } from '@/src/features/learning/useProfile';
+import { useJourney } from '@/src/features/learning/useProfile';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
-/** Shown first; older first attempts are summarised in one line. */
-const MAX_LISTED = 12;
+/** Recent first attempts shown here; the rest are one tap away in the answer history. */
+const RECENT = 5;
 
 const LEVEL_NOTE: Record<EvidenceLevel, string> = {
   none: 'No answers in this area yet. The lessons below practise it.',
-  activity: 'Not enough first attempts to describe a pattern yet.',
+  activity: 'Too few first attempts to describe a pattern yet.',
   tentative: 'Early evidence — a few more first attempts will show whether this pattern holds.',
   established: 'Enough first attempts to describe how they’ve gone. Still a record of answers, not a measure of ability.',
 };
 
-/** Words carry the result; the icon only repeats it. */
-const RESULT: Record<AttemptResult, { label: string; icon: LucideIcon; color: string }> = {
-  matched: { label: 'Matched the model', icon: CircleCheck, color: colors.success },
-  partly: { label: 'Partly matched', icon: Minus, color: colors.textBody },
-  reasonable: { label: 'A reasonable answer', icon: Minus, color: colors.textBody },
-  different: { label: 'Different from the model', icon: CircleX, color: colors.textMuted },
-  'not-compared': { label: 'Depended on the unknowable — not compared', icon: CircleDashed, color: colors.textMuted },
-};
-
-/** One skill area in detail: its measure, the first attempts behind it and the lessons that practise it. */
+/**
+ * One area in detail: lessons completed (activity) and first attempts matched (evidence) side by side, any change
+ * over time, the next thing to do in this area, the most recent answers, and every lesson that practises it.
+ */
 export default function AreaReportScreen() {
   const insets = useSafeAreaInsets();
   const { skill } = useLocalSearchParams<{ skill: string }>();
-  const { hydrated, profile, attempts, completed } = useProfile();
-  if (!hydrated) return <MessageScreen loading />;
-
+  const { hydrated, profile, attempts, completed, inProgress, journey } = useJourney();
   const known = allSkills().some((s) => s.id === skill);
-  const detail = known ? areaDetail(profile, skill as SkillArea, { attempts, completed }) : null;
-  if (!detail) return <MessageScreen title="Area not found" body="This skill area doesn’t exist." />;
+  const area = skill as SkillArea;
+  const extra = useMemo(
+    () =>
+      known
+        ? {
+            detail: areaDetail(profile, area, { attempts, completed }),
+            trend: areaTrend(profile, area),
+            next: areaNext(area, { attempts, completed, inProgress }),
+            recent: answerHistory(profile, attempts, area).slice(0, RECENT),
+          }
+        : null,
+    [known, profile, area, attempts, completed, inProgress],
+  );
 
-  const { skill: s, row, modules } = detail;
-  const listed = detail.attempts.slice(0, MAX_LISTED);
-  const older = detail.attempts.length - listed.length;
+  if (!hydrated) return <MessageScreen loading />;
+  const card = journey.areas.find((a) => a.id === skill);
+  if (!extra?.detail || !card) return <MessageScreen title="Area not found" body="This skill area doesn’t exist." />;
+  const { detail, trend, next, recent } = extra;
+  const total = detail.attempts.length;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Backdrop />
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: insets.top + space.md, paddingBottom: insets.bottom + space.huge }}>
         <View style={styles.column}>
-          <ScreenHeader title={s.label} subtitle={s.description} />
+          <ScreenHeader title={card.label} subtitle={card.description} />
 
-          <Card style={{ gap: space.xs }}>
-            <AppText variant="heading" tabular>
-              {row?.measure ?? 'Not explored yet'}
-            </AppText>
-            <EvidenceCaption text={LEVEL_NOTE[row?.level ?? 'none']} />
+          <Card style={{ gap: space.lg }}>
+            <View style={{ gap: space.sm }} accessible accessibilityLabel={`${card.lessons.done} of ${card.lessons.total} lessons in this area completed.`}>
+              <View style={styles.row}>
+                <AppText variant="small" color={colors.textMuted} style={{ flex: 1 }}>
+                  Lessons completed
+                </AppText>
+                <AppText variant="small" weight="semibold" tabular>
+                  {card.lessons.done} of {card.lessons.total}
+                </AppText>
+              </View>
+              <ProgressBar value={card.lessons.total ? card.lessons.done / card.lessons.total : 0} />
+            </View>
+            <View style={{ gap: space.xs }}>
+              <View style={styles.row}>
+                <AppText variant="small" color={colors.textMuted} style={{ flex: 1 }}>
+                  First attempts
+                </AppText>
+                <AppText variant="small" weight="semibold" tabular>
+                  {card.judged ? `${card.matched} of ${card.judged} matched` : '—'}
+                </AppText>
+              </View>
+              <EvidenceCaption text={LEVEL_NOTE[card.level]} />
+            </View>
+            {trend.ready ? (
+              <View style={styles.trend} accessible accessibilityLabel={`Earlier first attempts: ${trend.earlier.matched} of ${trend.earlier.judged}. Recent: ${trend.later.matched} of ${trend.later.judged}.`}>
+                <AppText variant="small" color={colors.textBody}>
+                  {trend.direction === 'higher'
+                    ? 'Your recent first attempts here matched more often than your earlier ones.'
+                    : trend.direction === 'lower'
+                      ? 'Your recent first attempts here matched less often than your earlier ones — later questions may be harder.'
+                      : 'Your earlier and recent first attempts here have matched at similar rates.'}
+                </AppText>
+                <AppText variant="caption" color={colors.textMuted} tabular>
+                  Earlier {trend.earlier.matched} of {trend.earlier.judged} · Recent {trend.later.matched} of {trend.later.judged} · different questions, so a rough signal
+                </AppText>
+              </View>
+            ) : null}
           </Card>
 
-          {listed.length ? (
-            <View style={{ gap: space.xs }}>
-              <SectionLabel>Your first attempts</SectionLabel>
+          {next ? <RecommendationCard rec={next} kicker="Next in this area" /> : null}
+
+          {recent.length ? (
+            <View>
+              <SectionLabel>Recent first attempts</SectionLabel>
               <Card style={{ gap: space.md }}>
-                {listed.map((a) => {
+                {recent.map((a) => {
                   const r = RESULT[a.result];
                   return (
                     <View key={a.id} style={styles.attempt} accessible accessibilityLabel={`${a.question}. ${r.label}.`}>
@@ -77,24 +118,28 @@ export default function AreaReportScreen() {
                           {a.question}
                         </AppText>
                         <AppText variant="caption" color={colors.textMuted}>
-                          {r.label} · {a.daily ? 'Daily challenge' : (getLesson(a.lesson)?.title ?? '')}
+                          {r.label}
                         </AppText>
                       </View>
                     </View>
                   );
                 })}
-                {older ? <EvidenceCaption text={`And ${older} earlier.`} /> : null}
               </Card>
-              {detail.retries ? (
-                <EvidenceCaption text={`You also retried questions here ${detail.retries === 1 ? 'once' : `${detail.retries} times`}. Retries show up under “Learning after feedback” and never change these results.`} />
-              ) : null}
+              <View style={{ marginTop: space.sm }}>
+                <LinkRow
+                  icon={ListOrdered}
+                  title={total > RECENT ? `All ${total} answers in this area` : 'Answers in detail'}
+                  subtitle={detail.retries ? `Including what changed on ${detail.retries === 1 ? 'your retry' : `your ${detail.retries} retries`}` : 'Your answer, confidence and what happened'}
+                  onPress={() => router.push({ pathname: '/report/history', params: { skill: area } })}
+                />
+              </View>
             </View>
           ) : null}
 
-          <View style={{ gap: space.xs }}>
+          <View>
             <SectionLabel>Lessons that practise this area</SectionLabel>
             <Card padded={false} style={{ overflow: 'hidden' }}>
-              {modules.map((m) => (
+              {detail.modules.map((m) => (
                 <View key={m.id}>
                   <AppText variant="caption" color={colors.textMuted} style={styles.module}>
                     Module {m.number} · {m.title}
@@ -112,14 +157,7 @@ export default function AreaReportScreen() {
                       <AppText variant="small" color={colors.text} style={{ flex: 1 }}>
                         {l.title}
                       </AppText>
-                      {l.completed ? (
-                        <View style={styles.done}>
-                          <CircleCheck size={14} color={colors.success} />
-                          <AppText variant="caption" color={colors.success}>
-                            Done
-                          </AppText>
-                        </View>
-                      ) : null}
+                      {l.completed ? <CircleCheck size={16} color={colors.success} accessibilityLabel="Completed" /> : null}
                       <ChevronRight size={16} color={colors.textMuted} />
                     </Pressable>
                   ))}
@@ -135,9 +173,10 @@ export default function AreaReportScreen() {
 
 const styles = StyleSheet.create({
   column: { maxWidth: MAX_CONTENT_WIDTH, width: '100%', alignSelf: 'center', gap: space.lg },
+  row: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
+  trend: { gap: space.xs, paddingTop: space.md, borderTopWidth: 1, borderTopColor: colors.border },
   attempt: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
   module: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.xs },
   lesson: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 48, paddingHorizontal: space.lg },
   lessonNumber: { width: 20 },
-  done: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 });
