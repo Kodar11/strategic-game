@@ -1,7 +1,9 @@
 # Strategy Arena
 
-Five deeper strategy games against bot opponents at Easy, Normal and Hard. Four games share the Investor, the Banker,
-the Deal Maker and the Opportunist; the Cooperation Game has its own four (below). They sit under the existing five games on the Games tab.
+Eighteen strategy games against bot opponents at Easy, Normal and Hard (the first five are described first; the
+other thirteen in "The full library" below). Four of the first five share the Investor, the Banker, the Deal Maker
+and the Opportunist; the Cooperation Game and every later game have their own four. They sit under the five classic
+games on the Games tab.
 
 The Arena is deliberately separate from `src/games/` (see [GAMES.md](GAMES.md)): those games have exact SQL ports, a
 fixed `GameId` set in Supabase and power the Game of the Week. Arena games run entirely on the device, make no
@@ -79,3 +81,50 @@ screen discards the match.
 Tuning numbers live in `COOP_TUNING`, separate from the four policy functions. Everything the screens say about a
 match — briefings, the opponent-history notes, statistics, insights, lessons — comes from `cooperation-analysis.ts` and
 states its evidence; pattern claims need at least two or three observations.
+
+## The full library: thirteen more games
+
+The Arena now holds eighteen games. The thirteen added after the first five follow the same reducer contract, run only
+on the device, and each has its own four opponents (catalog copy: `src/arena/catalog-library.ts`; boards:
+`src/features/arena/ui/library/`; tests: `src/arena/__tests__/library.test.ts`).
+
+| Game | Engine | Core loop | Opponents | Difficulty changes |
+|---|---|---|---|---|
+| The Mole | `mole.ts` | 4 suspects, one Mole; camera pairs (75 % include it), private interrogations (nervous 75/25 %), everyone accuses; you accuse at the end | the Mole's cover style: Investigator, Social Reader, Deceiver, Opportunist | how well the Mole blends in |
+| The Commons | `commons.ts` | 4 boats request 0–10 fish; proportional rationing; logistic regrowth; collapse below 10; leftover fish shared as a dividend | Conservator, Free Rider, Conditional Contributor, Resource Maximizer | pool awareness, endgame grabbing, lookahead |
+| The Coalition | `coalition.ts` | seats 34/28/22/16 dealt at random; rotating proposer splits 12 points among a ≥51-seat coalition; unanimity among members | Loyal Ally, Power Broker, Opportunistic Switcher, Fair Negotiator | thresholds, use of the public record |
+| The Inspector | `inspector.ts` | alternating roles; comply/cut corners vs inspect/trust; one-round equilibrium 2/7 cheating, 1/3 inspecting | Strict Inspector, Calculated Inspector, Rule Follower, Risk Taker (a policy for each role) | history use, recency, mixing at equilibrium |
+| The Traveler's Dilemma | `travelers.ts` | claims 2–20; lower claim paid, ±2 bonus/penalty (±5 in Big bonus); win needs 60 % of the maximum | Game-Theory Purist, Cooperative Traveler, Aggressive Undercutter, Adaptive Reasoner | reciprocity, prediction, best reply weighting |
+| The Saboteur | `saboteur.ts` | leader benches one bot; secret energy cards (0–3) or a −1 jam; only totals revealed; final accusation | the saboteur's method: Mission Planner, Investigator, Opportunistic, Deceptive | when and how often it jams |
+| Bluff | `bluff.ts` | draw tokens (Gold 3 / Silver 1 / Stone 0), press for more at a 15 % Crack risk, claim; believe or call | Cautious Bluffer, Confident Risk Taker, Observant Challenger, Unpredictable Performer | exact odds, reading your bluff rate |
+| The Defusal | `defusal.ts` | cooperative: 2 live wires; complementary private clues; alternate share-and-cut; one live cut or a spent fuse fails | Methodical Analyst, Cautious Checker, Bold Solver, Information Sharer | the puzzle: 4 / 3 / 2 clues each |
+| The Power Play | `power-play.ts` | 12-card deck (Treasurer, Thief, Guard, Oracle); claim roles to act, challenge or block; 10 coins or the other side's last card | Honest Operator, Calculated Bluffer, Suspicious Challenger, Strategic Manipulator | card counting, claim history |
+| The Last Stand | `last-stand.ts` | cooperative: 6 districts on a ring; douse / firebreak / refill; fires at 2+ grow and spread; teammate announces first | Planner, Emergency Responder, Resource Guardian, Opportunistic Coordinator | the crisis: ignition rate |
+| Liar's Dice | `liars-dice.ts` | no wilds; raise quantity or face; call "Liar!"; loser loses a die | Probability Calculator, Aggressive Bidder, Conservative Challenger, Psychological Bluffer | counting its own cup (Easy forgets), reading your bid faces (Hard) |
+| The Codebreaker | `codebreaker.ts` | cooperative: 3×3 board, theme + number clues from a word–theme association model; roles alternate | Literal, Associative, Risk-Aware, Creative (as clue-giver and as guesser) | the board: traps and size |
+| The Gambit | `gambit.ts` | 5×6 board, 3 pieces each; Step (sure), Dash (50 %), Strike (55 %); first to bring 2 home | Safe Planner, Aggressive Gambler, Positional Strategist, Adaptive Tactician | lookahead (Hard weighs your best reply) |
+
+Cooperative games (Defusal, Last Stand, Codebreaker) report a shared result (`MatchResult.headline`), never a winner
+between you and the bot; their difficulty sets the problem, since a better teammate would make Hard easier.
+
+Balance was checked with throwaway simulations of fixed player policies over 100–300 seeds per opponent × level (for
+example: greedy fishing always collapses the lake; a careful defuser succeeds ~96 % on Easy and ~60 % on Hard; the
+Gambit personalities take risky moves ~15 % / ~40 % / ~55 % / ~85 % of the time). The durable checks are in the tests.
+
+## Hidden personalities and prediction (every Arena game)
+
+`persona=mystery` (the default on every setup screen) has the play screen pick the opponent from the match seed
+(`hiddenOpponent` in `src/arena/reads.ts`), so it never appears in the URL and a rematch draws again. Names, badges,
+seat names and the opponent card stay neutral until the reveal; in the Auction House and Market Rivals every bot seat
+is masked, since the other seats would otherwise give the rival away by elimination.
+
+- **When:** after `READ_RULES[game].after(total)` rounds — enough decisions to tell the personalities apart (two to four
+  rounds, more in long matches; a short match may only allow a guess at the end). Documented per game in `READ_RULES`.
+- **How:** optional, from a compact panel under the board ("Think you've figured them out?"); changeable until the
+  match ends; the last guess counts. A match that ends without one offers a guess once before the reveal (skippable).
+- **Scoring:** right / wrong / unscored, kept locally (`reads` in `src/features/arena/records.ts`). No points, no effect
+  on the bot, the score or the outcome — the engines never receive the guess.
+- **Reveal:** the true personality, the guess, the verdict, and the engine's `debrief.opponentRead`, which cites this
+  match's recorded decisions.
+- **Trust model:** like every Arena game, this is client-side; a player who inspects their own app can see the hidden
+  state. Nothing here is competitive.

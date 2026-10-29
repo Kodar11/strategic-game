@@ -4,7 +4,51 @@ import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withTiming } from '
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
 import { AppText } from '@/src/components/ui/AppText';
-import { Handshake, Landmark, Lightbulb, type LucideIcon, Shield, Shuffle, TrendingUp, X, Zap } from '@/src/components/ui/icons';
+import {
+  BookOpen,
+  Brain,
+  Castle,
+  ClipboardCheck,
+  Compass,
+  Dices,
+  Drama,
+  Droplets,
+  Flame,
+  Footprints,
+  Ghost,
+  Hand,
+  HandHeart,
+  Handshake,
+  Landmark,
+  Lightbulb,
+  ListOrdered,
+  type LucideIcon,
+  Magnet,
+  MessageCircle,
+  Puzzle,
+  Radio,
+  Rocket,
+  Route,
+  Scale,
+  ScanEye,
+  Scissors,
+  Search,
+  Shield,
+  ShieldCheck,
+  ShieldHalf,
+  Shuffle,
+  Siren,
+  Snail,
+  TreePine,
+  TrendingUp,
+  Turtle,
+  Users,
+  VenetianMask,
+  WandSparkles,
+  X,
+  Zap,
+} from '@/src/components/ui/icons';
+import { LIBRARY_ART } from './library/art';
 import type { ArenaGameId } from '@/src/arena/core';
 import { useMotionReduced } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
@@ -16,10 +60,75 @@ export const ARENA_TINT: Record<ArenaGameId, { fg: string; bg: string; solid: st
   auction: { fg: colors.rivalText, bg: colors.rivalSoft, solid: colors.rival },
   market: { fg: colors.accent, bg: colors.accentSoft, solid: colors.accent },
   signal: { fg: colors.success, bg: colors.successSoft, solid: colors.success },
+  mole: { fg: colors.rivalText, bg: colors.rivalSoft, solid: colors.rival },
+  commons: { fg: colors.accent, bg: colors.accentSoft, solid: colors.accent },
+  coalition: { fg: colors.insight, bg: colors.insightSoft, solid: colors.insight },
+  inspector: { fg: colors.primaryText, bg: colors.primarySoft, solid: colors.primary },
+  travelers: { fg: colors.rivalText, bg: colors.rivalSoft, solid: colors.rival },
+  saboteur: { fg: colors.insight, bg: colors.insightSoft, solid: colors.insight },
+  bluff: { fg: colors.insight, bg: colors.insightSoft, solid: colors.insight },
+  defusal: { fg: colors.success, bg: colors.successSoft, solid: colors.success },
+  'power-play': { fg: colors.insight, bg: colors.insightSoft, solid: colors.insight },
+  'last-stand': { fg: colors.rivalText, bg: colors.rivalSoft, solid: colors.rival },
+  'liars-dice': { fg: colors.accent, bg: colors.accentSoft, solid: colors.accent },
+  codebreaker: { fg: colors.primaryText, bg: colors.primarySoft, solid: colors.primary },
+  gambit: { fg: colors.success, bg: colors.successSoft, solid: colors.success },
 };
 
 /** An icon per opponent id, across every arena game (the Cooperation Game has its own four). */
-export const PERSONA_ICON: Record<string, LucideIcon> = { investor: TrendingUp, banker: Landmark, dealmaker: Handshake, opportunist: Zap, collaborator: Handshake, retaliator: Shield, chameleon: Shuffle };
+export const PERSONA_ICON: Record<string, LucideIcon> = {
+  investor: TrendingUp,
+  banker: Landmark,
+  dealmaker: Handshake,
+  opportunist: Zap,
+  collaborator: Handshake,
+  retaliator: Shield,
+  chameleon: Shuffle,
+  investigator: Search,
+  'social-reader': Users,
+  deceiver: VenetianMask,
+  conservator: TreePine,
+  'free-rider': Footprints,
+  conditional: Scale,
+  maximizer: TrendingUp,
+  loyal: Handshake,
+  broker: Landmark,
+  switcher: Shuffle,
+  fair: Scale,
+  strict: ShieldCheck,
+  calculated: Brain,
+  'rule-follower': ClipboardCheck,
+  'risk-taker': Dices,
+  purist: Brain,
+  cooperative: HandHeart,
+  undercutter: Scissors,
+  adaptive: Compass,
+  planner: Route,
+  cautious: Turtle,
+  observant: ScanEye,
+  performer: Drama,
+  methodical: ListOrdered,
+  bold: Rocket,
+  sharer: MessageCircle,
+  honest: ShieldCheck,
+  bluffer: VenetianMask,
+  challenger: Hand,
+  manipulator: Magnet,
+  responder: Siren,
+  guardian: Droplets,
+  coordinator: Radio,
+  calculator: Brain,
+  aggressive: Flame,
+  conservative: Snail,
+  psychological: Ghost,
+  literal: BookOpen,
+  associative: Puzzle,
+  'risk-aware': ShieldHalf,
+  creative: WandSparkles,
+  safe: Turtle,
+  gambler: Dices,
+  positional: Castle,
+};
 
 /** A compact emblem per game, built from the brand palette. Decorative: hidden from screen readers. */
 export function ArenaArt({ game, size = 64 }: { game: ArenaGameId; size?: number }) {
@@ -30,7 +139,9 @@ export function ArenaArt({ game, size = 64 }: { game: ArenaGameId; size?: number
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants">
       <Svg width={size * 0.78} height={size * 0.78} viewBox="0 0 48 48">
-        {game === 'cooperation' ? (
+        {game in LIBRARY_ART ? (
+          LIBRARY_ART[game as keyof typeof LIBRARY_ART]
+        ) : game === 'cooperation' ? (
           <>
             <Line x1={13} y1={24} x2={35} y2={24} stroke={colors.insight} strokeWidth={3} strokeDasharray="5 3" />
             <Circle cx={12} cy={24} r={8} fill={colors.primary} />
@@ -218,4 +329,6 @@ export interface BoardProps<S, A> {
   act: (a: A) => void;
   over: boolean;
   rivalName: string;
+  /** Display names by seat, when the play screen masks personalities (a mystery match). */
+  nameOf?: (seat: number) => string;
 }

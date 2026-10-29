@@ -3,6 +3,7 @@ import { create } from 'zustand';
 
 import { ARENA } from '@/src/arena/catalog';
 import { ARENA_IDS, type ArenaGameId, LENGTHS, LEVELS, type Level, type MatchLength, type Outcome, isArenaId, isLength, isLevel } from '@/src/arena/core';
+import { MYSTERY, type ReadVerdict } from '@/src/arena/reads';
 
 /**
  * Strategy Arena records, kept on this device only: win/loss per game and per opponent, best score, the last few
@@ -43,10 +44,17 @@ export interface ArenaPrefs {
   variant: string;
 }
 
+/** Personality predictions per game: right and wrong (unscored matches aren't counted). */
+export interface ReadTally {
+  right: number;
+  wrong: number;
+}
+
 interface Stored {
   games: Partial<Record<ArenaGameId, GameRecord>>;
   coached: Partial<Record<ArenaGameId, true>>;
   prefs: Partial<Record<ArenaGameId, ArenaPrefs>>;
+  reads: Partial<Record<ArenaGameId, ReadTally>>;
 }
 
 interface ArenaRecordsState extends Stored {
@@ -56,6 +64,8 @@ interface ArenaRecordsState extends Stored {
   record: (game: ArenaGameId, m: Omit<RecentMatch, 'at'>) => boolean;
   markCoached: (game: ArenaGameId) => void;
   savePrefs: (game: ArenaGameId, prefs: ArenaPrefs) => void;
+  /** Records a scored personality prediction. Unscored (no guess) records nothing. */
+  recordRead: (game: ArenaGameId, verdict: ReadVerdict) => void;
 }
 
 const int = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? Math.round(x) : null);
@@ -69,7 +79,7 @@ const isOutcome = (x: unknown): x is Outcome => x === 'win' || x === 'loss' || x
 /** Rebuilds a stored blob from scratch, keeping only well-formed parts. */
 export function sanitize(raw: unknown): Stored {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  const out: Stored = { games: {}, coached: {}, prefs: {} };
+  const out: Stored = { games: {}, coached: {}, prefs: {}, reads: {} };
   const games = (o.games && typeof o.games === 'object' ? o.games : {}) as Record<string, unknown>;
   for (const id of ARENA_IDS) {
     const g = games[id];
@@ -93,17 +103,23 @@ export function sanitize(raw: unknown): Stored {
   const prefs = (o.prefs && typeof o.prefs === 'object' ? o.prefs : {}) as Record<string, unknown>;
   for (const id of ARENA_IDS) {
     const p = prefs[id] as Record<string, unknown> | undefined;
-    if (p && typeof p.persona === 'string' && ARENA[id].opponents.some((o) => o.id === p.persona) && isLevel(p.level) && isLength(p.length) && typeof p.variant === 'string') out.prefs[id] = { persona: p.persona, level: p.level, length: p.length, variant: p.variant };
+    if (p && typeof p.persona === 'string' && (p.persona === MYSTERY || ARENA[id].opponents.some((o) => o.id === p.persona)) && isLevel(p.level) && isLength(p.length) && typeof p.variant === 'string') out.prefs[id] = { persona: p.persona, level: p.level, length: p.length, variant: p.variant };
+  }
+  const reads = (o.reads && typeof o.reads === 'object' ? o.reads : {}) as Record<string, unknown>;
+  for (const id of ARENA_IDS) {
+    const r = reads[id] as Record<string, unknown> | undefined;
+    if (r && typeof r === 'object') out.reads[id] = { right: count(r.right), wrong: count(r.wrong) };
   }
   return out;
 }
 
-const persist = (s: Stored) => AsyncStorage.setItem(KEY, JSON.stringify({ games: s.games, coached: s.coached, prefs: s.prefs })).catch(() => undefined);
+const persist = (s: Stored) => AsyncStorage.setItem(KEY, JSON.stringify({ games: s.games, coached: s.coached, prefs: s.prefs, reads: s.reads })).catch(() => undefined);
 
 export const useArenaRecords = create<ArenaRecordsState>()((set, get) => ({
   games: {},
   coached: {},
   prefs: {},
+  reads: {},
   loaded: false,
   load: async () => {
     if (get().loaded) return;
@@ -138,6 +154,12 @@ export const useArenaRecords = create<ArenaRecordsState>()((set, get) => ({
   },
   savePrefs: (game, prefs) => {
     set({ prefs: { ...get().prefs, [game]: prefs } });
+    persist(get());
+  },
+  recordRead: (game, verdict) => {
+    if (verdict === 'unscored') return;
+    const t = get().reads[game] ?? { right: 0, wrong: 0 };
+    set({ reads: { ...get().reads, [game]: verdict === 'correct' ? { ...t, right: t.right + 1 } : { ...t, wrong: t.wrong + 1 } } });
     persist(get());
   },
 }));

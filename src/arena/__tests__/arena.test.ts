@@ -37,12 +37,18 @@ function anyMove(id: string, s: any, k: number): unknown {
       return p.signal === 'warn' ? 'pass' : 'invest';
     }
   }
+  // Library games list their legal actions.
+  const ms = ARENA_ENGINES[id as keyof typeof ARENA_ENGINES].moves?.(s);
+  if (ms?.length) return ms[k % ms.length];
   throw new Error(id);
 }
 
 function playOut(engine: AnyArenaEngine, s: any): any {
   let k = 0;
-  while (!engine.isOver(s)) s = engine.apply(s, anyMove(engine.id, s, k++));
+  while (!engine.isOver(s)) {
+    s = engine.apply(s, anyMove(engine.id, s, k++));
+    if (k > 500) throw new Error(`${engine.id}: did not finish`);
+  }
   return s;
 }
 
@@ -55,7 +61,8 @@ describe('every arena game', () => {
           for (const variant of engine.variants)
             for (const length of LENGTHS) {
               const s = playOut(engine, engine.create({ persona, level, variant, length, seed: 7 }));
-              assert.equal(engine.played(s), engine.rounds(length));
+              if (engine.endsEarly) assert.ok(engine.played(s) >= 1 && engine.played(s) <= engine.rounds(length), `${id}: played ${engine.played(s)} of ${engine.rounds(length)}`);
+              else assert.equal(engine.played(s), engine.rounds(length));
               const r = engine.result(s);
               assert.ok(['win', 'loss', 'draw'].includes(r.outcome));
               assert.equal(r.standings.find((x) => x.isPlayer)!.score, r.player);

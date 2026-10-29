@@ -8,12 +8,14 @@ import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
-import { ArrowLeft, ChevronDown, Lock, Play } from '@/src/components/ui/icons';
+import { ArrowLeft, ChevronDown, CircleHelp, Lock, Play } from '@/src/components/ui/icons';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { Segmented } from '@/src/components/ui/Segmented';
 import { ARENA, LENGTH_LABEL, LEVEL_HINT, LEVEL_LABEL, opponentName } from '@/src/arena/catalog';
 import { ARENA_IDS, LENGTHS, LEVELS, type Level, type MatchLength, isArenaId } from '@/src/arena/core';
 import { COOP_PAYOFFS, type CoopMove, coopPayoff } from '@/src/arena/cooperation';
+import { MYSTERY, READ_RULES } from '@/src/arena/reads';
+import { TEAM_GAMES } from '@/src/features/arena/ui/library';
 import { MiniMatrix } from '@/src/features/games/ui/common';
 import { played, useArenaRecords } from '@/src/features/arena/records';
 import { ARENA_TINT, ArenaArt, PERSONA_ICON } from '@/src/features/arena/ui/parts';
@@ -38,6 +40,7 @@ export default function ArenaGameScreen() {
   const record = useArenaRecords((s) => (isArenaId(gameId) ? s.games[gameId] : undefined));
   const prefs = useArenaRecords((s) => (isArenaId(gameId) ? s.prefs[gameId] : undefined));
   const coached = useArenaRecords((s) => (isArenaId(gameId) ? s.coached[gameId] : undefined));
+  const reads = useArenaRecords((s) => (isArenaId(gameId) ? s.reads[gameId] : undefined));
   const [chosen, setPersona] = useState<string | null>(null);
   const [level, setLevel] = useState<Level>('easy');
   const [length, setLength] = useState<MatchLength>('standard');
@@ -65,8 +68,10 @@ export default function ArenaGameScreen() {
   const tint = ARENA_TINT[gameId];
   const unlocked = played(record) > 0;
   const standard = g.variants.find((v) => !v.challenge)!.id;
-  // The chosen opponent if this game offers it, otherwise the game's first.
-  const persona = chosen && g.opponents.some((o) => o.id === chosen) ? chosen : g.opponents[0].id;
+  // A mystery opponent by default; a named one when the player picks it (and this game offers it).
+  const persona = chosen && chosen !== MYSTERY && g.opponents.some((o) => o.id === chosen) ? chosen : MYSTERY;
+  const team = TEAM_GAMES.has(gameId);
+  const who = team ? 'teammate' : gameId === 'auction' || gameId === 'market' ? 'main rival' : 'opponent';
   const mode = variant && g.variants.some((v) => v.id === variant && (!v.challenge || unlocked)) ? variant : standard;
   const showRules = rulesOpen ?? (loaded && !coached && !unlocked);
   const close = () => (router.canGoBack() ? router.back() : router.replace('/games'));
@@ -142,7 +147,19 @@ export default function ArenaGameScreen() {
           </Card>
 
           <View style={{ gap: space.sm }}>
-            <SectionLabel>{gameId === 'auction' || gameId === 'market' ? 'Your main rival' : 'Your opponent'}</SectionLabel>
+            <SectionLabel>{`Your ${who}`}</SectionLabel>
+            <ChoiceCard
+              compact
+              icon={CircleHelp}
+              title={`Mystery ${who}`}
+              description={`One of the four personalities, kept hidden. Watch ${READ_RULES[gameId].evidence}, then guess ${READ_RULES[gameId].target}’s personality.`}
+              selected={persona === MYSTERY}
+              onSelect={() => setPersona(MYSTERY)}
+              tone="orange"
+            />
+            <AppText variant="caption" color={colors.textMuted}>
+              Or practise against a known personality:
+            </AppText>
             {g.opponents.map((o) => {
               const t = record?.byPersona[o.id];
               return (
@@ -205,7 +222,7 @@ export default function ArenaGameScreen() {
             })}
           </View>
 
-          <Button label={`Play vs ${opponentName(gameId, persona)}`} icon={Play} onPress={play} />
+          <Button label={persona === MYSTERY ? `Play · mystery ${who}` : `Play ${team ? 'with' : 'vs'} ${opponentName(gameId, persona)}`} icon={Play} onPress={play} />
 
           {record && played(record) ? (
             <Card style={{ gap: space.xs }}>
@@ -213,6 +230,11 @@ export default function ArenaGameScreen() {
               <AppText variant="bodyStrong" tabular>
                 {record.w} won · {record.l} lost · {record.d} drawn{record.best !== null ? `  ·  best ${record.best} ${g.unit}` : ''}
               </AppText>
+              {reads && reads.right + reads.wrong ? (
+                <AppText variant="small" color={colors.insight}>
+                  Personality reads: {reads.right} right of {reads.right + reads.wrong}
+                </AppText>
+              ) : null}
               {record.recent.slice(0, 5).map((m, i) => (
                 <View key={i} style={styles.hist}>
                   <AppText variant="small" weight="semibold" color={m.outcome === 'win' ? colors.success : m.outcome === 'loss' ? colors.rivalText : colors.textBody} style={{ width: 44 }}>

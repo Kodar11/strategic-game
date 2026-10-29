@@ -94,7 +94,7 @@ export default function GamesScreen() {
               Strategy Arena
             </AppText>
             <AppText variant="small" color={colors.textMuted}>
-              Five deeper games against the Investor, the Banker, the Deal Maker and the Opportunist. Played on your device.
+              {ARENA_ORDER.length} deeper games, each with four hidden personalities to figure out. Played on your device.
             </AppText>
           </View>
           {ARENA_ORDER.map((id, i) => (

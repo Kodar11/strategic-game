@@ -175,3 +175,20 @@ verified in `app.json` and an `assetlinks.json` / `apple-app-site-association` o
   explicitly unverified and never ranked.
 - Remaining exposure: anonymous sign-up makes multiple identities cheap (more attempts per real person). Supabase's
   sign-up rate limits or CAPTCHA reduce this; linking accounts would remove it.
+
+## Reading the opponent in every practice game
+
+The Rock, Paper, Scissors read now applies to all five practice games (`src/games/reads.ts`; engines and SQL untouched,
+so rules versions are unchanged):
+
+- Practice starts with a mystery opponent in every game (`opponent=mystery`); "Choose a specific opponent" is
+  deliberate practice with no read.
+- One locked read per mystery match, open after `CLASSIC_READ[game].minRounds` (Split or Steal 4, Stag Hunt 3,
+  Ultimatum 4 — two offers each way — Two-Thirds 2, Rock, Paper, Scissors 4). If none was made, the reveal waits.
+- The options describe each personality at the match's difficulty and restate the engine's documented policy
+  (tests check the checkable ones against the engines). In Two-Thirds the read is about the crowd type (5 of the 8 bots).
+- A right read earns the same Insight Points as in Rock, Paper, Scissors; wrong costs nothing; match points never move.
+  Practice logs carry `opponent`, `prediction` and `insightPoints` for every game — the existing columns already
+  allowed any game's personalities, so no migration was needed.
+- The reveal (`ClassicReveal`) shows the personality and its rule, the read and verdict, evidence counted from the
+  recorded rounds, and one takeaway. Server-run matches (Game of the Week, challenges) always name their opponent.

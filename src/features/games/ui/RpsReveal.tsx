@@ -5,7 +5,7 @@ import { Button } from '@/src/components/ui/Button';
 import { CircleCheck, CircleX, Crosshair, Hand, HandFist, Lightbulb, type LucideIcon, Scissors, Target } from '@/src/components/ui/icons';
 import { DIFFICULTY_LABEL, personality } from '@/src/games/catalog';
 import { RPS_INSIGHT, type RpsBot, type RpsMove, type RpsRound } from '@/src/games/rps';
-import { matchReveal } from '@/src/games/rps-insight';
+import { type OpponentRead, matchReveal } from '@/src/games/rps-insight';
 import { colors, radius, space } from '@/src/theme/tokens';
 import type { MatchView } from '../useMatch';
 import { Panel } from './parts';
@@ -45,7 +45,14 @@ export function RpsRounds({ rounds }: { rounds: RpsRound[] }) {
  * read went and the Insight Points it earned, evidence from the recorded throws, and one takeaway.
  */
 export function RpsReveal({ view, onPractise }: { view: MatchView; onPractise?: (bot: RpsBot) => void }) {
-  const reveal = matchReveal({ bot: view.bot as RpsBot, difficulty: view.difficulty, mode: view.opponent, rounds: view.rounds as RpsRound[], read: view.read?.current ?? null });
+  const reveal = matchReveal({
+    bot: view.bot as RpsBot,
+    difficulty: view.difficulty,
+    mode: view.opponent,
+    rounds: view.rounds as RpsRound[],
+    // lockRead only accepts this game's bots, so a Rock, Paper, Scissors read names an RpsBot.
+    read: (view.read?.current ?? null) as OpponentRead | null,
+  });
   if (!reveal) return null;
   const guessName = reveal.read ? personality('rps', reveal.read.guess)?.name : null;
 

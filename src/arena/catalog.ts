@@ -1,9 +1,10 @@
 import { BUDGET_PER_LOT, auctionLots } from './auction.ts';
 import { COOP_PAYOFFS, coopRounds } from './cooperation.ts';
-import { type ArenaGameId, type Level, type MatchLength, PERSONAS, PERSONA_NAME, type Persona } from './core.ts';
+import { ARENA_IDS, type ArenaGameId, type Level, type MatchLength, PERSONAS, PERSONA_NAME, type Persona } from './core.ts';
 import { PRICE_MAX, PRICE_MIN, marketRounds } from './market.ts';
 import { FEE, GAIN, LOSS, STAKE, TEST_COST, signalRounds } from './signal.ts';
 import { ultRounds } from './ultimatum-game.ts';
+import { LIBRARY_INFO } from './catalog-library.ts';
 
 /**
  * What the player reads about each Strategy Arena game. Behaviour lives in the engines; every line here must stay
@@ -66,6 +67,7 @@ const C = COOP_PAYOFFS.classic;
 const H = COOP_PAYOFFS['high-stakes'];
 
 export const ARENA: Record<ArenaGameId, ArenaInfo> = {
+  ...LIBRARY_INFO,
   cooperation: {
     id: 'cooperation',
     title: 'The Cooperation Game',
@@ -223,4 +225,5 @@ export const ARENA: Record<ArenaGameId, ArenaInfo> = {
 export const opponentInfo = (game: ArenaGameId, id: string) => ARENA[game].opponents.find((o) => o.id === id);
 export const opponentName = (game: ArenaGameId, id: string) => opponentInfo(game, id)?.name ?? id;
 
-export const ARENA_ORDER: readonly ArenaGameId[] = ['cooperation', 'ultimatum-game', 'auction', 'market', 'signal'];
+/** Library order. */
+export const ARENA_ORDER: readonly ArenaGameId[] = ARENA_IDS;

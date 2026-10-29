@@ -5,8 +5,8 @@ import { GameError, type ServerMatch } from '@/src/data/games';
 import { toDataError } from '@/src/data/errors';
 import { type Difficulty, type GameId, type Outcome, type Totals, randomSeed } from '@/src/games/core';
 import { engineFor } from '@/src/games/registry';
-import { type OpponentMode, type OpponentRead, awaitingRead, insightFor, lockPrediction, pickOpponent, predictionOpen } from '@/src/games/rps-insight';
-import type { RpsBot } from '@/src/games/rps';
+import { type ReadLock, lockRead, pickHidden, readIsAwaited, readIsOpen, readMinRounds, readPoints } from '@/src/games/reads';
+import type { OpponentMode } from '@/src/games/rps-insight';
 
 /**
  * One match, whatever runs it. Practice: the engine on the device, with a fresh seed. Competition and challenge: the
@@ -33,13 +33,13 @@ export interface MatchView {
   error: string | null;
   play: (move: unknown) => void;
   server: ServerMatch | null;
-  /** 'mystery': the opponent stays hidden until the match ends (Rock, Paper, Scissors practice). */
+  /** 'mystery': the opponent stays hidden until the match ends (any practice match without a chosen opponent). */
   opponent: OpponentMode;
   /**
    * A mystery match's "Read your opponent": the locked prediction, whether one can be made now, and making it.
    * `awaiting`: every round is played but the reveal waits (`done` is still false) until the player reads or skips.
    */
-  read: { current: OpponentRead | null; open: boolean; awaiting: boolean; lock: (guess: RpsBot) => void; skip: () => void } | null;
+  read: { current: ReadLock | null; open: boolean; awaiting: boolean; lock: (guess: string) => void; skip: () => void } | null;
 }
 
 function uuid(): string {
@@ -51,22 +51,25 @@ function uuid(): string {
 }
 
 /**
- * A practice match on the device, with a fresh seed. Remount it (a new React key) to play again. In Rock, Paper,
- * Scissors a null `choice` is a mystery match: the opponent is picked here, at random, and kept hidden until the end.
+ * A practice match on the device, with a fresh seed. Remount it (a new React key) to play again. A null `choice` is a
+ * mystery match: the opponent is picked here, at random, and kept hidden until the end (rules in src/games/reads.ts).
  */
 export function usePracticeMatch(game: GameId, choice: string | null, difficulty: Difficulty): MatchView {
   const engine = engineFor(game);
   const [current, setState] = useState(() => {
-    const { bot, mode } = game === 'rps' ? pickOpponent(choice, Math.random()) : { bot: choice ?? engine.bots[0], mode: 'chosen' as const };
-    return { seed: randomSeed(), bot: bot as string, mode, rounds: [] as unknown[], read: null as OpponentRead | null, revealed: false };
+    const chosen = choice !== null && engine.bots.includes(choice);
+    const bot = chosen ? choice : pickHidden(engine.bots, Math.random());
+    const mode: OpponentMode = chosen ? 'chosen' : 'mystery';
+    return { seed: randomSeed(), bot, mode, rounds: [] as unknown[], read: null as ReadLock | null, revealed: false };
   });
   const recorded = useRef(false);
 
   const { bot, mode, read } = current;
   const spec = { bot, difficulty, seed: current.seed };
-  const readState = { mode, roundsPlayed: current.rounds.length, revealed: current.revealed, totalRounds: engine.rounds };
+  const minRounds = readMinRounds(game);
+  const readState = { mystery: mode === 'mystery', roundsPlayed: current.rounds.length, revealed: current.revealed, totalRounds: engine.rounds };
   // A mystery match without a read pauses after the last round, so the player can still make one before the reveal.
-  const awaiting = awaitingRead(read, readState);
+  const awaiting = readIsAwaited(read, readState, minRounds);
   const done = current.rounds.length >= engine.rounds && !awaiting;
   const totals = engine.totals(current.rounds);
   const outcome = done ? engine.outcome(current.rounds) : null;
@@ -74,7 +77,7 @@ export function usePracticeMatch(game: GameId, choice: string | null, difficulty
   useEffect(() => {
     if (!done || recorded.current) return;
     recorded.current = true;
-    const reads = game === 'rps' ? { opponent: mode, prediction: read?.guess ?? null, insightPoints: insightFor(read, bot as RpsBot)?.points ?? null } : {};
+    const reads = { opponent: mode, prediction: read?.guess ?? null, insightPoints: readPoints(read, bot)?.points ?? null };
     void useGames.getState().recordPractice({ id: uuid(), game, bot, difficulty, playerScore: totals.player, botScore: totals.bot, outcome: outcome!, ...reads });
   }, [done, game, bot, mode, read, difficulty, totals.player, totals.bot, outcome]);
 
@@ -88,7 +91,7 @@ export function usePracticeMatch(game: GameId, choice: string | null, difficulty
     });
   };
 
-  const lock = (guess: RpsBot) => setState((s) => ({ ...s, read: lockPrediction(s.read, guess, { mode: s.mode, roundsPlayed: s.rounds.length, revealed: s.revealed }) }));
+  const lock = (guess: string) => setState((s) => ({ ...s, read: lockRead(s.read, guess, { mystery: s.mode === 'mystery', roundsPlayed: s.rounds.length, revealed: s.revealed, totalRounds: engine.rounds }, minRounds, engine.bots) }));
   // Only at the end: skipping the read reveals the opponent.
   const skip = () => setState((s) => (s.rounds.length >= engine.rounds ? { ...s, revealed: true } : s));
 
@@ -108,7 +111,7 @@ export function usePracticeMatch(game: GameId, choice: string | null, difficulty
     play,
     server: null,
     opponent: mode,
-    read: mode === 'mystery' ? { current: read, open: predictionOpen(read, readState), awaiting, lock, skip } : null,
+    read: mode === 'mystery' ? { current: read, open: readIsOpen(read, readState, minRounds), awaiting, lock, skip } : null,
   };
 }
 

@@ -6,7 +6,7 @@ import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Crown, Gavel, Package } from '@/src/components/ui/icons';
 import { Slider } from '@/src/components/ui/Slider';
-import { type AuctionRound, type AuctionState, type Lot, auctionPrompt, posteriorMean, seatName } from '@/src/arena/auction';
+import { type AuctionRound, type AuctionState, type Lot, auctionPrompt, posteriorMean, seatName as auctionSeatName } from '@/src/arena/auction';
 import { haptic, useMotionReduced } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
 import { type BoardProps, Reveal, Row, Stat, signed } from './parts';
@@ -68,7 +68,8 @@ function BidPanel({ lot, estimate, cash, act }: { lot: Lot; estimate: number; ca
   );
 }
 
-function LotReveal({ s, r, n }: { s: AuctionState; r: AuctionRound; n: number }) {
+function LotReveal({ s, r, n, nameOf }: { s: AuctionState; r: AuctionRound; n: number; nameOf?: (seat: number) => string }) {
+  const seatName = (st: AuctionState, i: number) => nameOf?.(i) ?? auctionSeatName(st, i);
   const reduced = useMotionReduced();
   const order = r.bids.map((b, i) => ({ b, i })).sort((x, y) => y.b - x.b);
   const won = r.winner === 0;
@@ -107,14 +108,15 @@ function LotReveal({ s, r, n }: { s: AuctionState; r: AuctionRound; n: number })
   );
 }
 
-export function AuctionBoard({ state, act, over }: BoardProps<AuctionState, number>) {
+export function AuctionBoard({ state, act, over, nameOf }: BoardProps<AuctionState, number>) {
+  const seatName = (st: AuctionState, i: number) => nameOf?.(i) ?? auctionSeatName(st, i);
   const h = state.rounds;
   const last = h[h.length - 1];
   const p = auctionPrompt(state);
   const table = state.seats.map((_, i) => ({ i, profit: state.profit[i] })).sort((a, b) => b.profit - a.profit);
   return (
     <View style={{ gap: space.lg }}>
-      {last ? <LotReveal s={state} r={last} n={h.length} /> : null}
+      {last ? <LotReveal s={state} r={last} n={h.length} nameOf={nameOf} /> : null}
 
       {!over && p ? (
         <View style={{ gap: space.md, padding: space.lg, borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(249,115,22,0.35)', backgroundColor: colors.surface }}>

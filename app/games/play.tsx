@@ -22,12 +22,14 @@ import { ordinal } from '@/src/games/competition';
 import { OpponentBadges, Panel, ScoreBar } from '@/src/features/games/ui/parts';
 import { ResultPanel } from '@/src/features/games/ui/ResultPanel';
 import { RpsReveal, RpsRounds } from '@/src/features/games/ui/RpsReveal';
+import { ClassicReveal } from '@/src/features/games/ui/ClassicReveal';
+import { ReadOpponentPanel } from '@/src/features/games/ui/ReadOpponentPanel';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
 type Params = { game?: string; bot?: string; difficulty?: string; opponent?: string; mode?: string; competitionId?: string; token?: string; n?: string };
 
 /**
- * Playing a match. Practice (`game`, `bot`, `difficulty`) runs on the device; Rock, Paper, Scissors with
+ * Playing a match. Practice (`game`, `bot`, `difficulty`) runs on the device; any game with
  * `opponent=mystery` instead of a bot picks a hidden opponent on the device, so it never appears in the URL. `mode=competition` and
  * `mode=challenge` start — or resume — a match on the server, which decides the bot's moves and the score.
  */
@@ -35,7 +37,7 @@ export default function PlayScreen() {
   const p = useLocalSearchParams<Params>();
   if (p.mode === 'competition' && p.competitionId) return <ServerLoader key={`c:${p.competitionId}:${p.n ?? ""}`} start={() => gamesRepo.startCompetitionMatch(p.competitionId!)} />;
   if (p.mode === 'challenge' && p.token) return <ServerLoader key={`t:${p.token}`} start={() => gamesRepo.startChallengeMatch(p.token!)} />;
-  const mystery = p.game === 'rps' && p.opponent === 'mystery';
+  const mystery = p.opponent === 'mystery';
   if (!isGameId(p.game) || !isDifficulty(p.difficulty) || (!mystery && (!p.bot || !ENGINES[p.game].bots.includes(p.bot)))) {
     return <MessageScreen title="Game not found" body="That game, opponent or difficulty isn’t available." />;
   }
@@ -43,7 +45,7 @@ export default function PlayScreen() {
   return <Practice key={`${p.game}:${bot ?? 'mystery'}:${p.difficulty}`} game={p.game} bot={bot} difficulty={p.difficulty} />;
 }
 
-/** `bot` null: a mystery opponent (Rock, Paper, Scissors). */
+/** `bot` null: a mystery opponent. */
 function Practice({ game, bot, difficulty }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard' }) {
   const [round, setRound] = useState(0);
   return <PracticeSession key={round} game={game} bot={bot} difficulty={difficulty} onPlayAgain={() => setRound((n) => n + 1)} />;
@@ -61,7 +63,7 @@ function PracticeSession({ game, bot, difficulty, onPlayAgain }: { game: GameId;
           onPlayAgain={onPlayAgain}
           playAgainLabel={view.opponent === 'mystery' ? 'Play again · new mystery bot' : 'Play again'}
           detail={game === 'rps' ? <RpsRounds rounds={view.rounds as RpsRound[]} /> : undefined}
-          insight={game === 'rps' ? <RpsReveal view={view} onPractise={practise} /> : undefined}
+          insight={game === 'rps' ? <RpsReveal view={view} onPractise={practise} /> : <ClassicReveal view={view} onPractise={practise} />}
         />
       }
     />
@@ -218,6 +220,7 @@ function MatchLayout({ view, result }: { view: MatchView; result: React.ReactNod
             </AppText>
           ) : null}
           <Board view={view} />
+          {view.game !== 'rps' ? <ReadOpponentPanel view={view} /> : null}
           {view.done ? result : null}
         </View>
       </ScrollView>

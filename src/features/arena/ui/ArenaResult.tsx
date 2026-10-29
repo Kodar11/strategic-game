@@ -6,8 +6,9 @@ import { useEnter } from '@/src/components/lesson/motion';
 import { AppText } from '@/src/components/ui/AppText';
 import { Badge } from '@/src/components/ui/Card';
 import { Button } from '@/src/components/ui/Button';
-import { Eye, Gamepad2, Lightbulb, RotateCcw, Sparkles, Trophy } from '@/src/components/ui/icons';
-import { ARENA, LEVEL_LABEL, opponentName } from '@/src/arena/catalog';
+import { CircleCheck, CircleX, Crosshair, Eye, Gamepad2, Lightbulb, RotateCcw, Shuffle, Sparkles, Trophy } from '@/src/components/ui/icons';
+import { ARENA, LEVEL_LABEL, opponentInfo, opponentName } from '@/src/arena/catalog';
+import { READ_RULES, type ReadVerdict } from '@/src/arena/reads';
 import { type ArenaGameId, type Debrief, LEVELS, type Level, type MatchResult } from '@/src/arena/core';
 import { haptic } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
@@ -29,6 +30,7 @@ export function ArenaResult({
   onPlayAgain,
   onChange,
   onLibrary,
+  read,
 }: {
   game: ArenaGameId;
   result: MatchResult;
@@ -39,12 +41,15 @@ export function ArenaResult({
   onPlayAgain: () => void;
   onChange: (next: { persona?: string; level?: Level }) => void;
   onLibrary: () => void;
+  /** A mystery match's prediction: the guess (null if none) and its verdict. */
+  read?: { guess: string | null; verdict: ReadVerdict } | null;
 }) {
   const enter = useEnter();
   useEffect(() => haptic.success(), []);
   const g = ARENA[game];
   const win = result.outcome === 'win';
-  const hollow = result.outcome === 'draw' && result.note;
+  const hollow = result.outcome === 'draw' && result.note && !result.headline;
+  const team = result.standings.length === 1;
 
   return (
     <Animated.View entering={enter(0)} style={{ gap: space.lg }}>
@@ -57,10 +62,10 @@ export function ArenaResult({
           {newBest ? <Badge label="New best" tone="amber" /> : null}
         </Row>
         <AppText variant="title" accessibilityRole="header">
-          {hollow ? 'A hollow win' : HEADLINE[result.outcome]}
+          {result.headline ?? (hollow ? 'A hollow win' : HEADLINE[result.outcome])}
         </AppText>
         <AppText variant="bodyStrong" tabular>
-          You {result.player} {result.unit} · best rival {result.rival}
+          {team ? `Team score: ${result.player} ${result.unit}` : `You ${result.player} ${result.unit} · ${result.standings.length > 2 ? 'best rival' : 'opponent'} ${result.rival}`}
         </AppText>
         {result.note ? (
           <AppText variant="small" color={colors.insight}>
@@ -85,9 +90,11 @@ export function ArenaResult({
           </View>
         ) : null}
         <AppText variant="caption" color={colors.textMuted}>
-          vs {opponentName(game, persona)} · {LEVEL_LABEL[level]}
+          {team ? 'with' : 'vs'} {opponentName(game, persona)} · {LEVEL_LABEL[level]}
         </AppText>
       </View>
+
+      {read ? <PersonalityReveal game={game} persona={persona} read={read} evidence={debrief.opponentRead} /> : null}
 
       <View style={{ gap: space.sm, padding: space.lg, borderRadius: radius.lg, backgroundColor: colors.insightSoft, borderWidth: 1, borderColor: 'rgba(253,186,116,0.35)' }}>
         <Row>
@@ -114,20 +121,22 @@ export function ArenaResult({
         </Row>
       </View>
 
-      <View style={{ gap: space.xs, padding: space.lg, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
-        <Row>
-          <Eye size={16} color={colors.rivalText} />
-          <AppText variant="overline" color={colors.rivalText}>
-            Opponent revealed
+      {read ? null : (
+        <View style={{ gap: space.xs, padding: space.lg, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+          <Row>
+            <Eye size={16} color={colors.rivalText} />
+            <AppText variant="overline" color={colors.rivalText}>
+              {team ? 'Your teammate’s style' : 'Opponent revealed'}
+            </AppText>
+          </Row>
+          <AppText variant="small" color={colors.textBody}>
+            {debrief.opponentRead}
           </AppText>
-        </Row>
-        <AppText variant="small" color={colors.textBody}>
-          {debrief.opponentRead}
-        </AppText>
-      </View>
+        </View>
+      )}
 
       <View style={{ gap: space.md }}>
-        <Button label="Play again" icon={RotateCcw} iconPosition="left" onPress={onPlayAgain} />
+        <Button label={read ? 'Play again · new mystery opponent' : 'Play again'} icon={read ? Shuffle : RotateCcw} iconPosition="left" onPress={onPlayAgain} />
         <View style={{ gap: space.xs }}>
           <AppText variant="caption" color={colors.textMuted}>
             Try another opponent
@@ -174,5 +183,57 @@ export function ArenaResult({
         <Button label="Game library" variant="ghost" icon={Gamepad2} iconPosition="left" onPress={onLibrary} />
       </View>
     </Animated.View>
+  );
+}
+
+const VERDICT = {
+  correct: { title: 'You read them right', color: colors.success, bg: colors.successSoft, border: 'rgba(74,222,128,0.4)', icon: CircleCheck },
+  incorrect: { title: 'Not quite', color: colors.rivalText, bg: colors.rivalSoft, border: 'rgba(249,115,22,0.35)', icon: CircleX },
+  unscored: { title: 'Personality revealed', color: colors.textMuted, bg: colors.surface, border: colors.border, icon: Eye },
+} as const;
+
+/**
+ * The mystery opponent's reveal: who it really was, what the player guessed, the verdict, and the evidence from this
+ * match (the engine's debrief, computed from the recorded rounds).
+ */
+export function PersonalityReveal({ game, persona, read, evidence }: { game: ArenaGameId; persona: string; read: { guess: string | null; verdict: ReadVerdict }; evidence: string }) {
+  const v = VERDICT[read.verdict];
+  const Icon = v.icon;
+  const real = opponentInfo(game, persona);
+  const PIcon = PERSONA_ICON[persona] ?? Eye;
+  return (
+    <View style={{ gap: space.sm, padding: space.lg, borderRadius: radius.xl, borderWidth: 1, borderColor: v.border, backgroundColor: v.bg }} accessibilityLiveRegion="polite">
+      <Row>
+        <Icon size={18} color={v.color} strokeWidth={2.2} />
+        <AppText variant="overline" color={v.color} style={{ flex: 1 }}>
+          {v.title}
+        </AppText>
+      </Row>
+      <Row style={{ alignItems: 'center' }}>
+        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.rivalSoft, alignItems: 'center', justifyContent: 'center' }}>
+          <PIcon size={22} color={colors.rivalText} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <AppText variant="caption" color={colors.textMuted}>
+            {READ_RULES[game].target[0].toUpperCase() + READ_RULES[game].target.slice(1)} was
+          </AppText>
+          <AppText variant="heading">{real?.name ?? persona}</AppText>
+        </View>
+      </Row>
+      <AppText variant="small" color={colors.textBody}>
+        {read.guess === null ? 'You didn’t make a guess this time.' : read.verdict === 'correct' ? `You guessed ${opponentName(game, read.guess)} — correct.` : `You guessed ${opponentName(game, read.guess)}.`}
+      </AppText>
+      <View style={{ gap: 4, paddingTop: space.xs, borderTopWidth: 1, borderTopColor: colors.border }}>
+        <Row>
+          <Crosshair size={14} color={colors.insight} />
+          <AppText variant="overline" color={colors.insight}>
+            The evidence
+          </AppText>
+        </Row>
+        <AppText variant="small" color={colors.textBody}>
+          {evidence}
+        </AppText>
+      </View>
+    </View>
   );
 }

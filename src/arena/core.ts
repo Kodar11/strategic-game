@@ -20,7 +20,26 @@ import { type Outcome, draw } from '../games/core.ts';
  * random outcomes never depend on the difficulty.
  */
 
-export const ARENA_IDS = ['cooperation', 'ultimatum-game', 'auction', 'market', 'signal'] as const;
+export const ARENA_IDS = [
+  'cooperation',
+  'ultimatum-game',
+  'auction',
+  'market',
+  'signal',
+  'mole',
+  'commons',
+  'coalition',
+  'inspector',
+  'travelers',
+  'saboteur',
+  'bluff',
+  'defusal',
+  'power-play',
+  'last-stand',
+  'liars-dice',
+  'codebreaker',
+  'gambit',
+] as const;
 export type ArenaGameId = (typeof ARENA_IDS)[number];
 export const isArenaId = (x: unknown): x is ArenaGameId => typeof x === 'string' && (ARENA_IDS as readonly string[]).includes(x);
 
@@ -77,6 +96,11 @@ export interface MatchResult {
   /** Everyone, best first. */
   standings: Standing[];
   unit: string;
+  /**
+   * Cooperative games: the team's result in words ("Bomb defused", "The line held"), shown instead of
+   * "You won / You lost" — there is no opponent to beat, only a shared success or failure.
+   */
+  headline?: string;
 }
 
 /** The post-game analysis, generated from what actually happened in the match. */
@@ -105,6 +129,13 @@ export interface ArenaEngine<S extends { setup: Setup<V, any> }, A, V extends st
   played(state: S): number;
   result(state: S): MatchResult;
   debrief(state: S): Debrief;
+  /**
+   * The player's legal actions right now (a representative sample where a range is continuous). Used by tests to drive
+   * every engine; `validate` stays the authority on what is legal.
+   */
+  moves?(state: S): A[];
+  /** The match can end before `rounds(length)` (a collapse, an elimination, a defusal). */
+  endsEarly?: boolean;
 }
 
 // Erased engine type for the match hook and screens that handle any arena game.
@@ -119,6 +150,22 @@ export function drawInt(seed: number, round: number, k: number, lo: number, hi: 
 }
 
 export { draw };
+
+/** A seeded Fisher–Yates shuffle (a new array): the same seed, round and k always give the same order. */
+export function shuffled<T>(items: readonly T[], seed: number, round: number, k: number): T[] {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(draw(seed, round, k + i) * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Neutral display names for bot seats. Never tied to a personality, so a name can't give one away. */
+export const CODENAMES = ['Ash', 'Birch', 'Cedar', 'Dune', 'Elm'] as const;
+
+/** Clamp to [lo, hi]. */
+export const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
 
 /** Outcome by comparing the player with the best rival. */
 export function outcomeVs(player: number, rival: number): Outcome {

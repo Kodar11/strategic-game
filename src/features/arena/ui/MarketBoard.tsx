@@ -5,7 +5,7 @@ import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Gauge, Store, Tag, Users } from '@/src/components/ui/icons';
 import { Slider } from '@/src/components/ui/Slider';
-import { type Conditions, type MarketRound, type MarketState, PRICE_MAX, PRICE_MIN, marketOutcome, marketPar, marketPrompt, marketSeatName } from '@/src/arena/market';
+import { type Conditions, type MarketRound, type MarketState, PRICE_MAX, PRICE_MIN, marketOutcome, marketPar, marketPrompt, marketSeatName as seatNameOf } from '@/src/arena/market';
 import { haptic } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
 import { AnimatedBar, type BoardProps, Reveal, Row, Stat, signed } from './parts';
@@ -82,7 +82,8 @@ function PricePanel({ s, cond, last, act }: { s: MarketState; cond: Conditions; 
   );
 }
 
-function RoundReveal({ s, r, n }: { s: MarketState; r: MarketRound; n: number }) {
+function RoundReveal({ s, r, n, nameOf }: { s: MarketState; r: MarketRound; n: number; nameOf?: (seat: number) => string }) {
+  const marketSeatName = (st: MarketState, i: number) => nameOf?.(i) ?? seatNameOf(st, i);
   const sold = r.units.reduce((a, b) => a + b, 0);
   const best = r.profits.indexOf(Math.max(...r.profits));
   return (
@@ -107,7 +108,8 @@ function RoundReveal({ s, r, n }: { s: MarketState; r: MarketRound; n: number })
   );
 }
 
-export function MarketBoard({ state, act, over }: BoardProps<MarketState, number>) {
+export function MarketBoard({ state, act, over, nameOf }: BoardProps<MarketState, number>) {
+  const marketSeatName = (st: MarketState, i: number) => nameOf?.(i) ?? seatNameOf(st, i);
   const h = state.rounds;
   const last = h[h.length - 1];
   const p = marketPrompt(state);
@@ -115,7 +117,7 @@ export function MarketBoard({ state, act, over }: BoardProps<MarketState, number
   const max = Math.max(1, par, ...state.profit);
   return (
     <View style={{ gap: space.lg }}>
-      {last ? <RoundReveal s={state} r={last} n={h.length} /> : null}
+      {last ? <RoundReveal s={state} r={last} n={h.length} nameOf={nameOf} /> : null}
 
       {!over && p ? (
         <View style={{ gap: space.md, padding: space.lg, borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(34,211,238,0.3)', backgroundColor: colors.surface }}>

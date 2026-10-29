@@ -19,7 +19,9 @@ import { haptic, useMotionReduced } from '@/src/utils/feedback';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 import { useArenaRecords } from '../records';
 import { useArenaMatch } from '../useArenaMatch';
+import { useOpponentRead } from '../useOpponentRead';
 import { CoopResults } from './CoopResults';
+import { ReadPanel } from './ReadPanel';
 import { CoachTip, PERSONA_ICON, Row, signed } from './parts';
 
 export const MOVE_LABEL: Record<CoopMove, string> = { C: 'Cooperate', D: 'Defect' };
@@ -41,8 +43,11 @@ export function CooperationMatch({
   variant,
   seed,
   onPlayAgain,
+  mystery = false,
 }: {
   persona: CoopOpponent;
+  /** The personality is hidden until the end, with an optional prediction (src/arena/reads.ts). */
+  mystery?: boolean;
   level: Level;
   length: MatchLength;
   variant: CoopVariant;
@@ -58,8 +63,9 @@ export function CooperationMatch({
   const [rulesOpen, setRulesOpen] = useState(false);
   const scroll = useRef<ScrollView>(null);
   const g = ARENA.cooperation;
-  const name = COOP_NAME[persona];
   const h = state.rounds;
+  const read = useOpponentRead('cooperation', persona, mystery, h.length, state.total, cooperation.isOver(state));
+  const name = read.revealed ? COOP_NAME[persona] : 'Your opponent';
 
   useEffect(() => {
     void useArenaRecords.getState().load();
@@ -76,7 +82,7 @@ export function CooperationMatch({
     scroll.current?.scrollTo({ y: 0, animated: false });
   };
   const close = () => (router.canGoBack() ? router.back() : router.replace({ pathname: '/arena/[gameId]', params: { gameId: 'cooperation' } }));
-  const change = (n: { persona?: string; level?: Level }) => router.setParams({ persona: n.persona ?? persona, level: n.level ?? level });
+  const change = (n: { persona?: string; level?: Level }) => router.setParams({ persona: n.persona ?? (mystery ? 'mystery' : persona), level: n.level ?? level });
 
   // The round shown: during a reveal, the one just played.
   const shownRound = view === 'reveal' ? h.length : Math.min(h.length + 1, state.total);
@@ -102,8 +108,10 @@ export function CooperationMatch({
             ) : null}
           </Row>
 
-          {view === 'results' && result ? (
-            <CoopResults state={state} result={result} newBest={newBest} onRematch={onPlayAgain} onChange={change} onLibrary={() => router.navigate('/games')} />
+          {view === 'results' && result && read.awaiting ? (
+            <ReadPanel game="cooperation" read={read} played={h.length} />
+          ) : view === 'results' && result ? (
+            <CoopResults state={state} result={result} newBest={newBest} onRematch={onPlayAgain} onChange={change} onLibrary={() => router.navigate('/games')} read={mystery && read.verdict ? { guess: read.guess, verdict: read.verdict } : null} />
           ) : (
             <>
               {rulesOpen ? <RulesCard variant={variant} total={state.total} /> : null}
@@ -111,7 +119,8 @@ export function CooperationMatch({
               <Timeline h={h} total={state.total} current={view === 'decide' ? h.length : -1} />
               {tip ? <CoachTip text={tip} onDismiss={() => setTipHidden(true)} /> : null}
               {view === 'decide' ? <Decision key={h.length} state={state} name={name} onCommit={commit} /> : <Reveal state={state} name={name} onNext={next} />}
-              <OpponentCard persona={persona} level={level} length={length} variant={variant} h={h} />
+              {view === 'decide' ? <ReadPanel game="cooperation" read={read} played={h.length} /> : null}
+              {read.revealed ? <OpponentCard persona={persona} level={level} length={length} variant={variant} h={h} /> : null}
               <MatchHistory h={h} name={name} />
             </>
           )}

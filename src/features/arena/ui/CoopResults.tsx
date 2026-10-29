@@ -13,6 +13,8 @@ import { COOP_NAME, type CoopState } from '@/src/arena/cooperation';
 import { coopInsights, coopLessons, coopOpponentReveal, coopStats } from '@/src/arena/cooperation-analysis';
 import { haptic } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
+import type { ReadVerdict } from '@/src/arena/reads';
+import { PersonalityReveal } from './ArenaResult';
 import { PERSONA_ICON, Row } from './parts';
 
 const pct = (k: number, n: number) => (n ? `${Math.round((k / n) * 100)}%` : '—');
@@ -21,7 +23,7 @@ const pct = (k: number, n: number) => (n ? `${Math.round((k / n) * 100)}%` : '�
  * The end of a Cooperation Game match. The winner is decided by score alone (equal is a draw); everything else on the
  * screen — counts, rates, the strongest pattern, insights, lessons — is computed from the recorded rounds.
  */
-export function CoopResults({ state, result, newBest, onRematch, onChange, onLibrary }: { state: CoopState; result: MatchResult; newBest: boolean; onRematch: () => void; onChange: (n: { persona?: string; level?: Level }) => void; onLibrary: () => void }) {
+export function CoopResults({ state, result, newBest, onRematch, onChange, onLibrary, read }: { state: CoopState; result: MatchResult; newBest: boolean; onRematch: () => void; onChange: (n: { persona?: string; level?: Level }) => void; onLibrary: () => void; read?: { guess: string | null; verdict: ReadVerdict } | null }) {
   const enter = useEnter();
   useEffect(() => haptic.success(), []);
   const { persona, level } = state.setup;
@@ -119,6 +121,8 @@ export function CoopResults({ state, result, newBest, onRematch, onChange, onLib
         ))}
       </View>
 
+      {read ? <PersonalityReveal game="cooperation" persona={persona} read={read} evidence={coopOpponentReveal(state)} /> : null}
+
       <View style={styles.panel}>
         <Row>
           <Eye size={16} color={colors.rivalText} />
@@ -132,7 +136,7 @@ export function CoopResults({ state, result, newBest, onRematch, onChange, onLib
       </View>
 
       <View style={{ gap: space.md }}>
-        <Button label={`Rematch ${name}`} icon={RotateCcw} iconPosition="left" onPress={onRematch} />
+        <Button label={read ? 'Rematch · new mystery opponent' : `Rematch ${name}`} icon={RotateCcw} iconPosition="left" onPress={onRematch} />
         <View style={{ gap: space.xs }}>
           <AppText variant="caption" color={colors.textMuted}>
             Try another personality
