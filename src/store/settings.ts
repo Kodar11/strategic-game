@@ -1,7 +1,7 @@
 export interface Settings {
   reduceMotion: boolean;
   haptics: boolean;
-  /** The first-launch welcome (nickname, optional goal, first lesson) has been finished or skipped on this device. */
+  /** The first-session welcome (one decision against Maya, then a recommended lesson) was finished or skipped here. */
   onboarded: boolean;
 }
 

@@ -9,7 +9,7 @@ import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
-import { ChartNoAxesColumn, ChevronRight, Download, Pencil, RotateCcw, Trash, UserRound, X } from '@/src/components/ui/icons';
+import { ChartNoAxesColumn, ChevronRight, Download, Pencil, RotateCcw, Sparkles, Trash, UserRound, X } from '@/src/components/ui/icons';
 import { allLessons } from '@/src/content/lessons';
 import { accountDeletionError } from '@/src/data/account';
 import { deleteAccount, useSyncStatus } from '@/src/data/session';
@@ -314,6 +314,22 @@ function ProgressSection() {
           <AppText variant="bodyStrong">Your progress</AppText>
           <AppText variant="small" color={colors.textMuted}>
             View your learning profile and past activity.
+          </AppText>
+        </View>
+        <ChevronRight size={20} color={colors.textMuted} />
+      </Pressable>
+      <Pressable
+        onPress={() => router.push('/onboarding')}
+        accessibilityRole="button"
+        accessibilityLabel="Replay the introduction. The one-minute decision against Maya. Your progress isn’t affected."
+        style={({ pressed }) => [styles.navRow, { marginTop: space.sm }, pressed && { backgroundColor: colors.surfaceHigh }]}>
+        <View style={styles.navIcon}>
+          <Sparkles size={18} color={colors.primaryText} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <AppText variant="bodyStrong">Replay the introduction</AppText>
+          <AppText variant="small" color={colors.textMuted}>
+            The one-minute decision against Maya. Your progress isn’t affected.
           </AppText>
         </View>
         <ChevronRight size={20} color={colors.textMuted} />
