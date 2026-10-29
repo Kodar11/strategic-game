@@ -269,6 +269,7 @@ export function marketDebrief(s: MarketState): Debrief {
 
 export const market: ArenaEngine<MarketState, number, MarketVariant> = {
   id: 'market',
+  opponents: PERSONAS,
   variants: MARKET_VARIANTS,
   rounds: marketRounds,
   create(setup) {

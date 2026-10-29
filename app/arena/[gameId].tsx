@@ -11,8 +11,10 @@ import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
 import { ArrowLeft, ChevronDown, Lock, Play } from '@/src/components/ui/icons';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { Segmented } from '@/src/components/ui/Segmented';
-import { ARENA, LENGTH_LABEL, LEVEL_HINT, LEVEL_LABEL } from '@/src/arena/catalog';
-import { ARENA_IDS, LENGTHS, LEVELS, type Level, type MatchLength, PERSONAS, PERSONA_NAME, type Persona, isArenaId } from '@/src/arena/core';
+import { ARENA, LENGTH_LABEL, LEVEL_HINT, LEVEL_LABEL, opponentName } from '@/src/arena/catalog';
+import { ARENA_IDS, LENGTHS, LEVELS, type Level, type MatchLength, isArenaId } from '@/src/arena/core';
+import { COOP_PAYOFFS, type CoopMove, coopPayoff } from '@/src/arena/cooperation';
+import { MiniMatrix } from '@/src/features/games/ui/common';
 import { played, useArenaRecords } from '@/src/features/arena/records';
 import { ARENA_TINT, ArenaArt, PERSONA_ICON } from '@/src/features/arena/ui/parts';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
@@ -36,7 +38,7 @@ export default function ArenaGameScreen() {
   const record = useArenaRecords((s) => (isArenaId(gameId) ? s.games[gameId] : undefined));
   const prefs = useArenaRecords((s) => (isArenaId(gameId) ? s.prefs[gameId] : undefined));
   const coached = useArenaRecords((s) => (isArenaId(gameId) ? s.coached[gameId] : undefined));
-  const [persona, setPersona] = useState<Persona>('dealmaker');
+  const [chosen, setPersona] = useState<string | null>(null);
   const [level, setLevel] = useState<Level>('easy');
   const [length, setLength] = useState<MatchLength>('standard');
   const [variant, setVariant] = useState<string | null>(null);
@@ -63,6 +65,8 @@ export default function ArenaGameScreen() {
   const tint = ARENA_TINT[gameId];
   const unlocked = played(record) > 0;
   const standard = g.variants.find((v) => !v.challenge)!.id;
+  // The chosen opponent if this game offers it, otherwise the game's first.
+  const persona = chosen && g.opponents.some((o) => o.id === chosen) ? chosen : g.opponents[0].id;
   const mode = variant && g.variants.some((v) => v.id === variant && (!v.challenge || unlocked)) ? variant : standard;
   const showRules = rulesOpen ?? (loaded && !coached && !unlocked);
   const close = () => (router.canGoBack() ? router.back() : router.replace('/games'));
@@ -92,7 +96,12 @@ export default function ArenaGameScreen() {
               </AppText>
             </View>
           </View>
-          <AppText color={colors.textBody}>{g.tagline}</AppText>
+          {g.subtitle ? (
+            <AppText variant="bodyStrong" color={tint.fg}>
+              {g.subtitle}
+            </AppText>
+          ) : null}
+          <AppText color={colors.textBody}>{g.intro ?? g.tagline}</AppText>
 
           <View style={[styles.question, { borderColor: tint.fg }]}>
             <AppText variant="overline" color={tint.fg}>
@@ -109,6 +118,8 @@ export default function ArenaGameScreen() {
               ))}
             </View>
           </View>
+
+          {gameId === 'cooperation' ? <CoopPreview /> : null}
 
           <Card style={{ gap: space.sm }}>
             <Pressable onPress={() => setRulesOpen(!showRules)} accessibilityRole="button" accessibilityState={{ expanded: showRules }} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 32 }}>
@@ -132,17 +143,17 @@ export default function ArenaGameScreen() {
 
           <View style={{ gap: space.sm }}>
             <SectionLabel>{gameId === 'auction' || gameId === 'market' ? 'Your main rival' : 'Your opponent'}</SectionLabel>
-            {PERSONAS.map((p) => {
-              const t = record?.byPersona[p];
+            {g.opponents.map((o) => {
+              const t = record?.byPersona[o.id];
               return (
                 <ChoiceCard
-                  key={p}
+                  key={o.id}
                   compact
-                  icon={PERSONA_ICON[p]}
-                  title={PERSONA_NAME[p]}
-                  description={`${g.personas[p]}${t ? `  ·  You ${t.w}–${t.l}${t.d ? `–${t.d}` : ''}` : ''}`}
-                  selected={persona === p}
-                  onSelect={() => setPersona(p)}
+                  icon={PERSONA_ICON[o.id]}
+                  title={o.name}
+                  description={[o.summary, o.tendency, t ? `You ${t.w}–${t.l}${t.d ? `–${t.d}` : ''}` : null].filter(Boolean).join('  ·  ')}
+                  selected={persona === o.id}
+                  onSelect={() => setPersona(o.id)}
                   tone="orange"
                 />
               );
@@ -194,7 +205,7 @@ export default function ArenaGameScreen() {
             })}
           </View>
 
-          <Button label={`Play vs ${PERSONA_NAME[persona]}`} icon={Play} onPress={play} />
+          <Button label={`Play vs ${opponentName(gameId, persona)}`} icon={Play} onPress={play} />
 
           {record && played(record) ? (
             <Card style={{ gap: space.xs }}>
@@ -208,7 +219,7 @@ export default function ArenaGameScreen() {
                     {OUTCOME[m.outcome]}
                   </AppText>
                   <AppText variant="small" color={colors.textBody} style={{ flex: 1 }} numberOfLines={1}>
-                    {PERSONA_NAME[m.persona]} · {LEVEL_LABEL[m.level]}
+                    {opponentName(gameId, m.persona)} · {LEVEL_LABEL[m.level]}
                   </AppText>
                   <AppText variant="small" tabular color={colors.textMuted}>
                     {m.player}–{m.rival}
@@ -219,6 +230,26 @@ export default function ArenaGameScreen() {
           ) : null}
         </View>
       </ScrollView>
+    </View>
+  );
+}
+
+const COOP_LABEL: Record<CoopMove, string> = { C: 'Cooperate', D: 'Defect' };
+
+/** The Cooperation Game's intro extras: the payoff matrix at a glance and why repetition matters. */
+function CoopPreview() {
+  const g = ARENA.cooperation;
+  return (
+    <View style={{ gap: space.sm }}>
+      <AppText variant="overline" color={colors.textMuted}>
+        Points per round · you / them
+      </AppText>
+      <MiniMatrix moves={['C', 'D'] as const} labels={COOP_LABEL} payoff={(p, b) => coopPayoff(COOP_PAYOFFS.classic, p, b)} />
+      {g.whyRepeated ? (
+        <AppText variant="small" color={colors.textBody}>
+          {g.whyRepeated}
+        </AppText>
+      ) : null}
     </View>
   );
 }

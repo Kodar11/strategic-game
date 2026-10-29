@@ -1,26 +1,36 @@
-import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONA_NAME, type Persona, type Setup, draw, plural, resultFrom } from './core.ts';
+import { type ArenaEngine, LENGTH_ROUNDS, type Level, type Setup, draw, resultFrom } from './core.ts';
+import { coopDebrief } from './cooperation-analysis.ts';
 
 /**
  * The Cooperation Game — a repeated prisoner's dilemma against one opponent, both choices locked in secret.
  *
- * Payoffs (you / opponent) with T > R > P > S and 2R > T + S, so defecting pays more in any single round, mutual
- * cooperation beats mutual defection, and taking turns exploiting each other is worse than steady cooperation:
+ * Payoffs live only here (COOP_PAYOFFS); the UI and analysis read them. Every variant satisfies T > R > P > S and
+ * 2R > T + S: defecting pays more in any single round, mutual cooperation beats mutual defection, and taking turns
+ * exploiting each other is worse than steady cooperation.
  *
- *               Classic   High stakes
- *   both C       3 / 3      5 / 5      R
- *   D vs C       5 / 0      8 / −2     T / S
- *   both D       1 / 1      1 / 1      P
+ *               Classic (default)   High stakes
+ *   both C          3 / 3              5 / 5      R
+ *   D vs C          5 / 0              8 / −2     T / S
+ *   both D          1 / 1              1 / 1      P
  *
- * Noisy line (a challenge variant): classic payoffs, but each side's choice is mis-delivered with probability 10 %.
- * Slips are drawn from the seed (independent of difficulty) and revealed to both players after the round, so the
- * difference between a betrayal and an accident is visible — and forgiving accidents becomes a skill.
+ * Noisy line (challenge): classic payoffs, but each side's choice is mis-delivered with probability 10 %. Slips are
+ * drawn from the seed (independent of difficulty and of anyone's choice) and revealed to both sides after the round.
  *
- * The length is announced up front (6, 10 or 14 rounds); everyone knows when the last round comes.
+ * Round count is fixed at creation (6, 10 by default, or 14) and announced up front. Higher total score wins; equal
+ * totals are a draw.
+ *
+ * Lifecycle (all pure): `cooperation.create(setup)` → for each round, `apply(state, { move, round })`. The action names
+ * the round it answers, so a duplicated or stale submission is refused instead of resolving a round twice. The
+ * opponent's move is computed inside `apply` from completed rounds only, before the player's move is looked at.
  */
 
 export type CoopMove = 'C' | 'D';
 export type CoopVariant = 'classic' | 'high-stakes' | 'noisy';
 export const COOP_VARIANTS: readonly CoopVariant[] = ['classic', 'high-stakes', 'noisy'];
+
+export const COOP_OPPONENTS = ['collaborator', 'retaliator', 'opportunist', 'chameleon'] as const;
+export type CoopOpponent = (typeof COOP_OPPONENTS)[number];
+export const COOP_NAME: Record<CoopOpponent, string> = { collaborator: 'The Collaborator', retaliator: 'The Retaliator', opportunist: 'The Opportunist', chameleon: 'The Chameleon' };
 
 export interface Payoffs {
   T: number;
@@ -52,10 +62,18 @@ export interface CoopRound {
   bs: number;
 }
 
+export type CoopSetup = Setup<CoopVariant, CoopOpponent>;
+
 export interface CoopState {
-  setup: Setup<CoopVariant>;
+  setup: CoopSetup;
   total: number;
   rounds: CoopRound[];
+}
+
+/** The player's committed move for a specific round (0-based). */
+export interface CoopAction {
+  move: CoopMove;
+  round: number;
 }
 
 export function coopPayoff(pay: Payoffs, p: CoopMove, b: CoopMove): [number, number] {
@@ -66,6 +84,37 @@ export function coopPayoff(pay: Payoffs, p: CoopMove, b: CoopMove): [number, num
 }
 
 const flip = (m: CoopMove): CoopMove => (m === 'C' ? 'D' : 'C');
+
+// ── Bot tuning (difficulty) — kept apart from the policies below ─────────────
+
+/**
+ * Per-difficulty numbers for each policy. Difficulty changes how well a bot reasons (forgiveness, memory, pattern
+ * reading, endgame awareness) — never the payoffs or the scores.
+ */
+export const COOP_TUNING = {
+  collaborator: {
+    easy: { forgive: 0.75, forgivesIsolated: false, guardAt: Infinity, recover: 1, slipsForgiven: false, readsPatterns: false },
+    normal: { forgive: 0.5, forgivesIsolated: false, guardAt: 3, recover: 1, slipsForgiven: false, readsPatterns: false },
+    hard: { forgive: 0.34, forgivesIsolated: true, guardAt: 2, recover: 2, slipsForgiven: true, readsPatterns: true },
+  },
+  retaliator: {
+    easy: { forgive: 0.4, punishRepeated: false, mercy: 0, slipsForgiven: false },
+    normal: { forgive: 0, punishRepeated: false, mercy: 0, slipsForgiven: false },
+    hard: { forgive: 0, punishRepeated: true, mercy: 0.1, slipsForgiven: true },
+  },
+  opportunist: {
+    easy: { mode: 'habit' as const },
+    normal: { mode: 'probe' as const },
+    hard: { mode: 'model' as const, forgivenessToExploit: 0.6 },
+  },
+  chameleon: {
+    easy: { mode: 'mirror' as const, window: 3, mistake: 0.15 },
+    normal: { mode: 'rates' as const, minEvidence: 4 },
+    hard: { mode: 'profile' as const, minEvidence: 4 },
+  },
+} satisfies Record<CoopOpponent, Record<Level, object>>;
+
+// ── Shared reading of the history ───────────────────────────────────────────
 
 /** A deliberate defection: chosen, not a slip. Slips are revealed to both sides, so bots may tell them apart. */
 const meantD = (r: CoopRound | undefined) => r?.pi === 'D';
@@ -81,7 +130,7 @@ export function predictPlayer(h: readonly CoopRound[]): CoopMove | null {
 }
 
 /** How often the player cooperated in the round after the bot defected: [cooperated, samples]. */
-function forgivenessAfterBotD(h: readonly CoopRound[]): [number, number] {
+export function forgivenessAfterBotD(h: readonly CoopRound[]): [number, number] {
   let c = 0;
   let n = 0;
   for (let i = 0; i + 1 < h.length; i++) {
@@ -93,239 +142,212 @@ function forgivenessAfterBotD(h: readonly CoopRound[]): [number, number] {
   return [c, n];
 }
 
+export type PlayerProfile = 'unknown' | 'pushover' | 'reciprocal' | 'cooperative' | 'aggressive' | 'erratic';
+
 /**
- * The opponent's choice for round `h.length`, from revealed rounds only — never the player's current choice.
- *
- * Investor (long-term value).
- *   Easy: tit-for-tat, but one time in five it lets a defection go unanswered (patient to a fault).
- *   Normal: forgives a lone defection, but answers a defection when it's the second in the last four rounds.
- *   Hard: forgives slips, answers each deliberate defection once, and stops cooperating while the player defects in
- *   half or more of the last four rounds (it won't be milked). Never defects first, even in the last round.
- * Banker (consistent, low risk).
- *   Easy: cooperates while the player has cooperated in at least half of all rounds.
- *   Normal: trusts until the first defection, then needs two cooperations in a row before trusting again.
- *   Hard: as Normal, judged on deliberate moves (slips forgiven), and always takes the safe defection in the final
- *   round, when no reply can follow.
- * Deal Maker (reciprocity, repair).
- *   Easy: cooperates unless the player just defected — and even then forgives on a coin flip.
- *   Normal: tit-for-tat that offers an olive branch (cooperates) after two mutual defections in a row — unless the
- *   player has defected four rounds running.
- *   Hard: retaliates once per deliberate defection and forgives slips. Against a player who defected deliberately in
- *   three of the last four rounds it defects until they cooperate again; otherwise it offers the olive branch. In the
- *   final round it defects if the player has betrayed it twice or more.
- * Opportunist (exploits).
- *   Easy: copies the player's last move, except it defects whenever the player cooperated in each of the last three,
- *   and it lets go of a grudge — after a mutual defection it cooperates.
- *   Normal: tit-for-tat that probes — defects after three mutual cooperations; if the player keeps cooperating after
- *   being hit, it keeps defecting.
- *   Hard: measures how often the player forgives its defections; defects against a forgiving player (≥ 60 % of at
- *   least two samples) or a predictable cooperator, probes once in round 5 after unbroken cooperation, and always
- *   defects in the final round. Otherwise tit-for-tat.
+ * How the Chameleon (Hard) reads the player from completed rounds:
+ * - unknown: fewer than `minEvidence` rounds.
+ * - pushover: cooperates ≥ 70 % and keeps cooperating after most of the bot's defections (≥ 1 sample).
+ * - reciprocal: copies the bot's previous move ≥ 75 % of the time.
+ * - cooperative: cooperates ≥ 70 % (and answers defections).
+ * - aggressive: cooperates ≤ 35 %.
+ * - erratic: anything else.
  */
-export function coopBotMove(setup: Setup<CoopVariant>, total: number, h: readonly CoopRound[]): CoopMove {
-  const { persona, level, seed } = setup;
+export function profilePlayer(h: readonly CoopRound[], minEvidence = 4): PlayerProfile {
   const n = h.length;
+  if (n < minEvidence) return 'unknown';
+  const coopRate = h.filter((r) => r.pi === 'C').length / n;
+  const [forgave, samples] = forgivenessAfterBotD(h);
+  let copied = 0;
+  for (let i = 1; i < n; i++) if (h[i].pi === h[i - 1].b) copied += 1;
+  if (coopRate >= 0.7 && samples >= 1 && forgave / samples > 0.5) return 'pushover';
+  if (copied / (n - 1) >= 0.75) return 'reciprocal';
+  if (coopRate >= 0.7) return 'cooperative';
+  if (coopRate <= 0.35) return 'aggressive';
+  return 'erratic';
+}
+
+// ── The four policies ───────────────────────────────────────────────────────
+
+/**
+ * The Collaborator — cooperates by default and forgives, but guards against repeated exploitation.
+ * Opening: cooperates. After a defection it forgives with probability `forgive` (Easy 75 %, Normal 50 %, Hard 34 %).
+ * Hard never punishes an isolated defection (the only one in the last four rounds) — it absorbs a one-off betrayal.
+ * Guard: once the player has defected `guardAt` times in the last four rounds (Normal 3, Hard 2, Easy never), it
+ * defects until the player cooperates `recover` rounds in a row (Normal 1, Hard 2). Hard also forgives slips and,
+ * against a player whose last four moves alternate, defects when the pattern says a defection is coming.
+ */
+function collaborator(setup: CoopSetup, h: readonly CoopRound[]): CoopMove {
+  const t = COOP_TUNING.collaborator[setup.level];
+  const n = h.length;
+  if (n === 0) return 'C';
+  const bad = t.slipsForgiven ? meantD : gotD;
+  if (h.slice(-4).filter(bad).length >= t.guardAt) {
+    const recovered = n >= t.recover && h.slice(-t.recover).every((r) => !bad(r));
+    if (!recovered) return 'D';
+  }
+  if (t.readsPatterns && predictPlayer(h) === 'D' && h.slice(-4).some(bad) && !h.slice(-4).every(bad)) return 'D';
+  if (bad(h[n - 1])) {
+    if (t.forgivesIsolated && h.slice(-4).filter(bad).length === 1) return 'C';
+    return draw(setup.seed, n, 0) < t.forgive ? 'C' : 'D';
+  }
+  return 'C';
+}
+
+/**
+ * The Retaliator — reciprocity.
+ * Opening: cooperates. Easy: answers a defection with one, but lets it go 40 % of the time. Normal: strict
+ * tit-for-tat (copies the player's last delivered move). Hard: forgives slips; an isolated defection (the only one in
+ * the last four rounds) gets one answer, with a 10 % chance of mercy; repeated exploitation (two or more in the last
+ * four) gets a two-round answer, so cooperation must be shown, not just offered once.
+ */
+function retaliator(setup: CoopSetup, h: readonly CoopRound[]): CoopMove {
+  const t = COOP_TUNING.retaliator[setup.level];
+  const n = h.length;
+  if (n === 0) return 'C';
+  const bad = t.slipsForgiven ? meantD : gotD;
   const last = h[n - 1];
   const prev = h[n - 2];
-  const finalRound = n === total - 1;
-  const recentMeantD = (k: number) => h.slice(-k).filter(meantD).length;
-  const mutualDStreak = n >= 2 && last.p === 'D' && last.b === 'D' && prev.p === 'D' && prev.b === 'D';
+  if (!t.punishRepeated) return bad(last) && draw(setup.seed, n, 0) >= t.forgive ? 'D' : 'C';
+  const repeated = h.slice(-4).filter(bad).length >= 2;
+  if (bad(last)) return !repeated && draw(setup.seed, n, 0) < t.mercy ? 'C' : 'D';
+  if (repeated && bad(prev)) return 'D';
+  return 'C';
+}
+
+/**
+ * The Opportunist — takes short-term gains where they look safe.
+ * Easy (a habit you can spot): copies your last move, but defects whenever you cooperated in both of the last two
+ * rounds; after a mutual defection it cooperates again.
+ * Normal (probe and exploit): tit-for-tat, but defects after three rounds of mutual cooperation. If you have never
+ * answered its defections, it keeps defecting while you keep cooperating; once you answer one, it offers cooperation
+ * the next round instead of trading blows.
+ * Hard (models you): measures how often you cooperate right after its defections — at 60 % or more over two or more
+ * samples it defects; it also defects against a predictable cooperator who has never punished it, probes once in
+ * round 5 after unbroken cooperation, and always defects in the final round. Otherwise tit-for-tat.
+ */
+function opportunist(setup: CoopSetup, total: number, h: readonly CoopRound[]): CoopMove {
+  const t = COOP_TUNING.opportunist[setup.level];
+  const n = h.length;
   if (n === 0) return 'C';
+  const last = h[n - 1];
+  const prev = h[n - 2];
+  if (t.mode === 'habit') {
+    if (n >= 2 && last.p === 'C' && prev.p === 'C') return 'D';
+    return last.p === 'D' && last.b === 'D' ? 'C' : last.p;
+  }
+  if (t.mode === 'probe') {
+    const [forgave, samples] = forgivenessAfterBotD(h);
+    if (samples >= 1 && forgave === samples && last.pi === 'C') return 'D';
+    if (n >= 2 && h[n - 2].b === 'D' && last.pi === 'D') return 'C';
+    if (n >= 3 && h.slice(-3).every((r) => r.p === 'C' && r.b === 'C')) return 'D';
+    return last.p;
+  }
+  if (n === total - 1) return 'D';
+  const [c, samples] = forgivenessAfterBotD(h);
+  if (samples >= 2 && c / samples >= t.forgivenessToExploit) return 'D';
+  if (predictPlayer(h) === 'C' && samples >= 1 && c === samples) return 'D';
+  if (n === 4 && h.every((r) => r.p === 'C' && r.b === 'C')) return 'D';
+  return last.p;
+}
 
-  switch (persona) {
-    case 'investor':
-      if (level === 'easy') return gotD(last) && draw(seed, n, 0) >= 0.2 ? 'D' : 'C';
-      if (level === 'normal') return gotD(last) && h.slice(-4).filter(gotD).length >= 2 ? 'D' : 'C';
-      if (n >= 4 && recentMeantD(4) >= 2) return 'D';
-      return meantD(last) ? 'D' : 'C';
-    case 'banker': {
-      if (level === 'easy') return h.filter((r) => r.p === 'C').length * 2 >= n ? 'C' : 'D';
-      const bad = level === 'hard' ? meantD : gotD;
-      if (level === 'hard' && finalRound) return 'D';
-      if (!h.some(bad)) return 'C';
-      return n >= 2 && !bad(last) && !bad(prev) ? 'C' : 'D';
-    }
-    case 'dealmaker':
-      if (level === 'easy') return gotD(last) && draw(seed, n, 0) < 0.5 ? 'D' : 'C';
-      if (level === 'normal') return mutualDStreak && !(n >= 4 && h.slice(-4).every(gotD)) ? 'C' : last.p;
-      if (finalRound && h.filter(meantD).length >= 2) return 'D';
-      if (n >= 4 && recentMeantD(4) >= 3) return meantD(last) ? 'D' : 'C';
-      if (mutualDStreak) return 'C';
-      return meantD(last) ? 'D' : 'C';
-    case 'opportunist': {
-      if (level === 'easy') {
-        if (n >= 3 && h.slice(-3).every((r) => r.p === 'C')) return 'D';
-        return last.p === 'D' && last.b === 'D' ? 'C' : last.p;
-      }
-      if (level === 'normal') {
-        let j = -1;
-        for (let i = n - 1; i >= 0; i--) if (h[i].bi === 'D') { j = i; break; }
-        if (j >= 0 && j + 1 < n && h[j + 1].pi === 'C' && last.pi === 'C') return 'D';
-        if (n >= 3 && h.slice(-3).every((r) => r.p === 'C' && r.b === 'C')) return 'D';
-        return last.p;
-      }
-      if (finalRound) return 'D';
-      const [c, samples] = forgivenessAfterBotD(h);
-      if (samples >= 2 && c / samples >= 0.6) return 'D';
-      if (predictPlayer(h) === 'C' && samples >= 1 && c === samples) return 'D';
-      if (n === 4 && h.every((r) => r.p === 'C' && r.b === 'C')) return 'D';
-      return last.p;
-    }
+/**
+ * The Chameleon — reads you and changes its policy.
+ * Opening: cooperates in rounds 1–2; on Normal and Hard it defects in round 3 as a probe (to see whether you answer).
+ * Easy (mirror): from round 3, plays the majority of your last three moves (cooperates on a tie), and gets it
+ *   wrong 15 % of the time.
+ * Normal (broad rates): after four rounds, cooperates if you've cooperated ≥ 70 %, defects if ≤ 35 %, otherwise
+ *   tit-for-tat.
+ * Hard (profile, see profilePlayer): exploits a pushover, cooperates with reciprocal and cooperative players (but
+ *   still answers a defection the round after it),
+ *   defects against an aggressive one, plays tit-for-tat against an erratic one, defects whenever your last four
+ *   moves form a plain pattern that says a defection is next (always defecting, or strict alternation) — and defects
+ *   in the final round against anyone who isn't aggressive (no reply can follow).
+ */
+function chameleon(setup: CoopSetup, total: number, h: readonly CoopRound[]): CoopMove {
+  const t = COOP_TUNING.chameleon[setup.level];
+  const n = h.length;
+  const last = h[n - 1];
+  if (n < 2) return 'C';
+  if (t.mode === 'mirror') {
+    const window = h.slice(-t.window);
+    const coop = window.filter((r) => r.p === 'C').length;
+    const pick: CoopMove = coop * 2 >= window.length ? 'C' : 'D';
+    return draw(setup.seed, n, 0) < t.mistake ? flip(pick) : pick;
+  }
+  if (n === 2) return 'D';
+  if (n < t.minEvidence) return last.p;
+  if (t.mode === 'rates') {
+    const rate = h.filter((r) => r.p === 'C').length / n;
+    return rate >= 0.7 ? 'C' : rate <= 0.35 ? 'D' : last.p;
+  }
+  const profile = profilePlayer(h, t.minEvidence);
+  if (n === total - 1 && profile !== 'aggressive') return 'D';
+  if (predictPlayer(h) === 'D') return 'D';
+  if (profile === 'pushover' || profile === 'aggressive') return 'D';
+  if (profile === 'reciprocal' || profile === 'cooperative') return last.p === 'D' ? 'D' : 'C';
+  return last.p;
+}
+
+/** The opponent's intended move for round `h.length`, from completed rounds only. */
+export function coopBotMove(setup: CoopSetup, total: number, h: readonly CoopRound[]): CoopMove {
+  switch (setup.persona) {
+    case 'collaborator':
+      return collaborator(setup, h);
+    case 'retaliator':
+      return retaliator(setup, h);
+    case 'opportunist':
+      return opportunist(setup, total, h);
+    case 'chameleon':
+      return chameleon(setup, total, h);
   }
 }
 
-/** Relationship strength 0–100 from the shared history: mutual cooperation builds it, betrayals break it. */
-export function trustLevel(h: readonly CoopRound[]): number {
-  let t = 50;
-  for (const r of h) {
-    if (r.p === 'C' && r.b === 'C') t += 12;
-    else if (r.p === 'D' && r.b === 'D') t -= 15;
-    else t -= r.pi === r.p && r.bi === r.b ? 35 : 10; // a slip strains trust less than a betrayal
-    t = Math.min(100, Math.max(0, t));
-  }
-  return t;
-}
+// ── Lifecycle ───────────────────────────────────────────────────────────────
 
-function validate(s: CoopState, a: unknown): string | null {
+export function validateCoop(s: CoopState, a: unknown): string | null {
   if (s.rounds.length >= s.total) return 'The match is over.';
-  if (a !== 'C' && a !== 'D') return 'Choose Cooperate or Defect.';
+  if (!a || typeof a !== 'object') return 'Choose Cooperate or Defect.';
+  const { move, round } = a as Partial<CoopAction>;
+  if (move !== 'C' && move !== 'D') return 'Choose Cooperate or Defect.';
+  if (round !== s.rounds.length) return 'That choice was for a round that has already been played.';
   return null;
 }
 
-function apply(s: CoopState, a: CoopMove): CoopState {
-  const why = validate(s, a);
+/** Resolves the current round exactly once. Throws on an illegal, duplicate or late action. */
+export function resolveCoop(s: CoopState, a: CoopAction): CoopState {
+  const why = validateCoop(s, a);
   if (why) throw new Error(`cooperation: ${why}`);
   const n = s.rounds.length;
   const bi = coopBotMove(s.setup, s.total, s.rounds);
   const noisy = s.setup.variant === 'noisy';
-  const p = noisy && draw(s.setup.seed, n, 10) < COOP_NOISE ? flip(a) : a;
+  const p = noisy && draw(s.setup.seed, n, 10) < COOP_NOISE ? flip(a.move) : a.move;
   const b = noisy && draw(s.setup.seed, n, 11) < COOP_NOISE ? flip(bi) : bi;
   const [ps, bs] = coopPayoff(COOP_PAYOFFS[s.setup.variant], p, b);
-  return { ...s, rounds: [...s.rounds, { pi: a, bi, p, b, ps, bs }] };
+  return { ...s, rounds: [...s.rounds, { pi: a.move, bi, p, b, ps, bs }] };
 }
 
-const sum = (h: readonly CoopRound[], f: (r: CoopRound) => number) => h.reduce((t, r) => t + f(r), 0);
+export const coopTotals = (h: readonly CoopRound[]) => ({ player: h.reduce((t, r) => t + r.ps, 0), bot: h.reduce((t, r) => t + r.bs, 0) });
 
-export function coopDebrief(s: CoopState): Debrief {
-  const h = s.rounds;
-  const pay = COOP_PAYOFFS[s.setup.variant];
-  const you = sum(h, (r) => r.ps);
-  const them = sum(h, (r) => r.bs);
-  const allC = pay.R * h.length;
-  // Candidate moments, each tagged with its round so the debrief reads in match order.
-  const moments: { at: number; text: string }[] = [];
-
-  // Being betrayed: the first time you cooperated into a defection, and how you answered.
-  const hits = h.map((r, i) => (r.p === 'C' && r.b === 'D' ? i : -1)).filter((i) => i >= 0);
-  if (hits.length) {
-    const i = hits[0];
-    let streak = 0;
-    for (let k = i - 1; k >= 0 && h[k].p === 'C' && h[k].b === 'C'; k--) streak += 1;
-    const next = h[i + 1];
-    const reply = !next ? ' It was the last round, so there was no way to answer.' : next.pi === 'D' ? ' You answered with a defection the next round.' : ' You cooperated again straight after.';
-    const more = hits.length >= 2 ? ` In all, it caught you cooperating ${plural(hits.length, 'time')}.` : '';
-    moments.push({ at: i, text: `Round ${i + 1}: ${streak >= 2 ? `after ${streak} rounds of mutual cooperation, ` : ''}it defected while you cooperated — ${pay.S} for you, ${pay.T} for it.${reply}${more}` });
-  }
-
-  // Your first deliberate defection, and what it cost or earned over the next rounds.
-  const first = h.findIndex((r) => r.pi === 'D');
-  if (first >= 0) {
-    const r = h[first];
-    const after = h.slice(first + 1, first + 4);
-    const answered = after.filter((x) => x.b === 'D').length;
-    const gain = r.b === 'C' ? `took ${r.ps} instead of ${pay.R}` : `met its defection (${r.ps} each)`;
-    moments.push({
-      at: first,
-      text:
-        after.length === 0
-          ? `You defected in round ${first + 1}, the last round, and ${gain} — there was no round left for a reply.`
-          : `You first defected in round ${first + 1} and ${gain}. ${answered === 0 ? 'The opponent didn’t retaliate' : `It defected in ${answered} of the next ${after.length} rounds`}; those rounds paid you ${sum(after, (x) => x.ps)}, against ${pay.R * after.length} for steady cooperation.`,
-    });
-  }
-
-  // A long run of mutual cooperation.
-  let best = 0;
-  let bestEnd = 0;
-  let run = 0;
-  h.forEach((r, i) => {
-    run = r.p === 'C' && r.b === 'C' ? run + 1 : 0;
-    if (run > best) {
-      best = run;
-      bestEnd = i;
-    }
-  });
-  if (moments.length < 2 && best >= 3) moments.push({ at: bestEnd - best + 1, text: `Rounds ${bestEnd - best + 2}–${bestEnd + 1}: ${best} rounds of mutual cooperation, worth ${best * pay.R} each.` });
-
-  // Slips in the noisy line.
-  const slips = h.map((r, i) => (r.p !== r.pi || r.b !== r.bi ? i : -1)).filter((i) => i >= 0);
-  if (s.setup.variant === 'noisy' && slips.length && moments.length < 3) moments.push({ at: slips[0], text: `${plural(slips.length, 'round')} had a slip, the first in round ${slips[0] + 1}. How each of you treated an accident — as betrayal or noise — shaped what came next.` });
-
-  const botFirst = hits.length > 0 && (first < 0 || hits[0] <= first);
-  const lastR = h[h.length - 1];
-  const endgame = lastR && lastR.pi === 'D' && lastR.b === 'C' ? ' Defecting in the final round paid because no reply could follow.' : '';
-  const insight =
-    you >= allC * 0.85
-      ? `You finished with ${you} of a possible ${allC} for unbroken cooperation. Repeated play gives trust a value no single round has.${endgame}`
-      : botFirst
-        ? `Some opponents test whether a betrayal goes unpunished. Answering a defection promptly — then returning to cooperation — makes exploiting you unprofitable; cooperating regardless invites more. Expect the test late in a match, when a reply has fewer rounds to bite.`
-        : first >= 0 && first < h.length - 1 && you < allC * 0.6
-          ? `Defection paid once, but the reply cost more: ${you} points against ${allC} for cooperating every round. Against a reciprocal opponent, the next rounds are part of the price.${endgame}`
-          : `You scored ${you}; steady mutual cooperation would have given ${allC}, mutual defection ${pay.P * h.length}. Where you landed between them depended on how each of you answered the other.${endgame}`;
-
-  return {
-    headline: you > them ? 'Your strategy paid' : you < them ? 'The opponent came out ahead' : 'Dead level',
-    moments: moments.sort((a, b) => a.at - b.at).slice(0, 3).map((m) => m.text),
-    insight,
-    opponentRead: coopRead(s.setup.persona, h),
-  };
-}
-
-function coopRead(persona: Persona, h: readonly CoopRound[]): string {
-  let afterD = 0;
-  let answeredD = 0;
-  let afterC = 0;
-  let returnedC = 0;
-  for (let i = 0; i + 1 < h.length; i++) {
-    if (h[i].p === 'D') {
-      afterD += 1;
-      if (h[i + 1].bi === 'D') answeredD += 1;
-    } else {
-      afterC += 1;
-      if (h[i + 1].bi === 'C') returnedC += 1;
-    }
-  }
-  const evidence = [afterD ? `after your defections it defected next ${answeredD} of ${afterD} times` : null, afterC ? `after your cooperation it cooperated ${returnedC} of ${afterC} times` : null].filter(Boolean).join('; ');
-  const style: Record<Persona, string> = {
-    investor: 'The Investor protects a profitable relationship: it tolerates a lot, but not a pattern of betrayal.',
-    banker: 'The Banker runs one consistent rule: trust is earned back with steady cooperation.',
-    dealmaker: 'The Deal Maker reciprocates and repairs: it answers betrayal, then offers a way back.',
-    opportunist: 'The Opportunist tests for weakness and defects when it expects no punishment.',
-  };
-  return `${style[persona]}${evidence ? ` In this match, ${evidence}.` : ''}`;
-}
-
-export const cooperation: ArenaEngine<CoopState, CoopMove, CoopVariant> = {
+export const cooperation: ArenaEngine<CoopState, CoopAction, CoopVariant> = {
   id: 'cooperation',
+  opponents: COOP_OPPONENTS,
   variants: COOP_VARIANTS,
   rounds: coopRounds,
-  create: (setup) => ({ setup, total: coopRounds(setup.length), rounds: [] }),
-  validate,
-  apply,
+  create: (setup) => ({ setup: setup as CoopSetup, total: coopRounds(setup.length), rounds: [] }),
+  validate: validateCoop,
+  apply: resolveCoop,
   isOver: (s) => s.rounds.length >= s.total,
   played: (s) => s.rounds.length,
-  result: (s) =>
-    resultFrom(
+  result: (s) => {
+    const t = coopTotals(s.rounds);
+    return resultFrom(
       [
-        { id: 'you', name: 'You', score: sum(s.rounds, (r) => r.ps), isPlayer: true },
-        { id: s.setup.persona, name: PERSONA_NAME[s.setup.persona], score: sum(s.rounds, (r) => r.bs), isPlayer: false },
+        { id: 'you', name: 'You', score: t.player, isPlayer: true },
+        { id: s.setup.persona, name: COOP_NAME[s.setup.persona], score: t.bot, isPlayer: false },
       ],
       'points',
-      { par: coopPar(s), parLabel: '70% of steady cooperation' },
-    ),
+    );
+  },
   debrief: coopDebrief,
 };
-
-/** The score a win needs: 70 % of what cooperating every round pays (rounded up). */
-export function coopPar(s: Pick<CoopState, 'setup' | 'total'>): number {
-  return Math.ceil(0.7 * COOP_PAYOFFS[s.setup.variant].R * s.total);
-}

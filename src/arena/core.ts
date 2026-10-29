@@ -40,8 +40,12 @@ export const isLength = (x: unknown): x is MatchLength => typeof x === 'string' 
 
 export type { Outcome };
 
-export interface Setup<V extends string = string> {
-  persona: Persona;
+/**
+ * A match setup. `persona` is the chosen opponent: one of the four shared personalities by default, or a game's own
+ * opponent set (the Cooperation Game has its own four), listed in that engine's `opponents`.
+ */
+export interface Setup<V extends string = string, P extends string = Persona> {
+  persona: P;
   level: Level;
   variant: V;
   length: MatchLength;
@@ -86,12 +90,14 @@ export interface Debrief {
   opponentRead: string;
 }
 
-export interface ArenaEngine<S extends { setup: Setup<V> }, A, V extends string = string> {
+export interface ArenaEngine<S extends { setup: Setup<V, any> }, A, V extends string = string> {
   id: ArenaGameId;
+  /** The opponents this game offers, by id (first is the default). */
+  opponents: readonly string[];
   variants: readonly V[];
   /** Rounds (or items) in a match of this length. */
   rounds(length: MatchLength): number;
-  create(setup: Setup<V>): S;
+  create(setup: Setup<V, any>): S;
   validate(state: S, action: A): string | null;
   apply(state: S, action: A): S;
   isOver(state: S): boolean;

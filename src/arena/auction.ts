@@ -257,6 +257,7 @@ export function auctionDebrief(s: AuctionState): Debrief {
 
 export const auction: ArenaEngine<AuctionState, number, AuctionVariant> = {
   id: 'auction',
+  opponents: PERSONAS,
   variants: AUCTION_VARIANTS,
   rounds: auctionLots,
   create(setup) {

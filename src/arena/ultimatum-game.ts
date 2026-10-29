@@ -1,4 +1,4 @@
-import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONA_NAME, type Persona, type Setup, drawInt, plural, resultFrom } from './core.ts';
+import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONAS, PERSONA_NAME, type Persona, type Setup, drawInt, plural, resultFrom } from './core.ts';
 
 /**
  * The Ultimatum Game — a series of take-it-or-leave-it negotiations over changing pools, roles alternating.
@@ -283,6 +283,7 @@ function ultRead(persona: Persona, h: readonly UltRound[]): string {
 
 export const ultimatumGame: ArenaEngine<UltState, UltAction, UltVariant> = {
   id: 'ultimatum-game',
+  opponents: PERSONAS,
   variants: ULT_VARIANTS,
   rounds: ultRounds,
   create: (setup) => ({ setup, total: ultRounds(setup.length), rounds: [] }),

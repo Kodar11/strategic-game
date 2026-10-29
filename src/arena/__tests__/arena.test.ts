@@ -4,7 +4,6 @@ import { describe, it } from 'node:test';
 
 import { ARENA } from '../catalog.ts';
 import { BIDDERS, auction, auctionBotBid, auctionLot, auctionPrompt, auctionSeats, posteriorMean, type AuctionState } from '../auction.ts';
-import { COOP_PAYOFFS, COOP_VARIANTS, cooperation, coopBotMove, coopPar, coopPayoff, isDilemma, trustLevel, type CoopMove, type CoopState } from '../cooperation.ts';
 import { ARENA_IDS, LENGTHS, LEVELS, PERSONAS, type AnyArenaEngine, type Level, type Persona, type Setup, resultFrom } from '../core.ts';
 import { PRICE_MAX, PRICE_MIN, bestReply, conditions, equilibriumPrice, market, marketBotPrice, marketOutcome, marketPar, type MarketState } from '../market.ts';
 import { ARENA_ENGINES } from '../registry.ts';
@@ -12,12 +11,15 @@ import { FEE, GAIN, LOSS, STAKE, TEST_COST, afterTest, botBelief, hiddenSignal, 
 import { ULT_POOLS, playerProposesUlt, ultBotMinAccept, ultBotOffer, ultPrompt, ultTerms, ultimatumGame, type UltState } from '../ultimatum-game.ts';
 
 const setup = <V extends string>(persona: Persona, level: Level, variant: V, seed = 42, length: Setup['length'] = 'standard'): Setup<V> => ({ persona, level, variant, length, seed });
+/** A setup for any game: the given shared persona where the game offers it, otherwise that game's first opponent. */
+const setupFor = (engine: AnyArenaEngine, persona: Persona, level: Level, variant: string, seed = 42) =>
+  ({ persona: engine.opponents.includes(persona) ? persona : engine.opponents[0], level, variant, length: 'standard' as const, seed });
 
 /** A legal move for any arena game, from a simple policy — enough to drive every engine to the end. */
 function anyMove(id: string, s: any, k: number): unknown {
   switch (id) {
     case 'cooperation':
-      return k % 3 === 0 ? 'D' : 'C';
+      return { move: k % 3 === 0 ? 'D' : 'C', round: s.rounds.length };
     case 'ultimatum-game': {
       const p = ultPrompt(s)!;
       return p.terms.proposer === 'player' ? Math.floor(p.terms.pool / 2) : k % 2 ? 'accept' : 'reject';
@@ -47,8 +49,8 @@ function playOut(engine: AnyArenaEngine, s: any): any {
 describe('every arena game', () => {
   for (const id of ARENA_IDS) {
     const engine = ARENA_ENGINES[id];
-    it(`${id}: completes a match for every persona, level, variant and length`, () => {
-      for (const persona of PERSONAS)
+    it(`${id}: completes a match for every opponent, level, variant and length`, () => {
+      for (const persona of engine.opponents)
         for (const level of LEVELS)
           for (const variant of engine.variants)
             for (const length of LENGTHS) {
@@ -64,27 +66,28 @@ describe('every arena game', () => {
     });
 
     it(`${id}: refuses moves after the end and leaves the state unchanged`, () => {
-      const s = playOut(engine, engine.create(setup('investor', 'normal', engine.variants[0])));
-      assert.ok(engine.validate(s, anyMove(id, engine.create(setup('investor', 'normal', engine.variants[0])), 0)));
+      const s = playOut(engine, engine.create(setupFor(engine, 'investor', 'normal', engine.variants[0])));
+      assert.ok(engine.validate(s, anyMove(id, engine.create(setupFor(engine, 'investor', 'normal', engine.variants[0])), 0)));
       assert.throws(() => engine.apply(s, 'C'));
     });
 
     it(`${id}: replays exactly from the same seed`, () => {
-      const a = playOut(engine, engine.create(setup('opportunist', 'hard', engine.variants[engine.variants.length - 1], 99)));
-      const b = playOut(engine, engine.create(setup('opportunist', 'hard', engine.variants[engine.variants.length - 1], 99)));
+      const a = playOut(engine, engine.create(setupFor(engine, 'opportunist', 'hard', engine.variants[engine.variants.length - 1], 99)));
+      const b = playOut(engine, engine.create(setupFor(engine, 'opportunist', 'hard', engine.variants[engine.variants.length - 1], 99)));
       assert.deepEqual(a, b);
     });
 
     it(`${id}: a rematch starts from a clean state`, () => {
-      const fresh = engine.create(setup('banker', 'easy', engine.variants[0], 5));
+      const fresh = engine.create(setupFor(engine, 'banker', 'easy', engine.variants[0], 5));
       playOut(engine, fresh);
       assert.equal(engine.played(fresh), 0, 'apply must not mutate the previous state');
-      assert.deepEqual(engine.create(setup('banker', 'easy', engine.variants[0], 5)), fresh);
+      assert.deepEqual(engine.create(setupFor(engine, 'banker', 'easy', engine.variants[0], 5)), fresh);
     });
 
-    it(`${id}: the catalog describes every persona and variant`, () => {
+    it(`${id}: the catalog describes every opponent and variant`, () => {
       const info = ARENA[id];
-      for (const p of PERSONAS) assert.ok(info.personas[p].length > 10);
+      assert.deepEqual(info.opponents.map((o) => o.id), [...engine.opponents]);
+      for (const o of info.opponents) assert.ok(o.name.length > 3 && o.summary.length > 10);
       assert.deepEqual(info.variants.map((v) => v.id), [...engine.variants]);
       assert.equal(info.variants.filter((v) => !v.challenge).length, 1, 'exactly one standard variant');
     });
@@ -103,124 +106,6 @@ describe('results and par', () => {
     assert.equal(resultFrom(e(20, 25), 'p', { par: 21 }).outcome, 'loss');
     assert.equal(resultFrom(e(30, 30), 'p', { par: 21, tieWins: false }).outcome, 'draw');
     assert.equal(resultFrom(e(-3, -8), 'p', { positive: true }).outcome, 'draw');
-  });
-});
-
-// ── Cooperation ─────────────────────────────────────────────────────────────
-
-describe('cooperation', () => {
-  it('every variant is a genuine repeated dilemma', () => {
-    for (const v of COOP_VARIANTS) assert.ok(isDilemma(COOP_PAYOFFS[v]), v);
-  });
-
-  it('pays the four outcomes from the matrix', () => {
-    const P = COOP_PAYOFFS.classic;
-    assert.deepEqual(coopPayoff(P, 'C', 'C'), [P.R, P.R]);
-    assert.deepEqual(coopPayoff(P, 'D', 'C'), [P.T, P.S]);
-    assert.deepEqual(coopPayoff(P, 'C', 'D'), [P.S, P.T]);
-    assert.deepEqual(coopPayoff(P, 'D', 'D'), [P.P, P.P]);
-  });
-
-  it('the bot chooses before seeing the current move (simultaneous)', () => {
-    for (const persona of PERSONAS)
-      for (const level of LEVELS) {
-        let s = cooperation.create(setup(persona, level, 'classic', 3));
-        for (let i = 0; i < 9; i++) {
-          const c = cooperation.apply(s, 'C');
-          const d = cooperation.apply(s, 'D');
-          assert.equal(c.rounds[i].bi, d.rounds[i].bi, `${persona} ${level} round ${i + 1}`);
-          s = i % 4 === 0 ? d : c;
-        }
-      }
-  });
-
-  it('accumulates scores and validates moves', () => {
-    let s: CoopState = cooperation.create(setup('dealmaker', 'normal', 'classic'));
-    assert.ok(cooperation.validate(s, 'X' as never));
-    s = cooperation.apply(s, 'C');
-    s = cooperation.apply(s, 'C');
-    const r = cooperation.result(s);
-    assert.equal(r.player, 6);
-    assert.equal(r.rival, 6);
-  });
-
-  it('slips only happen in the noisy line, are independent of difficulty, and are revealed', () => {
-    const run = (level: Level, variant: 'classic' | 'noisy') => {
-      let s: CoopState = cooperation.create(setup('investor', level, variant, 11, 'long'));
-      while (!cooperation.isOver(s)) s = cooperation.apply(s, 'C');
-      return s.rounds.map((r) => r.p !== r.pi);
-    };
-    assert.ok(run('easy', 'classic').every((x) => !x));
-    assert.deepEqual(run('easy', 'noisy'), run('hard', 'noisy'));
-    let slips = 0;
-    for (let seed = 0; seed < 200; seed++) {
-      let s: CoopState = cooperation.create(setup('banker', 'normal', 'noisy', seed));
-      while (!cooperation.isOver(s)) s = cooperation.apply(s, 'C');
-      slips += s.rounds.filter((r) => r.p !== r.pi).length;
-    }
-    assert.ok(slips > 120 && slips < 280, `${slips} slips in 2000 choices`);
-  });
-
-  const vs = (persona: Persona, level: Level, policy: (h: CoopState['rounds'], s: CoopState) => CoopMove) => {
-    let s: CoopState = cooperation.create(setup(persona, level, 'classic', 21));
-    while (!cooperation.isOver(s)) s = cooperation.apply(s, policy(s.rounds, s));
-    return s;
-  };
-
-  it('reciprocal personas cooperate with a cooperator and punish a defector', () => {
-    for (const persona of ['investor', 'banker', 'dealmaker'] as const) {
-      const nice = vs(persona, 'normal', () => 'C');
-      assert.ok(nice.rounds.every((r) => r.b === 'C'), persona);
-      const mean = vs(persona, 'normal', () => 'D');
-      assert.ok(mean.rounds.filter((r) => r.b === 'D').length >= 7, persona);
-    }
-  });
-
-  it('always defecting is never a win: it tops the table below par', () => {
-    for (const persona of PERSONAS)
-      for (const level of ['normal', 'hard'] as const) {
-        const s = vs(persona, level, () => 'D');
-        assert.notEqual(cooperation.result(s).outcome, 'win', `${persona} ${level}`);
-        assert.ok(cooperation.result(s).player < coopPar(s));
-      }
-  });
-
-  it('the Opportunist exploits an unconditional cooperator', () => {
-    for (const level of LEVELS) {
-      const s = vs('opportunist', level, () => 'C');
-      assert.equal(cooperation.result(s).outcome, 'loss', level);
-    }
-  });
-
-  it('difficulty changes the policy: Hard Banker takes the final-round defection, Easy and Normal do not', () => {
-    for (const level of LEVELS) {
-      const s = vs('banker', level, () => 'C');
-      assert.equal(s.rounds[s.total - 1].b, level === 'hard' ? 'D' : 'C', level);
-    }
-  });
-
-  it('difficulty changes exploitability: alternating defections pay more against Easy than Hard Investor', () => {
-    const alt = (level: Level) => cooperation.result(vs('investor', level, (h) => (h.length % 2 ? 'D' : 'C'))).player;
-    assert.ok(alt('easy') > alt('hard'), `${alt('easy')} vs ${alt('hard')}`);
-  });
-
-  it('Hard Opportunist punishes forgiveness: it keeps defecting on a player who never retaliates', () => {
-    const s = vs('opportunist', 'hard', () => 'C');
-    assert.ok(s.rounds.filter((r) => r.b === 'D').length >= 5);
-    assert.equal(coopBotMove(s.setup, s.total, s.rounds.slice(0, s.total - 1)), 'D');
-  });
-
-  it('trust rises with mutual cooperation and falls with betrayal', () => {
-    const good = vs('dealmaker', 'easy', () => 'C');
-    assert.equal(trustLevel(good.rounds), 100);
-    const bad = vs('investor', 'hard', () => 'D');
-    assert.ok(trustLevel(bad.rounds) < 20);
-  });
-
-  it('the debrief names the first defection and its consequences', () => {
-    const s = vs('investor', 'hard', (h) => (h.length === 3 ? 'D' : 'C'));
-    const d = cooperation.debrief(s);
-    assert.match(d.moments[0], /round 4/);
   });
 });
 

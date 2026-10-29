@@ -1,4 +1,4 @@
-import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONA_NAME, type Persona, type Setup, draw, drawInt, plural, resultFrom } from './core.ts';
+import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONAS, PERSONA_NAME, type Persona, type Setup, draw, drawInt, plural, resultFrom } from './core.ts';
 
 /**
  * The Hidden Signal — ventures that are secretly Strong or Weak, a sender who knows which, and an investor who doesn't.
@@ -296,6 +296,7 @@ export function signalDebrief(s: SignalState): Debrief {
 
 export const hiddenSignal: ArenaEngine<SignalState, SignalAction, SignalVariant> = {
   id: 'signal',
+  opponents: PERSONAS,
   variants: SIGNAL_VARIANTS,
   rounds: signalRounds,
   create: (setup) => ({ setup, total: signalRounds(setup.length), rounds: [], tested: false }),

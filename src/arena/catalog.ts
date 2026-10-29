@@ -1,6 +1,6 @@
 import { BUDGET_PER_LOT, auctionLots } from './auction.ts';
 import { COOP_PAYOFFS, coopRounds } from './cooperation.ts';
-import type { ArenaGameId, Level, MatchLength, Persona } from './core.ts';
+import { type ArenaGameId, type Level, type MatchLength, PERSONAS, PERSONA_NAME, type Persona } from './core.ts';
 import { PRICE_MAX, PRICE_MIN, marketRounds } from './market.ts';
 import { FEE, GAIN, LOSS, STAKE, TEST_COST, signalRounds } from './signal.ts';
 import { ultRounds } from './ultimatum-game.ts';
@@ -18,6 +18,17 @@ export interface VariantInfo {
   challenge: boolean;
 }
 
+export interface OpponentInfo {
+  id: string;
+  name: string;
+  summary: string;
+  /** A memorable behavioural tendency, shown on the opponent card. */
+  tendency?: string;
+}
+
+/** The four shared personalities, with a game-specific summary each. */
+const shared = (summary: Record<Persona, string>): OpponentInfo[] => PERSONAS.map((id) => ({ id, name: PERSONA_NAME[id], summary: summary[id] }));
+
 export interface ArenaInfo {
   id: ArenaGameId;
   title: string;
@@ -30,7 +41,12 @@ export interface ArenaInfo {
   rules: string[];
   unit: string;
   tone: 'blue' | 'orange' | 'amber' | 'cyan' | 'success';
-  personas: Record<Persona, string>;
+  /** Who you can play, first is the default. */
+  opponents: OpponentInfo[];
+  /** Optional extras for the intro screen. */
+  subtitle?: string;
+  intro?: string;
+  whyRepeated?: string;
   variants: VariantInfo[];
   rounds: (length: MatchLength) => number;
   roundWord: string;
@@ -53,23 +69,26 @@ export const ARENA: Record<ArenaGameId, ArenaInfo> = {
   cooperation: {
     id: 'cooperation',
     title: 'The Cooperation Game',
-    tagline: 'Lock in Cooperate or Defect in secret, round after round, against the same opponent.',
-    question: 'Can you build trust with an opponent who might exploit it?',
-    decisions: ['Cooperate or defect, every round', 'When to forgive — and when to retaliate', 'Whether to trust the last round'],
+    subtitle: 'Trust is easy to build. Harder to keep.',
+    tagline: 'Work together, take a risk, or betray your partner. Every choice changes what happens next.',
+    question: 'Can you learn to cooperate with someone whose next move you cannot control?',
+    intro: 'Every round, you and your opponent decide whether to cooperate or look out for yourselves. You won’t see their choice until you commit. Remember what happened before: your next move could change everything.',
+    whyRepeated: 'You face the same opponent every round, and it remembers. A betrayal can pay now and cost you later.',
+    decisions: ['Cooperate or defect, every round', 'When to forgive — and when to retaliate', 'How to read your opponent'],
     rules: [
-      'Each round you and the opponent each choose Cooperate or Defect. Both choices lock in secret and are revealed together.',
-      `Classic payoffs: both cooperate ${C.R} each · you defect on a cooperator ${C.T} for you, ${C.S} for them · both defect ${C.P} each.`,
-      'Defecting always pays more this round — but mutual cooperation beats mutual defection, and the opponent remembers.',
-      'The number of rounds is shown from the start. To win, finish level with or ahead of the opponent and score at least 70% of what cooperating every round would pay. Out-scoring it by wrecking both scores is only a hollow win.',
+      'Each round you and your opponent each choose Cooperate or Defect, in secret. Both choices are revealed together once you commit.',
+      `Both cooperate: ${C.R} each. One defects on a cooperator: ${C.T} for the defector, ${C.S} for the cooperator. Both defect: ${C.P} each.`,
+      'Defecting always pays more in a single round — but two cooperators earn far more together than two defectors, and your opponent remembers what you did.',
+      'The number of rounds is fixed and shown from the start. The higher total score wins; equal scores are a draw.',
     ],
     unit: 'points',
     tone: 'blue',
-    personas: {
-      investor: 'Values a profitable long-term relationship. Patient — but not endlessly.',
-      banker: 'Runs one steady rule based on your record. Trust is earned back slowly.',
-      dealmaker: 'Opens with trust, answers betrayal, and offers a way back.',
-      opportunist: 'Looks for an opponent it can exploit and reacts to predictable play.',
-    },
+    opponents: [
+      { id: 'collaborator', name: 'The Collaborator', summary: 'Friendly and consistent. Wants a partnership that lasts.', tendency: 'Forgives the odd betrayal — but not a habit of them.' },
+      { id: 'retaliator', name: 'The Retaliator', summary: 'Fair-minded, but remembers betrayal.', tendency: 'Answers a defection with one of its own, then lets you earn trust back.' },
+      { id: 'opportunist', name: 'The Opportunist', summary: 'Pragmatic and focused on immediate gains.', tendency: 'Takes the advantage when it thinks you won’t answer.' },
+      { id: 'chameleon', name: 'The Chameleon', summary: 'Adaptive and hard to read.', tendency: 'Studies how you play and changes its strategy to match.' },
+    ],
     variants: [
       { id: 'classic', name: 'Classic', summary: `${C.R}/${C.R} · ${C.T}/${C.S} · ${C.P}/${C.P}`, challenge: false },
       { id: 'high-stakes', name: 'High stakes', summary: `Bigger temptation (${H.T}) and a real loss (${H.S}) for the betrayed`, challenge: true },
@@ -78,8 +97,8 @@ export const ARENA: Record<ArenaGameId, ArenaInfo> = {
     rounds: coopRounds,
     roundWord: 'rounds',
     coach: [
-      'The opponent has already locked its choice for this round — it can’t see yours. Pick Cooperate or Defect.',
-      'Watch the reveal: what it does next often depends on what you just did.',
+      'Your opponent has already locked its choice for this round — it can’t see yours. Tap a card to commit.',
+      'Watch what it does next: its choice often depends on what you just did.',
     ],
   },
   'ultimatum-game': {
@@ -96,12 +115,12 @@ export const ARENA: Record<ArenaGameId, ArenaInfo> = {
     ],
     unit: 'tokens',
     tone: 'amber',
-    personas: {
+    opponents: shared({
       investor: 'Thinks about the rounds still to come; a “no” early can be an investment.',
       banker: 'Keeps a steady acceptance line and makes safe, predictable offers.',
       dealmaker: 'Wants a deal both sides take and mirrors how fair you are.',
       opportunist: 'Hunts for the least you’ll accept — and may say no to train you.',
-    },
+    }),
     variants: [
       { id: 'standard', name: 'Standard', summary: 'Rejection leaves both with nothing', challenge: false },
       { id: 'outside-options', name: 'Outside options', summary: 'Each side has a public walk-away value up to 35% of the pool', challenge: true },
@@ -124,12 +143,12 @@ export const ARENA: Record<ArenaGameId, ArenaInfo> = {
     ],
     unit: 'profit',
     tone: 'orange',
-    personas: {
+    opponents: shared({
       investor: 'Bids for value and wants a margin on every lot.',
       banker: 'Guards its budget and goes quiet on uncertain lots.',
       dealmaker: 'Reads the room and bids what lots have been fetching.',
       opportunist: 'Strikes hard on lots it likes and when the room bids low.',
-    },
+    }),
     variants: [
       { id: 'standard', name: 'Standard', summary: 'Estimates within ±8 to ±16', challenge: false },
       { id: 'fog', name: 'Fog', summary: 'Estimates within ±20 to ±30 — the winner’s curse bites harder', challenge: true },
@@ -152,12 +171,12 @@ export const ARENA: Record<ArenaGameId, ArenaInfo> = {
     ],
     unit: 'profit',
     tone: 'cyan',
-    personas: {
+    opponents: shared({
       investor: 'Prices for sustainable profit and avoids starting price wars.',
       banker: 'Protects its margin, whatever the market does.',
       dealmaker: 'Mirrors the market: holds prices when rivals do, answers cuts.',
       opportunist: 'Undercuts whenever it sees a gap worth taking.',
-    },
+    }),
     variants: [
       { id: 'standard', name: 'Standard', summary: 'Moderate price sensitivity, cost 6', challenge: false },
       { id: 'price-war', name: 'Price war', summary: 'Customers are far more price-sensitive', challenge: true },
@@ -181,12 +200,12 @@ export const ARENA: Record<ArenaGameId, ArenaInfo> = {
     ],
     unit: 'tokens',
     tone: 'success',
-    personas: {
+    opponents: shared({
       investor: 'Weighs expected value and protects its reputation as a sender.',
       banker: 'Plays safe with big losses and never bluffs.',
       dealmaker: 'Judges signals by your record — and repays honesty in kind.',
       opportunist: 'Bluffs when you believe it, and adapts when you stop.',
-    },
+    }),
     variants: [
       { id: 'standard', name: 'Standard', summary: 'Tests are 80% accurate', challenge: false },
       { id: 'murky', name: 'Murky', summary: 'Tests are only 70% accurate', challenge: true },
@@ -199,5 +218,9 @@ export const ARENA: Record<ArenaGameId, ArenaInfo> = {
     ],
   },
 };
+
+/** An opponent's display info for a game, or undefined if the game doesn't offer it. */
+export const opponentInfo = (game: ArenaGameId, id: string) => ARENA[game].opponents.find((o) => o.id === id);
+export const opponentName = (game: ArenaGameId, id: string) => opponentInfo(game, id)?.name ?? id;
 
 export const ARENA_ORDER: readonly ArenaGameId[] = ['cooperation', 'ultimatum-game', 'auction', 'market', 'signal'];

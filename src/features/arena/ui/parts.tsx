@@ -4,8 +4,8 @@ import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withTiming } from '
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
 import { AppText } from '@/src/components/ui/AppText';
-import { Handshake, Landmark, Lightbulb, type LucideIcon, TrendingUp, X, Zap } from '@/src/components/ui/icons';
-import type { ArenaGameId, Persona } from '@/src/arena/core';
+import { Handshake, Landmark, Lightbulb, type LucideIcon, Shield, Shuffle, TrendingUp, X, Zap } from '@/src/components/ui/icons';
+import type { ArenaGameId } from '@/src/arena/core';
 import { useMotionReduced } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
 
@@ -18,7 +18,8 @@ export const ARENA_TINT: Record<ArenaGameId, { fg: string; bg: string; solid: st
   signal: { fg: colors.success, bg: colors.successSoft, solid: colors.success },
 };
 
-export const PERSONA_ICON: Record<Persona, LucideIcon> = { investor: TrendingUp, banker: Landmark, dealmaker: Handshake, opportunist: Zap };
+/** An icon per opponent id, across every arena game (the Cooperation Game has its own four). */
+export const PERSONA_ICON: Record<string, LucideIcon> = { investor: TrendingUp, banker: Landmark, dealmaker: Handshake, opportunist: Zap, collaborator: Handshake, retaliator: Shield, chameleon: Shuffle };
 
 /** A compact emblem per game, built from the brand palette. Decorative: hidden from screen readers. */
 export function ArenaArt({ game, size = 64 }: { game: ArenaGameId; size?: number }) {

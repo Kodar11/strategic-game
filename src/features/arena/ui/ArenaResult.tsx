@@ -7,8 +7,8 @@ import { AppText } from '@/src/components/ui/AppText';
 import { Badge } from '@/src/components/ui/Card';
 import { Button } from '@/src/components/ui/Button';
 import { Eye, Gamepad2, Lightbulb, RotateCcw, Sparkles, Trophy } from '@/src/components/ui/icons';
-import { ARENA, LEVEL_LABEL } from '@/src/arena/catalog';
-import { type ArenaGameId, type Debrief, LEVELS, type Level, type MatchResult, PERSONAS, PERSONA_NAME, type Persona } from '@/src/arena/core';
+import { ARENA, LEVEL_LABEL, opponentName } from '@/src/arena/catalog';
+import { type ArenaGameId, type Debrief, LEVELS, type Level, type MatchResult } from '@/src/arena/core';
 import { haptic } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
 import { PERSONA_ICON, Row } from './parts';
@@ -33,11 +33,11 @@ export function ArenaResult({
   game: ArenaGameId;
   result: MatchResult;
   debrief: Debrief;
-  persona: Persona;
+  persona: string;
   level: Level;
   newBest: boolean;
   onPlayAgain: () => void;
-  onChange: (next: { persona?: Persona; level?: Level }) => void;
+  onChange: (next: { persona?: string; level?: Level }) => void;
   onLibrary: () => void;
 }) {
   const enter = useEnter();
@@ -85,7 +85,7 @@ export function ArenaResult({
           </View>
         ) : null}
         <AppText variant="caption" color={colors.textMuted}>
-          vs {PERSONA_NAME[persona]} · {LEVEL_LABEL[level]}
+          vs {opponentName(game, persona)} · {LEVEL_LABEL[level]}
         </AppText>
       </View>
 
@@ -133,18 +133,18 @@ export function ArenaResult({
             Try another opponent
           </AppText>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}>
-            {PERSONAS.filter((p) => p !== persona).map((p) => {
+            {g.opponents.map((o) => o.id).filter((p) => p !== persona).map((p) => {
               const Icon = PERSONA_ICON[p];
               return (
                 <Pressable
                   key={p}
                   onPress={() => onChange({ persona: p })}
                   accessibilityRole="button"
-                  accessibilityLabel={`Play ${PERSONA_NAME[p]}, ${LEVEL_LABEL[level]}`}
+                  accessibilityLabel={`Play ${opponentName(game, p)}, ${LEVEL_LABEL[level]}`}
                   style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: pressed ? colors.surfaceHigh : colors.surface }]}>
                   <Icon size={14} color={colors.rivalText} />
                   <AppText variant="small" color={colors.text}>
-                    {PERSONA_NAME[p].replace(/^The /, '')}
+                    {opponentName(game, p).replace(/^The /, '')}
                   </AppText>
                 </Pressable>
               );

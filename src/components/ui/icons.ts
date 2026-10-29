@@ -87,3 +87,4 @@ export { default as HandCoins } from 'lucide-react-native/icons/hand-coins';
 export { default as ShieldAlert } from 'lucide-react-native/icons/shield-alert';
 export { default as ScanSearch } from 'lucide-react-native/icons/scan-search';
 export { default as Sparkles } from 'lucide-react-native/icons/sparkles';
+export { default as Shield } from 'lucide-react-native/icons/shield';

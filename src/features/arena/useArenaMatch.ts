@@ -11,7 +11,7 @@ const DOUBLE_TAP_MS = 350;
  * actions (an illegal one is refused and reported, never applied), swallows accidental double taps, and records the
  * result once when the match ends. Remount with a new key — and a new seed — for a rematch.
  */
-export function useArenaMatch<S extends { setup: Setup<V> }, A, V extends string>(engine: ArenaEngine<S, A, V>, setup: Setup<V>) {
+export function useArenaMatch<S extends { setup: Setup<V, any> }, A, V extends string>(engine: ArenaEngine<S, A, V>, setup: Setup<V, any>) {
   const [state, setState] = useState(() => engine.create(setup));
   const [refusal, setRefusal] = useState<string | null>(null);
   const [newBest, setNewBest] = useState(false);

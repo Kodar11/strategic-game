@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
-import { ARENA_IDS, type ArenaGameId, LENGTHS, LEVELS, type Level, type MatchLength, type Outcome, PERSONAS, type Persona, isArenaId, isLength, isLevel, isPersona } from '@/src/arena/core';
+import { ARENA } from '@/src/arena/catalog';
+import { ARENA_IDS, type ArenaGameId, LENGTHS, LEVELS, type Level, type MatchLength, type Outcome, isArenaId, isLength, isLevel } from '@/src/arena/core';
 
 /**
  * Strategy Arena records, kept on this device only: win/loss per game and per opponent, best score, the last few
@@ -20,7 +21,8 @@ export interface Tally {
 
 export interface RecentMatch {
   at: number;
-  persona: Persona;
+  /** An opponent id from that game's catalog. */
+  persona: string;
   level: Level;
   variant: string;
   outcome: Outcome;
@@ -30,12 +32,12 @@ export interface RecentMatch {
 
 export interface GameRecord extends Tally {
   best: number | null;
-  byPersona: Partial<Record<Persona, Tally>>;
+  byPersona: Partial<Record<string, Tally>>;
   recent: RecentMatch[];
 }
 
 export interface ArenaPrefs {
-  persona: Persona;
+  persona: string;
   level: Level;
   length: MatchLength;
   variant: string;
@@ -75,11 +77,14 @@ export function sanitize(raw: unknown): Stored {
     const r = g as Record<string, unknown>;
     const byPersona: GameRecord['byPersona'] = {};
     const bp = (r.byPersona && typeof r.byPersona === 'object' ? r.byPersona : {}) as Record<string, unknown>;
-    for (const p of PERSONAS) if (bp[p]) byPersona[p] = tally(bp[p]);
+    // Only opponents this game still offers (the Cooperation Game changed its cast; old entries are dropped).
+    const ids = ARENA[id].opponents.map((o) => o.id);
+    const valid = (x: unknown): x is string => typeof x === 'string' && ids.includes(x);
+    for (const p of ids) if (bp[p]) byPersona[p] = tally(bp[p]);
     const recent = (Array.isArray(r.recent) ? r.recent : [])
       .filter((m): m is Record<string, unknown> => !!m && typeof m === 'object')
-      .filter((m) => isPersona(m.persona) && isLevel(m.level) && isOutcome(m.outcome) && int(m.player) !== null && int(m.rival) !== null && int(m.at) !== null)
-      .map((m) => ({ at: int(m.at)!, persona: m.persona as Persona, level: m.level as Level, variant: typeof m.variant === 'string' ? m.variant : '', outcome: m.outcome as Outcome, player: int(m.player)!, rival: int(m.rival)! }))
+      .filter((m) => valid(m.persona) && isLevel(m.level) && isOutcome(m.outcome) && int(m.player) !== null && int(m.rival) !== null && int(m.at) !== null)
+      .map((m) => ({ at: int(m.at)!, persona: m.persona as string, level: m.level as Level, variant: typeof m.variant === 'string' ? m.variant : '', outcome: m.outcome as Outcome, player: int(m.player)!, rival: int(m.rival)! }))
       .slice(0, RECENT);
     out.games[id] = { ...tally(r), best: int(r.best), byPersona, recent };
   }
@@ -88,7 +93,7 @@ export function sanitize(raw: unknown): Stored {
   const prefs = (o.prefs && typeof o.prefs === 'object' ? o.prefs : {}) as Record<string, unknown>;
   for (const id of ARENA_IDS) {
     const p = prefs[id] as Record<string, unknown> | undefined;
-    if (p && isPersona(p.persona) && isLevel(p.level) && isLength(p.length) && typeof p.variant === 'string') out.prefs[id] = { persona: p.persona, level: p.level, length: p.length, variant: p.variant };
+    if (p && typeof p.persona === 'string' && ARENA[id].opponents.some((o) => o.id === p.persona) && isLevel(p.level) && isLength(p.length) && typeof p.variant === 'string') out.prefs[id] = { persona: p.persona, level: p.level, length: p.length, variant: p.variant };
   }
   return out;
 }
