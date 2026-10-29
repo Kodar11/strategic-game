@@ -1,13 +1,14 @@
 import { CircleCheck, Info, Lightbulb, TriangleAlert } from '@/src/components/ui/icons';
-import { type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { type ReactNode, useState } from 'react';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { Portrait } from '@/src/components/characters/Portrait';
 import { CAST, type CharacterId, type Expression } from '@/src/components/characters/cast';
-import { AppText } from '@/src/components/ui/AppText';
-import { colors, radius, space } from '@/src/theme/tokens';
+import { AppText, keepTogether } from '@/src/components/ui/AppText';
+import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 import { useEnter } from './motion';
+import { STAT_GAP, STAT_LIST_VALUE_SIZE, STAT_VALUE_SIZE, chunkRows, statColumns } from './stat-layout';
 import type { Verdict } from './verdict';
 
 /**
@@ -127,32 +128,77 @@ export function StepHeading({ kicker, title, body }: { kicker?: string; title: s
   );
 }
 
-/** A labelled number, e.g. "Your profit 8". */
-export function Stat({
-  label,
-  value,
-  tone = 'neutral',
-  caption,
-}: {
+export type StatTone = 'neutral' | 'blue' | 'orange' | 'amber';
+
+export interface StatItem {
   label: string;
   value: string;
-  tone?: 'neutral' | 'blue' | 'orange' | 'amber';
+  tone?: StatTone;
   caption?: string;
-}) {
+}
+
+/**
+ * A labelled number, e.g. "Your profit 8". `layout="row"` puts the label and value on one line, for narrow screens
+ * where a column of tall cards would waste space.
+ */
+export function Stat({ label, value, tone = 'neutral', caption, layout = 'card' }: StatItem & { layout?: 'card' | 'row' }) {
   const color = tone === 'blue' ? colors.primaryText : tone === 'orange' ? colors.rivalText : tone === 'amber' ? colors.insight : colors.text;
+  if (layout === 'row') {
+    return (
+      <View style={[styles.stat, styles.statRow]}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <AppText variant="small" color={colors.textMuted}>
+            {label}
+          </AppText>
+          {caption ? (
+            <AppText variant="caption" color={colors.textMuted}>
+              {caption}
+            </AppText>
+          ) : null}
+        </View>
+        <AppText variant="number" color={color} tabular style={styles.statRowValue}>
+          {keepTogether(value)}
+        </AppText>
+      </View>
+    );
+  }
   return (
     <View style={styles.stat}>
       <AppText variant="caption" color={colors.textMuted}>
         {label}
       </AppText>
-      <AppText variant="number" color={color} tabular style={{ fontSize: 30, lineHeight: 36 }}>
-        {value}
+      <AppText variant="number" color={color} tabular style={{ fontSize: STAT_VALUE_SIZE, lineHeight: STAT_VALUE_SIZE + 6 }}>
+        {keepTogether(value)}
       </AppText>
       {caption ? (
         <AppText variant="caption" color={colors.textMuted}>
           {caption}
         </AppText>
       ) : null}
+    </View>
+  );
+}
+
+/**
+ * A group of stats that picks its own layout from the space it gets: three or two columns when the values and labels
+ * fit, otherwise a compact list. Cards in a row share its height; a short last row stretches to fill.
+ */
+export function StatGrid({ stats, max = 3 }: { stats: readonly StatItem[]; max?: 2 | 3 }) {
+  const window = useWindowDimensions();
+  // First guess before layout: the page width minus page and card padding.
+  const [width, setWidth] = useState(() => Math.min(window.width, MAX_CONTENT_WIDTH) - 64);
+  const cols = statColumns(stats, width, window.fontScale, max);
+  return (
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ gap: cols === 1 ? space.xs : STAT_GAP }}>
+      {cols === 1
+        ? stats.map((s) => <Stat key={s.label} {...s} layout="row" />)
+        : chunkRows(stats, cols).map((row) => (
+            <View key={row.map((s) => s.label).join('|')} style={{ flexDirection: 'row', gap: STAT_GAP }}>
+              {row.map((s) => (
+                <Stat key={s.label} {...s} />
+              ))}
+            </View>
+          ))}
     </View>
   );
 }
@@ -194,6 +240,8 @@ const styles = StyleSheet.create({
     padding: space.md,
     gap: 2,
   },
+  statRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm },
+  statRowValue: { fontSize: STAT_LIST_VALUE_SIZE, lineHeight: STAT_LIST_VALUE_SIZE + 6, textAlign: 'right', flexShrink: 1, maxWidth: '60%' },
 });
 
 /** Strings, numbers, and JSX text with interpolations (arrays of those) must be wrapped in a Text. */

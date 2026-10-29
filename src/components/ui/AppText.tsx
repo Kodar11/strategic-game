@@ -44,3 +44,8 @@ export function AppText({ variant = 'body', color, weight, align, tabular, style
     />
   );
 }
+
+/** Non-breaking spaces, so a value and its unit ("3.5 units") never split across lines. */
+export function keepTogether(text: string) {
+  return text.replace(/ /g, ' ');
+}

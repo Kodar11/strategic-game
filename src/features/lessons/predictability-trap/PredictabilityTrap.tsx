@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { SceneArt } from '@/src/components/art/SceneArt';
 import { Completion } from '@/src/components/lesson/Completion';
 import { LessonShell, type StepDef } from '@/src/components/lesson/LessonShell';
-import { Dialogue, FeedbackPanel, Panel, Stat, StepHeading } from '@/src/components/lesson/Panels';
+import { Dialogue, FeedbackPanel, Panel, Stat, StatGrid, StepHeading } from '@/src/components/lesson/Panels';
 import { PredictionPrompt } from '@/src/components/lesson/Prediction';
 import {
   canLock,
@@ -176,10 +176,12 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
             <SceneArt scene="shootout" height={180} />
           </Animated.View>
           <StepHeading kicker={`Lesson ${lesson.number}`} title="The penalty shootout" body="You shoot left or right. Maya, in goal, dives left or right at the same moment." />
-          <View style={{ flexDirection: 'row', gap: space.sm }}>
-            <Stat label="She dives the other way" value="Goal" tone="blue" caption="you score 1" />
-            <Stat label="She guesses your side" value="Save" tone="orange" caption="you score 0" />
-          </View>
+          <StatGrid
+            stats={[
+              { label: 'She dives the other way', value: 'Goal', tone: 'blue', caption: 'you score 1' },
+              { label: 'She guesses your side', value: 'Save', tone: 'orange', caption: 'you score 0' },
+            ]}
+          />
           <Dialogue character="maya" expression="thinking" align="right" delay={120}>
             I don&apos;t know where you&apos;ll shoot. But I&apos;ll be watching every shot you take.
           </Dialogue>
@@ -261,11 +263,13 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
               </AppText>
             </Card>
             <History shots={data.shots} />
-            <View style={{ flexDirection: 'row', gap: space.sm }}>
-              <Stat label="Shots she read a pattern" value={String(readCount)} tone="orange" />
-              <Stat label="Saves from those reads" value={String(readSaves)} tone="orange" />
-              <Stat label="Your goals" value={`${goals}/${SHOTS_TO_TAKE}`} tone="blue" />
-            </View>
+            <StatGrid
+              stats={[
+                { label: 'Shots she read a pattern', value: String(readCount), tone: 'orange' },
+                { label: 'Saves from those reads', value: String(readSaves), tone: 'orange' },
+                { label: 'Your goals', value: `${goals}/${SHOTS_TO_TAKE}`, tone: 'blue' },
+              ]}
+            />
             <Dialogue character="maya" expression={readSaves >= 3 ? 'confident' : 'frustrated'} align="right">
               {readSaves >= 3 ? 'People think they’re being random. Most of them have a rhythm.' : 'You didn’t give me much to work with. Annoying.'}
             </Dialogue>
@@ -353,10 +357,12 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
           </Dialogue>
           <Card style={{ gap: space.sm }}>
             <SectionLabel>Expected goals per shot at 50/50</SectionLabel>
-            <View style={{ flexDirection: 'row', gap: space.sm }}>
-              <Stat label="If she always dives left" value={expectedPayoff(0.5, 1).toFixed(2)} tone="blue" />
-              <Stat label="If she always dives right" value={expectedPayoff(0.5, 0).toFixed(2)} tone="blue" />
-            </View>
+            <StatGrid
+              stats={[
+                { label: 'If she always dives left', value: expectedPayoff(0.5, 1).toFixed(2), tone: 'blue' },
+                { label: 'If she always dives right', value: expectedPayoff(0.5, 0).toFixed(2), tone: 'blue' },
+              ]}
+            />
             <AppText variant="caption" color={colors.textMuted}>
               Expected value = chance you shoot left × chance she dives right + chance you shoot right × chance she dives left.
             </AppText>
@@ -413,10 +419,12 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
                   {/* Expected values would answer the prediction, so they wait for the first simulation. */}
                   {phase === 'review' ? (
                     <>
-                      <View style={{ flexDirection: 'row', gap: space.sm }}>
-                        <Stat label="Expected if she dives left" value={expectedPayoff(q, 1).toFixed(2)} />
-                        <Stat label="Expected if she dives right" value={expectedPayoff(q, 0).toFixed(2)} />
-                      </View>
+                      <StatGrid
+                        stats={[
+                          { label: 'Expected if she dives left', value: expectedPayoff(q, 1).toFixed(2) },
+                          { label: 'Expected if she dives right', value: expectedPayoff(q, 0).toFixed(2) },
+                        ]}
+                      />
                       <Stat label="What you can count on (she picks the worse one for you)" value={guaranteedPayoff(q).toFixed(2)} tone="amber" />
                     </>
                   ) : (
@@ -434,10 +442,12 @@ export default function PredictabilityTrap({ lesson }: { lesson: LessonMeta }) {
                 />
                 {sim ? (
                   <Card style={{ gap: space.md }}>
-                    <View style={{ flexDirection: 'row', gap: space.sm }}>
-                      <Stat label="Observed this run" value={sim.observed.toFixed(2)} tone="blue" caption={`${sim.goals} goals of ${sim.shots}`} />
-                      <Stat label="Expected" value={sim.expected.toFixed(2)} tone="amber" caption={`she dives ${SIDE_NAME[sim.keeperDive]}`} />
-                    </View>
+                    <StatGrid
+                      stats={[
+                        { label: 'Observed this run', value: sim.observed.toFixed(2), tone: 'blue', caption: `${sim.goals} goals of ${sim.shots}` },
+                        { label: 'Expected', value: sim.expected.toFixed(2), tone: 'amber', caption: `she dives ${SIDE_NAME[sim.keeperDive]}` },
+                      ]}
+                    />
                     <RunningChart running={sim.running} expected={sim.expected} />
                     <AppText variant="caption" color={colors.textMuted}>
                       Short runs wander around the expected value; longer runs settle closer. Run it again to see a different sequence.

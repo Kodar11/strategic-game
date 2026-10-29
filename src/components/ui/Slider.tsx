@@ -5,7 +5,7 @@ import { PanResponder, Pressable, StyleSheet, View } from 'react-native';
 import { clamp } from '@/src/game/rng';
 import { haptic } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
-import { AppText } from './AppText';
+import { AppText, keepTogether } from './AppText';
 
 export interface SliderProps {
   value: number;
@@ -19,6 +19,8 @@ export interface SliderProps {
   /** Optional marker drawn on the track, e.g. a threshold. */
   marker?: { value: number; label: string };
   showValue?: boolean;
+  /** Keep the label for screen readers but don't print it, when the same question is already shown above the slider. */
+  hideLabel?: boolean;
 }
 
 const THUMB = 28;
@@ -30,7 +32,7 @@ function snap(raw: number, min: number, max: number, step: number) {
 }
 
 /** Draggable slider with +/− buttons and screen-reader increment/decrement support. */
-export function Slider({ value, min, max, step, onChange, label, formatValue, tone = 'blue', marker, showValue = true }: SliderProps) {
+export function Slider({ value, min, max, step, onChange, label, formatValue, tone = 'blue', marker, showValue = true, hideLabel = false }: SliderProps) {
   const [width, setWidth] = useState(0);
   const latest = useRef({ value, min, max, step, onChange, width });
   useLayoutEffect(() => {
@@ -84,16 +86,20 @@ export function Slider({ value, min, max, step, onChange, label, formatValue, to
 
   return (
     <View>
-      <View style={styles.labelRow}>
-        <AppText variant="small" color={colors.textMuted}>
-          {label}
-        </AppText>
-        {showValue ? (
-          <AppText variant="bodyStrong" color={colors.text} tabular>
-            {fmt(value)}
-          </AppText>
-        ) : null}
-      </View>
+      {!hideLabel || showValue ? (
+        <View style={styles.labelRow}>
+          {!hideLabel ? (
+            <AppText variant="small" color={colors.textMuted} style={styles.label}>
+              {label}
+            </AppText>
+          ) : null}
+          {showValue ? (
+            <AppText variant="bodyStrong" color={colors.text} tabular style={styles.value}>
+              {keepTogether(fmt(value))}
+            </AppText>
+          ) : null}
+        </View>
+      ) : null}
       <View style={styles.row}>
         <StepButton icon="minus" label={`Decrease ${label}`} onPress={() => nudge(-1)} disabled={value <= min} />
         <View
@@ -124,7 +130,9 @@ export function Slider({ value, min, max, step, onChange, label, formatValue, to
           <AppText
             variant="caption"
             color={colors.insight}
-            style={{ position: 'absolute', left: THUMB / 2 + markerRatio * usable - 40, width: 80, textAlign: 'center' }}>
+            numberOfLines={1}
+            // Centred under the marker, but never pushed past either end of the track.
+            style={{ position: 'absolute', left: clamp(THUMB / 2 + markerRatio * usable - 40, 0, Math.max(0, width - 80)), width: 80, textAlign: 'center' }}>
             {marker.label}
           </AppText>
         </View>
@@ -149,7 +157,10 @@ function StepButton({ icon, label, onPress, disabled }: { icon: 'plus' | 'minus'
 }
 
 const styles = StyleSheet.create({
-  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: space.sm },
+  // Label and value share a line while both fit; on narrow screens or with large text the value drops below.
+  labelRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: space.md, rowGap: space.xxs, marginBottom: space.sm },
+  label: { flexGrow: 1, flexShrink: 1, flexBasis: 160 },
+  value: { flexShrink: 0, marginLeft: 'auto', maxWidth: '100%' },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   trackArea: { flex: 1, height: 44, justifyContent: 'center' },
   track: { position: 'absolute', height: 6, borderRadius: 3, backgroundColor: colors.surfaceHigh, overflow: 'hidden' },

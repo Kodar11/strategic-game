@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { SceneArt } from '@/src/components/art/SceneArt';
 import { Completion } from '@/src/components/lesson/Completion';
 import { LessonShell, type StepDef } from '@/src/components/lesson/LessonShell';
-import { Dialogue, FeedbackPanel, Panel, Stat, StepHeading } from '@/src/components/lesson/Panels';
+import { Dialogue, FeedbackPanel, Panel, StatGrid, StepHeading } from '@/src/components/lesson/Panels';
 import { PredictionPrompt, PredictionResult } from '@/src/components/lesson/Prediction';
 import {
   type Confidence,
@@ -188,10 +188,12 @@ export default function StrategyDetective({ lesson }: { lesson: LessonMeta }) {
         <>
           <StepHeading title="A quick example" body="Suppose the average of all picks turns out to be 60." />
           <Card style={{ gap: space.md }}>
-            <View style={{ flexDirection: 'row', gap: space.sm }}>
-              <Stat label="Average" value="60" />
-              <Stat label="Target = ⅔ × 60" value="40" tone="amber" />
-            </View>
+            <StatGrid
+              stats={[
+                { label: 'Average', value: '60' },
+                { label: 'Target = ⅔ × 60', value: '40', tone: 'amber' },
+              ]}
+            />
             <AppText variant="small" color={colors.textMuted}>
               Whoever picked closest to 40 wins. If several are equally close, they share the win.
             </AppText>
@@ -502,11 +504,13 @@ function RoundResultView({ result, round }: { result: RoundResult; round: 1 | 2 
       <StepHeading kicker={`Round ${round} results`} title={won ? (winners.length > 1 ? 'You shared the win' : 'You won this round') : `You placed ${ordinal(learnerRank)} of ${playerCount}`} />
       <Card style={{ gap: space.lg }}>
         <NumberLine picks={result.picks} target={target} average={average} />
-        <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <Stat label="Average" value={average.toFixed(1)} />
-          <Stat label="Target (⅔)" value={target.toFixed(1)} tone="amber" />
-          <Stat label="You were off by" value={learner.distance.toFixed(1)} tone="blue" />
-        </View>
+        <StatGrid
+          stats={[
+            { label: 'Average', value: average.toFixed(1) },
+            { label: 'Target (⅔)', value: target.toFixed(1), tone: 'amber' },
+            { label: 'You were off by', value: learner.distance.toFixed(1), tone: 'blue' },
+          ]}
+        />
         <AppText variant="caption" color={colors.textMuted}>
           Sum of all {playerCount} picks = {sumText}. Average = {sumText} ÷ {playerCount} = {average.toFixed(1)}. Target = ⅔ × {average.toFixed(1)} = {target.toFixed(1)}.
         </AppText>
@@ -590,10 +594,12 @@ function CrowdLab({
             ))}
           </Card>
           <Card style={{ gap: space.md }}>
-            <View style={{ flexDirection: 'row', gap: space.sm }}>
-              <Stat label="Other players" value={String(n)} />
-              <Stat label="Best pick for you" value={best.toFixed(1)} tone="blue" caption={`lands on target ${target.toFixed(1)}`} />
-            </View>
+            <StatGrid
+              stats={[
+                { label: 'Other players', value: String(n) },
+                { label: 'Best pick for you', value: best.toFixed(1), tone: 'blue', caption: `lands on target ${target.toFixed(1)}` },
+              ]}
+            />
             <AppText variant="caption" color={colors.textMuted}>
               Average with your best pick = {average.toFixed(1)}. Best pick solves: your number = ⅔ × average including your number.
             </AppText>

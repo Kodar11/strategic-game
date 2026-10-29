@@ -145,10 +145,10 @@ export function ConfidenceScale({ value, onChange }: { value: Confidence | null;
           </AppText>
         ) : (
           <>
-            <AppText variant="caption" color={colors.textMuted}>
+            <AppText variant="caption" color={colors.textMuted} style={{ flexShrink: 1 }}>
               1 · {CONFIDENCE_LEVELS[0].label}
             </AppText>
-            <AppText variant="caption" color={colors.textMuted} align="right">
+            <AppText variant="caption" color={colors.textMuted} align="right" style={{ flexShrink: 1 }}>
               5 · {CONFIDENCE_LEVELS[4].label}
             </AppText>
           </>

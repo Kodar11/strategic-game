@@ -8,7 +8,7 @@ import { Portrait } from '@/src/components/characters/Portrait';
 import type { CharacterId } from '@/src/components/characters/cast';
 import { Completion } from '@/src/components/lesson/Completion';
 import { LessonShell, type StepDef } from '@/src/components/lesson/LessonShell';
-import { Dialogue, FeedbackPanel, Panel, Stat, StepHeading } from '@/src/components/lesson/Panels';
+import { Dialogue, FeedbackPanel, Panel, StatGrid, StepHeading } from '@/src/components/lesson/Panels';
 import { PayoffMatrix } from '@/src/components/lesson/PayoffMatrix';
 import { PredictionPrompt, PredictionResult } from '@/src/components/lesson/Prediction';
 import {
@@ -315,10 +315,12 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
                     ? 'Each company is indifferent against either rival choice; the model cannot predict which way they go.'
                     : `Both still cut and earn ${fmt(after.companyPayoffs![0])} each.`)}
             </Panel>
-            <View style={{ flexDirection: 'row', gap: space.sm }}>
-              <Stat label="Penalties you collect" value={after.predicted ? fmt(after.penaltiesCollected) : '—'} tone="orange" caption="at the predicted outcome" />
-              <Stat label="Rewards you pay" value={after.predicted ? fmt(after.rewardsPaid) : '—'} tone="blue" caption="at the predicted outcome" />
-            </View>
+            <StatGrid
+              stats={[
+                { label: 'Penalties you collect', value: after.predicted ? fmt(after.penaltiesCollected) : '—', tone: 'orange', caption: 'at the predicted outcome' },
+                { label: 'Rewards you pay', value: after.predicted ? fmt(after.rewardsPaid) : '—', tone: 'blue', caption: 'at the predicted outcome' },
+              ]}
+            />
             <Button label="Reset rules" variant="ghost" compact icon={RotateCcw} iconPosition="left" onPress={() => setRules({ penalty: 0, reward: 0 })} />
           </>
         );

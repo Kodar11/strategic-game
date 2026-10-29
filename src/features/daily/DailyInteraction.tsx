@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import { FeedbackPanel, Panel, Stat } from '@/src/components/lesson/Panels';
+import { FeedbackPanel, Panel, StatGrid } from '@/src/components/lesson/Panels';
 import { ConfidenceScale, PredictionPrompt, PredictionResult } from '@/src/components/lesson/Prediction';
 import type { Confidence } from '@/src/components/lesson/prediction-state';
 import { AppText } from '@/src/components/ui/AppText';
@@ -99,6 +99,7 @@ export function DailyInteraction({
             step={c.step}
             tone="cyan"
             label="Your answer"
+            hideLabel
             formatValue={(v) => formatNumber(c, v)}
             onChange={(v) => onDraft({ kind: 'number', draft: numberEngine.set(c, draft.draft, v) })}
           />
@@ -202,13 +203,7 @@ function ScenarioOutcome({ spec, answer }: { spec: ScenarioSpec; answer: Scenari
     <Card elevated style={{ gap: space.md }}>
       <SectionLabel color={colors.insight}>What happened</SectionLabel>
       <AppText variant="heading">{result.headline}</AppText>
-      <View style={{ flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' }}>
-        {result.stats.map((st) => (
-          <View key={st.label} style={{ flexBasis: '30%', flexGrow: 1 }}>
-            <Stat label={st.label} value={st.value} tone={st.tone === 'neutral' ? undefined : st.tone} />
-          </View>
-        ))}
-      </View>
+      <StatGrid stats={result.stats} />
       {result.bars?.length ? <Bars bars={result.bars} /> : null}
       {result.lines.map((l) => (
         <AppText key={l} variant="small" color={colors.textBody}>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Stat } from '@/src/components/lesson/Panels';
+import { StatGrid } from '@/src/components/lesson/Panels';
 import { PayoffMatrix } from '@/src/components/lesson/PayoffMatrix';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
@@ -147,7 +147,7 @@ function ParamLab({ lab, onExplored }: { lab: Extract<LabSpec, { kind: 'param' }
           step={s.step}
           label={s.label}
           tone="cyan"
-          formatValue={(v) => `${s.label}: ${v}${s.unit ?? ''}`}
+          formatValue={(v) => `${v}${s.unit ?? ''}`}
           onChange={(v) => {
             setValues((x) => ({ ...x, [s.id]: v }));
             if (!touched) {
@@ -157,13 +157,7 @@ function ParamLab({ lab, onExplored }: { lab: Extract<LabSpec, { kind: 'param' }
           }}
         />
       ))}
-      <View style={{ flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' }}>
-        {out.stats.map((s) => (
-          <View key={s.label} style={{ flexBasis: '30%', flexGrow: 1 }}>
-            <Stat label={s.label} value={s.value} tone={s.tone === 'neutral' ? undefined : s.tone} />
-          </View>
-        ))}
-      </View>
+      <StatGrid stats={out.stats} />
       {out.bars ? <Bars bars={out.bars} /> : null}
       {out.lines.map((l) => (
         <AppText key={l} variant="small">

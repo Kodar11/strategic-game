@@ -161,7 +161,8 @@ export function Completion({
         ) : null}
         {next ? (
           <Button
-            label={`Next: ${next.title}`}
+            kicker="Next lesson"
+            label={next.title}
             icon={ArrowRight}
             onPress={() => router.replace({ pathname: '/lesson/[lessonId]', params: { lessonId: next.id } })}
           />

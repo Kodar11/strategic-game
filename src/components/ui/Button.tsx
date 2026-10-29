@@ -17,6 +17,8 @@ export interface ButtonProps {
   style?: StyleProp<ViewStyle>;
   accessibilityHint?: string;
   compact?: boolean;
+  /** A short line above the label, e.g. "Next lesson" over a lesson title, so a long label reads as two deliberate lines. */
+  kicker?: string;
 }
 
 export function Button({
@@ -29,6 +31,7 @@ export function Button({
   style,
   accessibilityHint,
   compact,
+  kicker,
 }: ButtonProps) {
   const scale = useSharedValue(1);
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
@@ -41,7 +44,7 @@ export function Button({
     <Animated.View style={[animated, style]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={label}
+        accessibilityLabel={kicker ? `${kicker}: ${label}` : label}
         accessibilityHint={accessibilityHint}
         accessibilityState={{ disabled: !!disabled }}
         disabled={disabled}
@@ -61,9 +64,20 @@ export function Button({
         ]}>
         <View style={styles.row}>
           {Icon && iconPosition === 'left' ? <Icon size={18} color={fg} strokeWidth={2.2} /> : null}
-          <AppText variant="bodyStrong" color={fg} align="center" style={styles.label}>
-            {label}
-          </AppText>
+          {kicker ? (
+            <View style={[styles.label, { alignItems: 'center' }]}>
+              <AppText variant="overline" color={fg} align="center" style={{ opacity: 0.8 }}>
+                {kicker}
+              </AppText>
+              <AppText variant="bodyStrong" color={fg} align="center">
+                {label}
+              </AppText>
+            </View>
+          ) : (
+            <AppText variant="bodyStrong" color={fg} align="center" style={styles.label}>
+              {label}
+            </AppText>
+          )}
           {Icon && iconPosition === 'right' ? <Icon size={18} color={fg} strokeWidth={2.2} /> : null}
         </View>
       </Pressable>
@@ -96,7 +110,8 @@ const styles = StyleSheet.create({
   base: {
     minHeight: 52,
     borderRadius: radius.lg,
-    paddingHorizontal: space.xl,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },

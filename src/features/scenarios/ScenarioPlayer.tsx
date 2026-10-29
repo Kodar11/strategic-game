@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { Dialogue, FeedbackPanel, Panel, Stat } from '@/src/components/lesson/Panels';
+import { Dialogue, FeedbackPanel, Panel, StatGrid } from '@/src/components/lesson/Panels';
 import { PredictionPrompt, PredictionResult } from '@/src/components/lesson/Prediction';
 import { chooseAnswer, rateConfidence } from '@/src/components/lesson/prediction-state';
 import { useEnter } from '@/src/components/lesson/motion';
@@ -135,13 +135,7 @@ function Player({ spec }: { spec: ScenarioSpec }) {
           <Card elevated style={{ gap: space.md }}>
             <SectionLabel color={colors.insight}>What happened</SectionLabel>
             <AppText variant="heading">{result.headline}</AppText>
-            <View style={{ flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' }}>
-              {result.stats.map((s) => (
-                <View key={s.label} style={{ flexBasis: '30%', flexGrow: 1 }}>
-                  <Stat label={s.label} value={s.value} tone={s.tone === 'neutral' ? undefined : s.tone} />
-                </View>
-              ))}
-            </View>
+            <StatGrid stats={result.stats} />
             {result.bars?.length ? <Bars bars={result.bars} /> : null}
             {result.lines.map((l) => (
               <AppText key={l} variant="small" color={colors.textBody}>
@@ -252,7 +246,8 @@ export function Decision({ prompt, onCommit }: { prompt: DecisionPrompt; onCommi
           Your move
         </AppText>
         <AppText variant="bodyStrong">{prompt.prompt}</AppText>
-        <Slider value={num} min={prompt.min} max={prompt.max} step={prompt.step} onChange={setNum} label={prompt.prompt} formatValue={fmtValue} />
+        {/* The question is printed just above and the live value is on the commit button, so the slider shows neither. */}
+        <Slider value={num} min={prompt.min} max={prompt.max} step={prompt.step} onChange={setNum} label={prompt.prompt} formatValue={fmtValue} hideLabel showValue={false} />
         <Button label={`${cta}: ${fmtValue(num)}`} onPress={() => onCommit(num)} />
       </View>
     );
@@ -268,7 +263,7 @@ export function Decision({ prompt, onCommit }: { prompt: DecisionPrompt; onCommi
       </AppText>
       <AppText variant="bodyStrong">{prompt.prompt}</AppText>
       {prompt.parties.slice(0, -1).map((p, i) => (
-        <Slider key={p.id} value={alloc[i]} min={0} max={prompt.total} step={prompt.step} onChange={(v) => setAlloc((a) => a.map((x, j) => (j === i ? v : x)))} label={p.label} formatValue={(v) => `${p.label}: ${v}`} />
+        <Slider key={p.id} value={alloc[i]} min={0} max={prompt.total} step={prompt.step} onChange={(v) => setAlloc((a) => a.map((x, j) => (j === i ? v : x)))} label={p.label} />
       ))}
       <AppText variant="small" color={last < 0 ? colors.danger : colors.text}>
         {prompt.parties[prompt.parties.length - 1].label} gets the rest: {last}
