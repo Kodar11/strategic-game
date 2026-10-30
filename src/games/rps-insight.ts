@@ -7,7 +7,7 @@ import { RPS_BOTS, RPS_INSIGHT, RPS_MOVES, RPS_ROUNDS, type RpsBot, type RpsMove
  * - "Read your opponent": one locked prediction per mystery match, worth Insight Points (RPS_INSIGHT) when right —
  *   never touching match points;
  * - the post-match reveal: evidence from the recorded throws and one practical takeaway;
- * - "Repeat this throw": one auto-submitted move per remaining round, cancellable at any time.
+ * Repeat play (a throw, a cycle or a reply repeated over several rounds) is shared with other games: src/repeat/.
  * Everything here is pure; the screens hold the state.
  */
 
@@ -213,49 +213,4 @@ export function matchReveal(m: { bot: RpsBot; difficulty: Difficulty; mode: Oppo
     evidence: evidence(m.bot, m.difficulty, m.rounds),
     takeaway: rpsTakeaway(m.bot, m.difficulty),
   };
-}
-
-// ── Repeat this throw ────────────────────────────────────────────────────────
-
-export interface RepeatState {
-  roundsPlayed: number;
-  totalRounds: number;
-  /** A round is in flight (a server match): wait for it. */
-  busy: boolean;
-  done: boolean;
-  error?: boolean;
-}
-
-/**
- * "Repeat this throw": while armed, each `tick` releases the move at most once per round — only when the round before
- * has been resolved and nothing is in flight. It disarms itself when the match ends or a submission fails, and
- * `cancel` stops it at once. The caller decides when to tick (after its reveal pause), so no round is skipped.
- */
-export class RepeatThrow {
-  private armed: { move: RpsMove; sentFor: number } | null = null;
-
-  get move(): RpsMove | null {
-    return this.armed?.move ?? null;
-  }
-
-  start(move: RpsMove): void {
-    this.armed = { move, sentFor: -1 };
-  }
-
-  cancel(): void {
-    this.armed = null;
-  }
-
-  /** The move to submit for the current round, if it hasn't been released for this round yet; otherwise null. */
-  tick(s: RepeatState): RpsMove | null {
-    const a = this.armed;
-    if (!a) return null;
-    if (s.done || s.error || s.roundsPlayed >= s.totalRounds) {
-      this.armed = null;
-      return null;
-    }
-    if (s.busy || a.sentFor === s.roundsPlayed) return null;
-    a.sentFor = s.roundsPlayed;
-    return a.move;
-  }
 }

@@ -11,7 +11,6 @@ import {
   MYSTERY_NAME,
   type OpponentRead,
   RPS_READS,
-  RepeatThrow,
   awaitingRead,
   evidence,
   insightFor,
@@ -116,79 +115,6 @@ describe('every personality at every difficulty', () => {
       const t = rps.totals(rounds);
       assert.equal(t.player, rounds.reduce((s, r) => s + (r.r === 1 ? RPS_POINTS.win : r.r === 0 ? RPS_POINTS.tie : RPS_POINTS.loss), 0));
     }
-  });
-});
-
-// ── Repeat this throw ───────────────────────────────────────────────────────
-
-describe('repeat this throw', () => {
-  /** A practice match driven like the board: `play` appends a resolved round. */
-  function harness(seed = 3) {
-    const spec: MatchSpec<RpsBot> = { bot: 'mind-reader', difficulty: 'hard', seed };
-    const rounds: RpsRound[] = [];
-    const sent: RpsMove[] = [];
-    const repeater = new RepeatThrow();
-    const state = (busy = false, error = false) => ({ roundsPlayed: rounds.length, totalRounds: RPS_ROUNDS, busy, done: rounds.length >= RPS_ROUNDS, error });
-    /** One timer firing on the board: tick, and play what it releases. */
-    const tick = (busy = false, error = false) => {
-      const m = repeater.tick(state(busy, error));
-      if (m) {
-        sent.push(m);
-        if (!busy) rounds.push(rps.resolve(spec, rounds, m));
-      }
-      return m;
-    };
-    return { spec, rounds, sent, repeater, tick };
-  }
-
-  it('submits exactly one move per remaining round, however often it ticks, then disarms', () => {
-    const t = harness();
-    t.rounds.push(rps.resolve(t.spec, t.rounds, 'paper'));
-    t.repeater.start('paper');
-    for (let i = 0; i < 100; i++) t.tick();
-    assert.equal(t.rounds.length, RPS_ROUNDS);
-    assert.equal(t.sent.length, RPS_ROUNDS - 1);
-    assert.ok(t.rounds.every((r) => r.p === 'paper'));
-    assert.equal(t.repeater.move, null);
-    // The bot kept playing by its own logic.
-    t.rounds.forEach((r, i) => assert.equal(r.b, rpsBotMove(t.spec, t.rounds.slice(0, i))));
-  });
-
-  it('never submits twice for the same round when the round has not moved on', () => {
-    const stuck = new RepeatThrow();
-    stuck.start('rock');
-    const released = Array.from({ length: 5 }, () => stuck.tick({ roundsPlayed: 4, totalRounds: RPS_ROUNDS, busy: false, done: false }));
-    assert.deepEqual(released, ['rock', null, null, null, null]);
-  });
-
-  it('waits while a round is in flight and stops on a failed round', () => {
-    const t = harness();
-    t.repeater.start('scissors');
-    assert.equal(t.tick(true), null);
-    assert.equal(t.sent.length, 0);
-    assert.equal(t.tick(), 'scissors');
-    assert.equal(t.tick(false, true), null);
-    assert.equal(t.repeater.move, null);
-    assert.equal(t.sent.length, 1);
-  });
-
-  it('cancels cleanly mid-match: nothing more is sent', () => {
-    const t = harness();
-    t.repeater.start('rock');
-    for (let i = 0; i < 4; i++) t.tick();
-    t.repeater.cancel();
-    for (let i = 0; i < 10; i++) assert.equal(t.tick(), null);
-    assert.equal(t.sent.length, 4);
-    assert.equal(t.rounds.length, 4);
-    assert.equal(t.repeater.move, null);
-  });
-
-  it('does nothing in a finished match', () => {
-    const t = harness();
-    for (let i = 0; i < RPS_ROUNDS; i++) t.rounds.push(rps.resolve(t.spec, t.rounds, 'rock'));
-    t.repeater.start('rock');
-    assert.equal(t.tick(), null);
-    assert.equal(t.sent.length, 0);
   });
 });
 

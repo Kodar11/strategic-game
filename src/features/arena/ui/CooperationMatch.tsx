@@ -15,6 +15,9 @@ import type { Level, MatchLength } from '@/src/arena/core';
 import { COOP_NAME, COOP_PAYOFFS, type CoopMove, type CoopOpponent, type CoopRound, type CoopSetup, type CoopState, type CoopVariant, cooperation, coopPayoff } from '@/src/arena/cooperation';
 import { coopBriefing, coopOutcomeText, coopRevealNote, opponentPatterns } from '@/src/arena/cooperation-analysis';
 import { MiniMatrix } from '@/src/features/games/ui/common';
+import { RepeatDone, RepeatPanel } from '@/src/features/repeat/RepeatPanel';
+import { useRepeat } from '@/src/features/repeat/useRepeat';
+import { cooperationRepeat } from '@/src/repeat/arena';
 import { haptic, useMotionReduced } from '@/src/utils/feedback';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 import { useArenaRecords } from '../records';
@@ -30,6 +33,10 @@ export const moveTint = (m: CoopMove) => (m === 'C' ? { fg: colors.primaryText, 
 export const MoveIcon = ({ m, size = 22 }: { m: CoopMove; size?: number }) => (m === 'C' ? <Link2 size={size} color={moveTint(m).fg} strokeWidth={2.2} /> : <Unlink size={size} color={moveTint(m).fg} strokeWidth={2.2} />);
 
 type View_ = 'decide' | 'reveal' | 'results';
+
+/** Repeat play's pauses here: a short one before each repeated choice, a longer one to read each reveal. */
+const REPEAT_DECIDE_MS = 450;
+const REPEAT_REVEAL_MS = 1300;
 
 /**
  * A Cooperation Game match: briefing → secret decision → reveal → next round, then a results screen. The engine owns
@@ -66,14 +73,16 @@ export function CooperationMatch({
   const h = state.rounds;
   const read = useOpponentRead('cooperation', persona, mystery, h.length, state.total, cooperation.isOver(state));
   const name = read.revealed ? COOP_NAME[persona] : 'Your opponent';
+  const over = cooperation.isOver(state);
 
   useEffect(() => {
     void useArenaRecords.getState().load();
   }, []);
 
-  const commit = (move: CoopMove) => {
+  /** `quiet`: a repeated choice — no haptic for every automatic round. */
+  const commit = (move: CoopMove, quiet = false) => {
     if (view !== 'decide') return;
-    haptic.commit();
+    if (!quiet) haptic.commit();
     act({ move, round: h.length });
     setView('reveal');
   };
@@ -81,6 +90,26 @@ export function CooperationMatch({
     setView(h.length >= state.total ? 'results' : 'decide');
     scroll.current?.scrollTo({ y: 0, animated: false });
   };
+  // Repeat play: each repeated choice goes in through commit, as a tap would, and a reveal moves on by itself — except
+  // the final one, which waits for the player (prediction, then Continue).
+  const repeat = useRepeat(cooperationRepeat, {
+    ctx: state,
+    progress: { played: h.length, total: state.total, busy: view !== 'decide', over },
+    delayMs: REPEAT_DECIDE_MS,
+    play: (a) => {
+      if (view !== 'decide' || cooperation.validate(state, a) !== null) return false;
+      commit(a.move, true);
+      return true;
+    },
+  });
+  useEffect(() => {
+    if (!repeat.running || view !== 'reveal' || h.length >= state.total) return;
+    const t = setTimeout(next, REPEAT_REVEAL_MS);
+    return () => clearTimeout(t);
+    // `next` only reads state that is already in the dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repeat.running, view, h.length, state.total]);
+  const finalHold = view === 'reveal' && over && repeat.holding;
   const close = () => (router.canGoBack() ? router.back() : router.replace({ pathname: '/arena/[gameId]', params: { gameId: 'cooperation' } }));
   const change = (n: { persona?: string; level?: Level }) => router.setParams({ persona: n.persona ?? (mystery ? 'mystery' : persona), level: n.level ?? level });
 
@@ -118,7 +147,9 @@ export function CooperationMatch({
               <ScoreHeader state={state} view={view} name={name} round={shownRound} />
               <Timeline h={h} total={state.total} current={view === 'decide' ? h.length : -1} />
               {tip ? <CoachTip text={tip} onDismiss={() => setTipHidden(true)} /> : null}
-              {view === 'decide' ? <Decision key={h.length} state={state} name={name} onCommit={commit} /> : <Reveal state={state} name={name} onNext={next} />}
+              {view === 'decide' ? <Decision key={h.length} state={state} name={name} onCommit={commit} locked={repeat.running} /> : <Reveal state={state} name={name} onNext={next} hideNext={finalHold} />}
+              <RepeatPanel repeat={repeat} hidden={view !== 'decide'} />
+              {finalHold ? read.awaiting ? <ReadPanel game="cooperation" read={read} played={h.length} /> : <RepeatDone repeat={repeat} onContinue={next} /> : null}
               {view === 'decide' ? <ReadPanel game="cooperation" read={read} played={h.length} /> : null}
               {read.revealed ? <OpponentCard persona={persona} level={level} length={length} variant={variant} h={h} /> : null}
               <MatchHistory h={h} name={name} />
@@ -199,14 +230,15 @@ const Timeline = memo(function Timeline({ h, total, current }: { h: readonly Coo
   );
 });
 
-function Decision({ state, name, onCommit }: { state: CoopState; name: string; onCommit: (m: CoopMove) => void }) {
+/** `locked`: a repeat is choosing for the player this round. */
+function Decision({ state, name, onCommit, locked }: { state: CoopState; name: string; onCommit: (m: CoopMove) => void; locked?: boolean }) {
   const { width } = useWindowDimensions();
   const stacked = width < 360;
   const [picked, setPicked] = useState<CoopMove | null>(null);
   const pay = COOP_PAYOFFS[state.setup.variant];
   const briefing = coopBriefing(state.rounds, state.total);
   const pick = (m: CoopMove) => {
-    if (picked) return;
+    if (picked || locked) return;
     setPicked(m);
     onCommit(m);
   };
@@ -233,9 +265,9 @@ function Decision({ state, name, onCommit }: { state: CoopState; name: string; o
             <Pressable
               key={m}
               onPress={() => pick(m)}
-              disabled={!!picked}
+              disabled={!!picked || locked}
               accessibilityRole="button"
-              accessibilityState={{ selected: on, disabled: !!picked }}
+              accessibilityState={{ selected: on, disabled: !!picked || !!locked }}
               accessibilityLabel={`${MOVE_LABEL[m]}. ${m === 'C' ? 'Build a better outcome together.' : 'Take the immediate advantage.'} You get ${ifC} if they cooperate, ${ifD} if they defect.`}
               style={({ pressed }) => [styles.choice, stacked ? styles.choiceStacked : styles.choiceSide, { borderColor: on ? t.solid : colors.border }, (pressed || on) && { backgroundColor: t.bg }]}>
               <View style={[styles.choiceIcon, { backgroundColor: t.bg }]}>{on ? <Check size={24} color={t.fg} strokeWidth={2.6} /> : <MoveIcon m={m} size={24} />}</View>
@@ -258,7 +290,8 @@ function Decision({ state, name, onCommit }: { state: CoopState; name: string; o
   );
 }
 
-function Reveal({ state, name, onNext }: { state: CoopState; name: string; onNext: () => void }) {
+/** `hideNext`: a repeat played the final round; the screen shows the prediction and Continue instead. */
+function Reveal({ state, name, onNext, hideNext }: { state: CoopState; name: string; onNext: () => void; hideNext?: boolean }) {
   const reduced = useMotionReduced();
   const h = state.rounds;
   const r = h[h.length - 1];
@@ -314,7 +347,7 @@ function Reveal({ state, name, onNext }: { state: CoopState; name: string; onNex
           </AppText>
         ) : null}
       </Animated.View>
-      <Button label={left === 0 ? 'View Results' : left === 1 ? 'Final Round' : 'Next Round'} onPress={onNext} />
+      {hideNext ? null : <Button label={left === 0 ? 'View Results' : left === 1 ? 'Final Round' : 'Next Round'} onPress={onNext} />}
     </View>
   );
 }

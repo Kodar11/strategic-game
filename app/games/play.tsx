@@ -13,7 +13,7 @@ import type { ChallengeView, ServerMatch } from '@/src/data/games';
 import { gamesRepo, useGames } from '@/src/data/games-session';
 import { GAMES, personality } from '@/src/games/catalog';
 import { type GameId, isDifficulty, isGameId } from '@/src/games/core';
-import { ENGINES } from '@/src/games/registry';
+import { ENGINES, engineFor } from '@/src/games/registry';
 import { MYSTERY_NAME } from '@/src/games/rps-insight';
 import type { RpsRound } from '@/src/games/rps';
 import { type MatchView, usePracticeMatch, useServerMatch } from '@/src/features/games/useMatch';
@@ -24,6 +24,10 @@ import { ResultPanel } from '@/src/features/games/ui/ResultPanel';
 import { RpsReveal, RpsRounds } from '@/src/features/games/ui/RpsReveal';
 import { ClassicReveal } from '@/src/features/games/ui/ClassicReveal';
 import { ReadOpponentPanel } from '@/src/features/games/ui/ReadOpponentPanel';
+import { RepeatDone, RepeatPanel } from '@/src/features/repeat/RepeatPanel';
+import { useRepeat } from '@/src/features/repeat/useRepeat';
+import { CLASSIC_REPEAT } from '@/src/repeat/classic';
+import { NO_REPEAT } from '@/src/repeat/plan';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
 type Params = { game?: string; bot?: string; difficulty?: string; opponent?: string; mode?: string; competitionId?: string; token?: string; n?: string };
@@ -192,6 +196,21 @@ function ChallengeResult({ view, token }: { view: MatchView; token: string }) {
 
 function MatchLayout({ view, result }: { view: MatchView; result: React.ReactNode }) {
   const insets = useSafeAreaInsets();
+  const repeatable = CLASSIC_REPEAT[view.game];
+  const repeat = useRepeat(repeatable ?? NO_REPEAT, {
+    ctx: view.rounds,
+    progress: { played: view.rounds.length, total: view.totalRounds, busy: view.busy, over: view.rounds.length >= view.totalRounds, error: view.error !== null },
+    // The match's own submit, so busy, finished and server matches behave exactly as for a tap.
+    play: (m) => {
+      if (engineFor(view.game).parseMove(m, view.prompt) === null) return false;
+      view.play(m);
+      return true;
+    },
+  });
+  // While a repeat runs the board is read-only: one round never gets two moves.
+  const board = repeat.running ? { ...view, busy: true, play: () => undefined } : view;
+  // Skipping the end-of-match read is already an explicit "show me the results".
+  const readView = view.read && repeat.holding ? { ...view, read: { ...view.read, skip: () => (repeat.release(), view.read!.skip()) } } : view;
   const g = GAMES[view.game];
   const hidden = view.opponent === 'mystery' && !view.done;
   const botName = view.game === 'two-thirds' ? 'Bot rounds' : hidden ? MYSTERY_NAME : (personality(view.game, view.bot)?.name ?? view.bot);
@@ -219,9 +238,10 @@ function MatchLayout({ view, result }: { view: MatchView; result: React.ReactNod
               {view.error}
             </AppText>
           ) : null}
-          <Board view={view} />
-          {view.game !== 'rps' ? <ReadOpponentPanel view={view} /> : null}
-          {view.done ? result : null}
+          <Board view={board} />
+          {repeatable ? <RepeatPanel repeat={repeat} hidden={!!view.read?.awaiting} /> : null}
+          <ReadOpponentPanel view={readView} />
+          {view.done ? repeat.holding ? <RepeatDone repeat={repeat} /> : result : null}
         </View>
       </ScrollView>
     </View>

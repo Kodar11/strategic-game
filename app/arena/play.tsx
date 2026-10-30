@@ -28,6 +28,10 @@ import { ReadPanel } from '@/src/features/arena/ui/ReadPanel';
 import { SignalBoard } from '@/src/features/arena/ui/SignalBoard';
 import { UltimatumGameBoard } from '@/src/features/arena/ui/UltimatumGameBoard';
 import { MatchReflection } from '@/src/features/reflections/ReflectionCard';
+import { RepeatDone, RepeatPanel } from '@/src/features/repeat/RepeatPanel';
+import { useRepeat } from '@/src/features/repeat/useRepeat';
+import { ARENA_REPEAT } from '@/src/repeat/arena';
+import { NO_REPEAT } from '@/src/repeat/plan';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
 type Params = { game?: string; persona?: string; level?: string; length?: string; variant?: string };
@@ -73,6 +77,19 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
   const playedRounds = engine.played(state);
   const total = engine.rounds(length);
   const read = useOpponentRead(game, persona, mystery, playedRounds, total, over);
+  const repeatable = ARENA_REPEAT[game];
+  const repeat = useRepeat(repeatable ?? NO_REPEAT, {
+    ctx: state,
+    progress: { played: playedRounds, total, busy: false, over },
+    // Through the match's own act: the engine validates, resolves and records every repeated round.
+    play: (a) => {
+      if (engine.validate(state, a) !== null) return false;
+      act(a);
+      return true;
+    },
+  });
+  // Skipping the end-of-match guess is already an explicit "show me the results".
+  const readShown = repeat.holding ? { ...read, skip: () => (repeat.release(), read.skip()) } : read;
   const hidden = !read.revealed;
   const name = hidden ? (team ? 'Your teammate' : 'Your opponent') : opponentName(game, persona);
   const scroll = useRef<ScrollView>(null);
@@ -99,7 +116,8 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
   const field = FIELD_GAMES.has(game);
 
   const board = (() => {
-    const props = { state, act, over, rivalName: name, nameOf };
+    // While a repeat runs the board is read-only: one round never gets two moves.
+    const props = { state, act: repeat.running ? () => undefined : act, over, rivalName: name, nameOf };
     const Library = LIBRARY_BOARDS[game as keyof typeof LIBRARY_BOARDS];
     if (Library) return <Library {...props} />;
     switch (game) {
@@ -150,9 +168,11 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
               {refusal}
             </AppText>
           ) : null}
-          {board}
-          <ReadPanel game={game} read={read} played={playedRounds} />
-          {over && result && read.revealed ? (
+          <View style={repeat.running ? { pointerEvents: 'none' } : undefined}>{board}</View>
+          {repeatable ? <RepeatPanel repeat={repeat} roundWord={g.roundWord} /> : null}
+          <ReadPanel game={game} read={readShown} played={playedRounds} />
+          {over && result && read.revealed && repeat.holding ? <RepeatDone repeat={repeat} roundWord={g.roundWord} /> : null}
+          {over && result && read.revealed && !repeat.holding ? (
             <View onLayout={(e) => toResult(e.nativeEvent.layout.y)}>
               <ArenaResult
                 game={game}
