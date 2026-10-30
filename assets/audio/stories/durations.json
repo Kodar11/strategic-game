@@ -1,0 +1,248 @@
+{
+  "crossing/ambience/dawn.mp3": {
+    "durationMs": 40000,
+    "bytes": 280476,
+    "rmsDb": -30,
+    "peakDb": -7
+  },
+  "crossing/ambience/gusts.mp3": {
+    "durationMs": 40000,
+    "bytes": 280476,
+    "rmsDb": -28,
+    "peakDb": -6.8
+  },
+  "crossing/ambience/rain.mp3": {
+    "durationMs": 40000,
+    "bytes": 280476,
+    "rmsDb": -27,
+    "peakDb": -5.9
+  },
+  "crossing/ambience/river.mp3": {
+    "durationMs": 40000,
+    "bytes": 280476,
+    "rmsDb": -26,
+    "peakDb": -5.5
+  },
+  "crossing/ambience/storm.mp3": {
+    "durationMs": 55000,
+    "bytes": 385308,
+    "rmsDb": -24,
+    "peakDb": -2
+  },
+  "crossing/ambience/wind.mp3": {
+    "durationMs": 40000,
+    "bytes": 280476,
+    "rmsDb": -26,
+    "peakDb": -1.4
+  },
+  "crossing/music/banks.mp3": {
+    "durationMs": 60000,
+    "bytes": 480576,
+    "rmsDb": -22.3,
+    "peakDb": -1
+  },
+  "crossing/music/dusk.mp3": {
+    "durationMs": 64000,
+    "bytes": 512448,
+    "rmsDb": -21,
+    "peakDb": -4.8
+  },
+  "crossing/music/echo.mp3": {
+    "durationMs": 48000,
+    "bytes": 384576,
+    "rmsDb": -21,
+    "peakDb": -3.5
+  },
+  "crossing/music/frost.mp3": {
+    "durationMs": 64000,
+    "bytes": 512448,
+    "rmsDb": -21,
+    "peakDb": -2.6
+  },
+  "crossing/music/line.mp3": {
+    "durationMs": 64000,
+    "bytes": 512448,
+    "rmsDb": -21,
+    "peakDb": -5.5
+  },
+  "crossing/music/span.mp3": {
+    "durationMs": 72000,
+    "bytes": 576576,
+    "rmsDb": -21,
+    "peakDb": -4
+  },
+  "crossing/music/thread.mp3": {
+    "durationMs": 60000,
+    "bytes": 480576,
+    "rmsDb": -21,
+    "peakDb": -5.6
+  },
+  "crossing/music/unease.mp3": {
+    "durationMs": 56000,
+    "bytes": 448512,
+    "rmsDb": -21,
+    "peakDb": -6
+  },
+  "crossing/sfx/cloth.mp3": {
+    "durationMs": 2000,
+    "bytes": 16300,
+    "rmsDb": -24,
+    "peakDb": -4.3
+  },
+  "crossing/sfx/creak.mp3": {
+    "durationMs": 715,
+    "bytes": 6060,
+    "rmsDb": -20,
+    "peakDb": -5.8
+  },
+  "crossing/sfx/match.mp3": {
+    "durationMs": 2600,
+    "bytes": 21106,
+    "rmsDb": -37.2,
+    "peakDb": -1
+  },
+  "crossing/sfx/plank.mp3": {
+    "durationMs": 1100,
+    "bytes": 9195,
+    "rmsDb": -21,
+    "peakDb": -1.7
+  },
+  "crossing/sfx/rope.mp3": {
+    "durationMs": 3500,
+    "bytes": 28212,
+    "rmsDb": -20.2,
+    "peakDb": -1
+  },
+  "crossing/sfx/shutter.mp3": {
+    "durationMs": 1200,
+    "bytes": 9822,
+    "rmsDb": -27.5,
+    "peakDb": -1
+  },
+  "crossing/sfx/steps.mp3": {
+    "durationMs": 3200,
+    "bytes": 25913,
+    "rmsDb": -25.4,
+    "peakDb": -1
+  },
+  "crossing/sfx/thunder.mp3": {
+    "durationMs": 9000,
+    "bytes": 72306,
+    "rmsDb": -21,
+    "peakDb": -1.5
+  },
+  "meridian/ambience/fog.mp3": {
+    "durationMs": 30000,
+    "bytes": 210420,
+    "rmsDb": -30,
+    "peakDb": -13.8
+  },
+  "meridian/ambience/room.mp3": {
+    "durationMs": 30000,
+    "bytes": 210420,
+    "rmsDb": -30,
+    "peakDb": -16.9
+  },
+  "meridian/music/discovery.mp3": {
+    "durationMs": 52000,
+    "bytes": 416448,
+    "rmsDb": -22,
+    "peakDb": -7.6
+  },
+  "meridian/music/echo.mp3": {
+    "durationMs": 38400,
+    "bytes": 307776,
+    "rmsDb": -22,
+    "peakDb": -6.4
+  },
+  "meridian/music/encounter.mp3": {
+    "durationMs": 38400,
+    "bytes": 307776,
+    "rmsDb": -22,
+    "peakDb": -7.9
+  },
+  "meridian/music/fog.mp3": {
+    "durationMs": 38400,
+    "bytes": 307776,
+    "rmsDb": -22,
+    "peakDb": -8.5
+  },
+  "meridian/music/garden.mp3": {
+    "durationMs": 38400,
+    "bytes": 307776,
+    "rmsDb": -22,
+    "peakDb": -8.1
+  },
+  "meridian/music/hall.mp3": {
+    "durationMs": 52000,
+    "bytes": 416448,
+    "rmsDb": -22,
+    "peakDb": -8.3
+  },
+  "meridian/music/iron.mp3": {
+    "durationMs": 38400,
+    "bytes": 307776,
+    "rmsDb": -22,
+    "peakDb": -3.8
+  },
+  "meridian/music/trials.mp3": {
+    "durationMs": 48000,
+    "bytes": 384576,
+    "rmsDb": -22,
+    "peakDb": -6.3
+  },
+  "meridian/sfx/accord.mp3": {
+    "durationMs": 1600,
+    "bytes": 13165,
+    "rmsDb": -21,
+    "peakDb": -5.8
+  },
+  "meridian/sfx/clash.mp3": {
+    "durationMs": 800,
+    "bytes": 6687,
+    "rmsDb": -20,
+    "peakDb": -2.2
+  },
+  "meridian/sfx/commit.mp3": {
+    "durationMs": 500,
+    "bytes": 4388,
+    "rmsDb": -20,
+    "peakDb": -5.2
+  },
+  "meridian/sfx/crown.mp3": {
+    "durationMs": 2200,
+    "bytes": 17972,
+    "rmsDb": -22,
+    "peakDb": -6.6
+  },
+  "meridian/sfx/roomshift.mp3": {
+    "durationMs": 2400,
+    "bytes": 19435,
+    "rmsDb": -24,
+    "peakDb": -8.6
+  },
+  "meridian/sfx/share.mp3": {
+    "durationMs": 1200,
+    "bytes": 9822,
+    "rmsDb": -20,
+    "peakDb": -6.6
+  },
+  "meridian/sfx/slip.mp3": {
+    "durationMs": 500,
+    "bytes": 4388,
+    "rmsDb": -24,
+    "peakDb": -12.5
+  },
+  "meridian/sfx/take.mp3": {
+    "durationMs": 700,
+    "bytes": 5851,
+    "rmsDb": -20,
+    "peakDb": -3.1
+  },
+  "meridian/sfx/tick.mp3": {
+    "durationMs": 200,
+    "bytes": 1880,
+    "rmsDb": -26,
+    "peakDb": -14.8
+  }
+}

@@ -5,6 +5,7 @@ import type { LessonId } from '../../content/lessons.ts';
 import { explainOutcome } from '../lessons/cooperation-trap/copy.ts';
 import { proposalExplanation } from '../lessons/incentive-shift/copy.ts';
 import { CURRICULUM_CLIPS } from './curriculum-clips.ts';
+import { STORY_CLIPS } from './story-clips.ts';
 import type { SpeakingCharacter } from './voices.ts';
 
 /**
@@ -28,7 +29,8 @@ export type ClipSync = 'screen' | 'computed' | 'spoken';
 
 export interface ClipDef {
   id: string;
-  lesson: LessonId;
+  /** A lesson, or one of the two stories (dbu, mer; whose lines are generated into story-clips.ts). */
+  lesson: LessonId | 'dbu' | 'mer';
   character: SpeakingCharacter;
   style: ClipStyle;
   sync: ClipSync;
@@ -138,7 +140,7 @@ const LESSON_CLIPS = [
   { id: 'l5.done.takeaway', lesson: L5, character: 'sen', style: 'narration', sync: 'screen', text: 'To change what people choose, change what their choices cost and earn — then check what else changes.' },
 ] as const satisfies readonly ClipDef[];
 
-export const CLIPS = [...LESSON_CLIPS, ...CURRICULUM_CLIPS] as const;
+export const CLIPS = [...LESSON_CLIPS, ...CURRICULUM_CLIPS, ...STORY_CLIPS] as const;
 
 export type ClipId = (typeof CLIPS)[number]['id'];
 

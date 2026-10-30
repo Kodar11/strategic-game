@@ -1,0 +1,45 @@
+{
+  "_comment": "Recorded sources for the Stories soundscape. Every id is checked against its Freesound page by fetch-sources.mjs, which refuses anything not marked Creative Commons 0.",
+  "ambience": {
+    "leaves-wind": 669113,
+    "cold-gusts": 567356,
+    "river": 660252,
+    "rain": 695619,
+    "storm": 572432,
+    "dawn-birds": 611453
+  },
+  "sfx": {
+    "floorboard": 802600,
+    "rope-pulley": 394222,
+    "footsteps": 630010,
+    "match": 464052,
+    "fabric": 850705
+  },
+  "piano": {
+    "pack": 25405,
+    "notes": {
+      "D2": 448607,
+      "F2": 448588,
+      "A2": 448563,
+      "C3": 448546,
+      "D3": 448608,
+      "E3": 448614,
+      "F3": 448589,
+      "G3": 448559,
+      "A3": 448562,
+      "B3": 448568,
+      "C4": 448549,
+      "D4": 448609,
+      "E4": 448613,
+      "F4": 448595,
+      "G4": 448552,
+      "A4": 448561,
+      "B4": 448536,
+      "C5": 448548,
+      "D5": 448619,
+      "E5": 448612,
+      "F5": 448594,
+      "A5": 448560
+    }
+  }
+}

@@ -516,3 +516,54 @@ export function evolve(t: Tournament, generations: number, start?: readonly numb
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Replay
+
+export interface ReplayFrame {
+  /** The pairing just revealed, as entry indexes. Null on the opening frame. */
+  pair: [number, number] | null;
+  /** Standings counting only the pairings revealed so far: average points per round, highest first. */
+  order: { index: number; id: StrategyId; score: number }[];
+}
+
+/**
+ * The tournament as a sequence of revealed pairings, for watching the table form. Nothing here is staged: each frame's
+ * order is computed from the same pairwise averages as the final standings, and the last frame equals them.
+ * Pairings are revealed round by round, so everyone has met about as many opponents at any moment.
+ */
+export function replayFrames(t: Tournament): ReplayFrame[] {
+  const n = t.ids.length;
+  // Round-robin schedule (circle method), then each entry's twin match at the end.
+  const seats = Array.from({ length: n % 2 ? n + 1 : n }, (_, i) => i);
+  const schedule: [number, number][] = [];
+  for (let r = 0; r < seats.length - 1; r++) {
+    for (let i = 0; i < seats.length / 2; i++) {
+      const a = seats[i];
+      const b = seats[seats.length - 1 - i];
+      if (a < n && b < n) schedule.push([a, b]);
+    }
+    seats.splice(1, 0, seats.pop() as number);
+  }
+  for (let i = 0; i < n; i++) schedule.push([i, i]);
+
+  const total = new Array<number>(n).fill(0);
+  const meets = new Array<number>(n).fill(0);
+  const snapshot = (pair: [number, number] | null): ReplayFrame => ({
+    pair,
+    order: t.ids
+      .map((id, index) => ({ index, id, score: meets[index] ? total[index] / meets[index] : 0 }))
+      .sort((a, b) => (Math.abs(a.score - b.score) < 1e-9 ? a.index - b.index : b.score - a.score)),
+  });
+  const frames = [snapshot(null)];
+  for (const [a, b] of schedule) {
+    total[a] += t.avg[a][b] * t.counts[b];
+    meets[a] += t.counts[b];
+    if (a !== b) {
+      total[b] += t.avg[b][a] * t.counts[a];
+      meets[b] += t.counts[a];
+    }
+    frames.push(snapshot([a, b]));
+  }
+  return frames;
+}

@@ -24,6 +24,8 @@ export interface AudioBackend {
   pause(): void;
   resume(): void;
   dispose(): void;
+  /** Optional: stories have their own voice level. */
+  setVolume?(volume: number): void;
 }
 
 export interface NarrationRequest {
@@ -59,6 +61,9 @@ export class NarrationController {
   private watchdog: unknown = null;
   private pendingEnd: { run: number; handle: unknown } | null = null;
   private warned = new Set<string>();
+  private listeners = new Set<() => void>();
+  private interrupted: string | null = null;
+  private volume = 1;
   private readonly opts: Required<Omit<ControllerOptions, 'onWarn'>> & Pick<ControllerOptions, 'onWarn'>;
 
   constructor(options: ControllerOptions) {
@@ -78,6 +83,20 @@ export class NarrationController {
   }
   get queued(): readonly string[] {
     return this.queue;
+  }
+  get isPaused() {
+    return this.paused;
+  }
+
+  /** Called whenever what is playing changes (a clip starts, ends or is stopped; pause and resume). */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  setVolume(volume: number) {
+    this.volume = volume;
+    this.safely(() => this.backend?.setVolume?.(volume));
   }
 
   /** Returns true if the clip started or was queued. */
@@ -132,6 +151,7 @@ export class NarrationController {
     this.paused = true;
     this.clearWatchdog();
     this.safely(() => this.backend?.pause());
+    this.notify();
   }
 
   resume() {
@@ -139,6 +159,7 @@ export class NarrationController {
     this.paused = false;
     this.armWatchdog(this.generation);
     this.safely(() => this.backend?.resume());
+    this.notify();
   }
 
   setMuted(muted: boolean) {
@@ -178,7 +199,15 @@ export class NarrationController {
 
   /** Stop and clear everything now (app backgrounded, etc.). */
   stop() {
+    this.interrupted = this.current;
     this.halt();
+  }
+
+  /** Say again the line a `stop()` cut off, if nothing has played since. Returns whether it did. */
+  resumeInterrupted(): boolean {
+    const clip = this.interrupted;
+    this.interrupted = null;
+    return clip ? this.replay(clip) : false;
   }
 
   dispose() {
@@ -193,10 +222,15 @@ export class NarrationController {
     const gen = ++this.generation;
     this.current = clip;
     this.last = clip;
+    this.interrupted = null;
     this.paused = false;
     this.armWatchdog(gen);
+    this.notify();
     try {
-      this.backend ??= this.opts.createBackend();
+      if (!this.backend) {
+        this.backend = this.opts.createBackend();
+        this.backend.setVolume?.(this.volume);
+      }
       this.backend.play(
         asset,
         () => this.finished(gen),
@@ -216,6 +250,7 @@ export class NarrationController {
     this.clearWatchdog();
     this.current = null;
     this.advance();
+    if (!this.current) this.notify();
   }
 
   private advance() {
@@ -231,6 +266,7 @@ export class NarrationController {
       this.current = null;
       this.paused = false;
       this.safely(() => this.backend?.stop());
+      this.notify();
     }
   }
 
@@ -250,6 +286,10 @@ export class NarrationController {
     } catch (error) {
       this.warnOnce(`backend:${String(error)}`, `[narration] Audio backend error: ${String(error)}`);
     }
+  }
+
+  private notify() {
+    for (const listener of this.listeners) this.safely(listener);
   }
 
   private warnOnce(key: string, message: string) {

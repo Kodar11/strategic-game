@@ -142,8 +142,8 @@ Settler (win-stay lose-shift), Calculator (the deliberately elaborate one), and 
   description; each new Story One line is announced to screen readers.
 - Reduced motion (system or in-app setting) removes entering animations, the basket glide, rain and snow drift and the
   leaderboard / population reveals; nothing is gated on an animation finishing.
-- No audio: the stories are fully understandable without it, and the app has no audio pipeline for ambience. Adding
-  ambient sound would need a new dependency and controls, so it is out of scope for this version.
+- Sound: narration, music, ambience and effects are described in [STORIES_CINEMATIC.md](STORIES_CINEMATIC.md). The
+  stories remain fully understandable with it off.
 - Art is vector (react-native-svg), so there are no image assets to download. Fog-room runs (100 replays) take well under
   a second; results are memoised per step.
 
@@ -176,5 +176,4 @@ Settler (win-stay lose-shift), Calculator (the deliberately elaborate one), and 
 - Native (Android) verification, above.
 - Optional: illustrated character art for Mira and Hollis. The current silhouettes are intentional vector art, not
   placeholders, but painted portraits for the dialogue panel would deepen Story One.
-- Optional: ambient sound with an in-app toggle.
 - Progress is per device; syncing it through Supabase would need a schema change.

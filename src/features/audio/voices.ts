@@ -18,7 +18,7 @@ export interface VoiceConfig {
 }
 
 /** Every cast member currently has spoken lines. A character without lines should not get a voice. */
-export type SpeakingCharacter = CharacterId;
+export type SpeakingCharacter = CharacterId | 'storyteller' | 'mira' | 'hollis' | 'steward';
 
 export const AUDIO_FORMAT = {
   audioEncoding: 'MP3',
@@ -75,6 +75,34 @@ export const VOICES: Record<SpeakingCharacter, VoiceConfig> = {
     speakingRate: 0.98,
     direction: 'Market operator and council adviser. Grounded, practical, confident.',
     auditionCandidates: ['en-IN-Chirp3-HD-Orus', 'en-IN-Chirp3-HD-Iapetus', 'en-IN-Chirp3-HD-Rasalgethi'],
+  },
+  storyteller: {
+    languageCode: 'en-IN',
+    name: 'en-IN-Chirp3-HD-Sulafat',
+    speakingRate: 0.93,
+    direction: 'The Distance Between Us: unhurried, close, a little melancholy. Tells it as something remembered.',
+    auditionCandidates: ['en-IN-Chirp3-HD-Sulafat', 'en-IN-Chirp3-HD-Leda', 'en-IN-Chirp3-HD-Gacrux'],
+  },
+  mira: {
+    languageCode: 'en-IN',
+    name: 'en-IN-Chirp3-HD-Kore',
+    speakingRate: 1.0,
+    direction: 'Courier. Dry, quick, guarded; warmth has to be earned.',
+    auditionCandidates: ['en-IN-Chirp3-HD-Kore', 'en-IN-Chirp3-HD-Pulcherrima', 'en-IN-Chirp3-HD-Aoede'],
+  },
+  hollis: {
+    languageCode: 'en-IN',
+    name: 'en-IN-Chirp3-HD-Iapetus',
+    speakingRate: 0.92,
+    direction: 'Old bridgekeeper, injured. Slow, wry, tired.',
+    auditionCandidates: ['en-IN-Chirp3-HD-Iapetus', 'en-IN-Chirp3-HD-Rasalgethi', 'en-IN-Chirp3-HD-Alnilam'],
+  },
+  steward: {
+    languageCode: 'en-IN',
+    name: 'en-IN-Chirp3-HD-Schedar',
+    speakingRate: 0.98,
+    direction: 'The Rules of the Game: a precise, curious host of an experiment. Never a game-show announcer.',
+    auditionCandidates: ['en-IN-Chirp3-HD-Schedar', 'en-IN-Chirp3-HD-Achird', 'en-IN-Chirp3-HD-Algieba'],
   },
   nina: {
     languageCode: 'en-IN',

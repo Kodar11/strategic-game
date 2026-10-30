@@ -45,3 +45,6 @@ assets/audio/**/*.tmp
 # generated native folders
 /ios
 /android
+
+# Downloaded source recordings for scripts/story-audio (re-fetched on demand, never bundled).
+.audio-src/

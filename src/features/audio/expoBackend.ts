@@ -10,6 +10,7 @@ export function createExpoBackend(): AudioBackend {
   let player: AudioPlayer | null = null;
   let subscription: { remove: () => void } | null = null;
   let handlers: { onEnd: () => void; onError: (e: unknown) => void } | null = null;
+  let volume = 1;
 
   setAudioModeAsync({
     // Narration is part of the lesson and has its own in-app mute.
@@ -21,6 +22,7 @@ export function createExpoBackend(): AudioBackend {
   const ensure = () => {
     if (player) return player;
     player = createAudioPlayer(null, { updateInterval: 250 });
+    player.volume = volume;
     subscription = player.addListener('playbackStatusUpdate', (status) => {
       // A late "finished" from the previous source would arrive near its start position; ignore it.
       const early = status.duration > 0 && status.currentTime + 0.5 < status.duration;
@@ -54,6 +56,10 @@ export function createExpoBackend(): AudioBackend {
     },
     resume() {
       player?.play();
+    },
+    setVolume(v) {
+      volume = v;
+      if (player) player.volume = v;
     },
     dispose() {
       handlers = null;

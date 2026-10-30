@@ -1,16 +1,19 @@
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { View, useWindowDimensions } from 'react-native';
-import Animated, { Easing, FadeIn, cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeOut, cancelAnimation, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
+import type { Direction, Mood, Shot } from '@/src/stories/crossing/direction';
 import type { MiraPose, Sky, Stage } from '@/src/stories/crossing/story';
 import { useMotionReduced } from '@/src/utils/feedback';
+import { Bust } from './Bust';
 
 /**
- * The Ashgill gorge, drawn in vector so every beat can restage it: sky and weather, the posts and lanterns, what
- * crosses the gap (cable, guide line, hand-line, the finished span, or a cut line), and Mira on the far cliff.
- * The basket glides along the cable on the UI thread; rain and snow drift; all of it holds still under reduced
- * motion. Original artwork; see docs/STORIES.md.
+ * The Ashgill gorge, drawn in vector and built in depth: sky, drifting cloud, far peaks, the gorge with its moving
+ * water and mist, then the near world of posts, cable and people, then reeds in the foreground. A camera moves through
+ * these layers (each by its own depth), and each beat restages what is in them. Everything that moves animates a
+ * transform on the UI thread, so a moving scene costs no re-renders; under reduced motion it all holds still.
+ * Original artwork; see docs/STORY_AUDIO_ASSETS.md.
  */
 
 export const ART_W = 400;
@@ -45,124 +48,434 @@ const STARS = [
   [22, 18], [64, 40], [96, 12], [140, 30], [180, 9], [232, 26], [268, 14], [310, 38], [352, 20], [384, 46], [44, 66], [208, 52], [336, 64], [120, 58],
 ] as const;
 
-function CrossingArtView({ stage, maxHeight }: { stage: Stage; maxHeight?: number }) {
+/** Where the camera looks, as scale and an offset in art units. */
+const CAMERA: Record<Shot, { s: number; x: number; y: number }> = {
+  establish: { s: 1, x: 0, y: 0 },
+  wide: { s: 1, x: 0, y: 0 },
+  far: { s: 1.5, x: -82, y: -12 },
+  near: { s: 1.3, x: 42, y: -8 },
+  centre: { s: 1.28, x: 0, y: -14 },
+  'bust-mira': { s: 1.5, x: -82, y: -12 },
+  'bust-hollis': { s: 1.3, x: 42, y: -8 },
+};
+
+export interface ArtDirection {
+  shot: Shot;
+  mood: Mood;
+  grade: Direction['grade'];
+}
+
+const NEUTRAL: ArtDirection = { shot: 'wide', mood: 'guarded', grade: { warm: 0, cold: 0, dark: 0 } };
+
+function CrossingArtView({ stage, direction = NEUTRAL, maxHeight, coverHeight, still }: { stage: Stage; direction?: ArtDirection; maxHeight?: number; /** Fill this height, cropping the outer edges of the landscape if the screen is narrow. */ coverHeight?: number; still?: boolean }) {
   const { width: screenW } = useWindowDimensions();
-  const reduced = useMotionReduced();
+  const reducedSetting = useMotionReduced();
+  const reduced = reducedSetting || !!still;
   const w = Math.min(screenW, 720);
-  const scale = maxHeight ? Math.min(w / ART_W, maxHeight / ART_H) : w / ART_W;
+  const scale = coverHeight ? Math.max(w / ART_W, coverHeight / ART_H) : maxHeight ? Math.min(w / ART_W, maxHeight / ART_H) : w / ART_W;
   const width = ART_W * scale;
   const height = ART_H * scale;
-  const [top, mid, low] = SKIES[stage.sky];
-  const stars = stage.sky === 'night' || stage.sky === 'frost';
-  const peaksSnow = stage.night >= 4;
+  const [top] = SKIES[stage.sky];
+
+  // The camera. A long, slow drift over the settlement on the opening beat; otherwise a measured move.
+  const camS = useSharedValue(direction.shot === 'establish' && !reduced ? 1.55 : 1);
+  const camX = useSharedValue(direction.shot === 'establish' && !reduced ? 88 : 0);
+  const camY = useSharedValue(direction.shot === 'establish' && !reduced ? -18 : 0);
+  const { shot } = direction;
+  useEffect(() => {
+    const c = CAMERA[shot];
+    if (reduced) {
+      camS.set(1);
+      camX.set(0);
+      camY.set(0);
+      return;
+    }
+    const opts = { duration: shot === 'establish' ? 9000 : 1700, easing: Easing.inOut(Easing.cubic) };
+    camS.set(withTiming(c.s, opts));
+    camX.set(withTiming(c.x, opts));
+    camY.set(withTiming(c.y, opts));
+  }, [shot, reduced, camS, camX, camY]);
+  /** Each layer moves by its depth, which is what makes the picture feel like a place. */
+  const layer = (depth: number) => {
+    'worklet';
+    return { transform: [{ translateX: camX.get() * depth * scale }, { translateY: camY.get() * depth * scale }, { scale: 1 + (camS.get() - 1) * depth }] };
+  };
+  const farStyle = useAnimatedStyle(() => layer(0.35));
+  const midStyle = useAnimatedStyle(() => layer(0.72));
+  const nearStyle = useAnimatedStyle(() => layer(1));
+  const foreStyle = useAnimatedStyle(() => layer(1.3));
 
   // Basket position along the cable, animated between beats.
   const t = useSharedValue<number>(BASKET_T[stage.basket]);
   useEffect(() => {
     const to = BASKET_T[stage.basket];
     if (reduced) t.set(to);
-    else t.set(withTiming(to, { duration: 1400, easing: Easing.inOut(Easing.cubic) }));
+    else t.set(withTiming(to, { duration: 2200, easing: Easing.inOut(Easing.quad) }));
   }, [stage.basket, reduced, t]);
   const basketStyle = useAnimatedStyle(() => {
     const p = onCable(t.get());
     return { transform: [{ translateX: p.x * scale - 9 * scale }, { translateY: p.y * scale + 1 * scale }] };
   });
 
-  const label = describe(stage);
+  const box = { position: 'absolute' as const, left: 0, top: 0, width, height };
+  const bust = shot === 'bust-mira' ? 'mira' : shot === 'bust-hollis' ? 'hollis' : null;
+  const sky = stage.sky;
+  const mistLevel = sky === 'dawn' ? 0.5 : sky === 'frost' ? 0.42 : sky === 'storm' ? 0.34 : sky === 'dusk' ? 0.24 : 0.2;
+
   return (
-    <View style={{ width: '100%', height, alignItems: 'center', backgroundColor: top, overflow: 'hidden' }} accessible accessibilityRole="image" accessibilityLabel={label}>
-      <Animated.View key={`${stage.sky}-${stage.night}`} entering={reduced ? undefined : FadeIn.duration(700)} style={{ width, height }}>
-        <Svg width={width} height={height} viewBox={`0 0 ${ART_W} ${ART_H}`}>
-          <Defs>
-            <LinearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={top} />
-              <Stop offset="0.55" stopColor={mid} />
-              <Stop offset="1" stopColor={low} />
-            </LinearGradient>
-            <LinearGradient id="gorge" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor="#050810" stopOpacity={0.2} />
-              <Stop offset="1" stopColor="#020306" />
-            </LinearGradient>
-            <RadialGradient id="glow" cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor={LANTERN} stopOpacity={0.75} />
-              <Stop offset="0.4" stopColor={LANTERN} stopOpacity={0.22} />
-              <Stop offset="1" stopColor={LANTERN} stopOpacity={0} />
-            </RadialGradient>
-            <RadialGradient id="moon" cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor="#f4f1e8" stopOpacity={0.9} />
-              <Stop offset="1" stopColor="#f4f1e8" stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <Rect width={ART_W} height={ART_H} fill="url(#sky)" />
-          {stars ? STARS.map(([x, y], i) => <Circle key={i} cx={x} cy={y} r={i % 3 === 0 ? 1.1 : 0.7} fill="#dfe8ff" opacity={0.75} />) : null}
-          {stage.sky === 'night' || stage.sky === 'frost' ? (
-            <G>
-              <Circle cx={318} cy={48} r={26} fill="url(#moon)" opacity={0.5} />
-              <Circle cx={318} cy={48} r={9} fill="#f3efe4" opacity={0.9} />
-            </G>
+    <View style={{ width: '100%', height, alignItems: 'center', backgroundColor: top, overflow: 'hidden' }} accessible accessibilityRole="image" accessibilityLabel={describe(stage, bust)}>
+      <View style={{ width, height }}>
+        <Animated.View style={[box, farStyle]}>
+          <SkyFade sky={sky} night={stage.night} width={width} height={height} reduced={reduced} />
+          {!still ? <Clouds sky={sky} width={width} height={height} reduced={reduced} /> : null}
+          <Peaks stage={stage} width={width} height={height} />
+        </Animated.View>
+        <Animated.View style={[box, midStyle]}>
+          <Gorge sky={sky} width={width} height={height} />
+          {!still ? <RiverLight width={width} height={height} scale={scale} reduced={reduced} sky={sky} /> : null}
+          {!still ? <Mist width={width} height={height} scale={scale} reduced={reduced} level={mistLevel} /> : null}
+        </Animated.View>
+        <Animated.View style={[box, nearStyle]}>
+          <NearWorld stage={stage} width={width} height={height} />
+          {stage.basket !== 'gone' ? (
+            <Animated.View style={[{ position: 'absolute', left: 0, top: 0, width: 18 * scale, height: 14 * scale }, basketStyle]} pointerEvents="none">
+              <Svg width={18 * scale} height={14 * scale} viewBox="0 0 18 14">
+                <Line x1={9} y1={0} x2={3} y2={5} stroke="#8b97ab" strokeWidth={0.8} />
+                <Line x1={9} y1={0} x2={15} y2={5} stroke="#8b97ab" strokeWidth={0.8} />
+                <Path d="M2 5 L16 5 L14 13 L4 13 Z" fill="#6b4a2c" stroke="#a37548" strokeWidth={0.8} />
+                <Line x1={3} y1={8} x2={15} y2={8} stroke="#a37548" strokeWidth={0.5} />
+              </Svg>
+            </Animated.View>
           ) : null}
-          {stage.sky === 'storm' ? <Path d="M0 30 Q 80 10 160 34 T 320 26 T 400 40 L 400 0 L 0 0 Z" fill="#0d1220" opacity={0.9} /> : null}
-
-          {/* Far peaks */}
-          <Path d="M0 150 L40 112 L70 128 L112 84 L150 120 L188 96 L222 126 L262 80 L300 114 L338 92 L372 118 L400 104 L400 170 L0 170 Z" fill="#1a2438" opacity={stage.sky === 'dawn' || stage.sky === 'dusk' ? 0.75 : 0.95} />
-          {peaksSnow ? <Path d="M104 92 L112 84 L121 94 L114 91 Z M254 88 L262 80 L271 90 L263 87 Z M331 99 L338 92 L346 101 L339 98 Z" fill="#dfe7f2" opacity={0.8} /> : null}
-
-          {/* The gorge */}
-          <Path d="M0 140 L118 136 L128 150 L138 280 L0 280 Z" fill="#0c1220" />
-          <Path d="M400 136 L284 132 L272 150 L262 280 L400 280 Z" fill="#0c1220" />
-          <Path d="M128 150 L138 280 L262 280 L272 150 Q 200 176 128 150 Z" fill="url(#gorge)" />
-          <Path d="M168 266 Q 200 258 232 266" stroke="#5b7fa6" strokeWidth={1} opacity={0.35} fill="none" />
-          {/* Rock rims, rim-lit */}
-          <Path d="M0 140 L118 136 L128 150" stroke={stage.sky === 'dusk' || stage.sky === 'dawn' ? '#e8a46b' : '#3b5a85'} strokeWidth={1.4} opacity={0.6} fill="none" />
-          <Path d="M400 136 L284 132 L272 150" stroke={stage.sky === 'dusk' || stage.sky === 'dawn' ? '#e8a46b' : '#3b5a85'} strokeWidth={1.4} opacity={0.6} fill="none" />
-          {/* Stumps of the old Long Bridge */}
-          <Path d="M128 150 L150 158 L146 163 L130 158 Z M272 150 L250 158 L254 163 L270 158 Z" fill="#1b2232" />
-
-          {/* What crosses the gap */}
-          <Built stage={stage} />
-          <Path d={`M${L.x} ${L.y} Q ${SAG.x} ${SAG.y} ${R.x} ${R.y}`} stroke="#8b97ab" strokeWidth={1.3} fill="none" />
-
-          {/* Posts and winches */}
-          <Rect x={L.x - 3} y={L.y - 2} width={6} height={20} fill="#2a2f3a" />
-          <Rect x={R.x - 3} y={R.y - 2} width={6} height={20} fill="#2a2f3a" />
-          <Circle cx={L.x - 9} cy={L.y + 12} r={4} fill="#2a2f3a" stroke="#4a5263" strokeWidth={0.8} />
-          <Circle cx={R.x + 9} cy={R.y + 12} r={4} fill="#2a2f3a" stroke="#4a5263" strokeWidth={0.8} />
-
-          {/* Your lantern and you, from behind */}
-          <Circle cx={L.x - 22} cy={L.y + 2} r={22} fill="url(#glow)" />
-          <Keeper x={L.x - 22} y={L.y + 4} />
-
-          {/* Mira's side */}
-          {stage.miraLight ? <Circle cx={stage.mira === 'lantern-up' ? R.x + 18 : R.x + 22} cy={stage.mira === 'lantern-up' ? R.y - 14 : R.y + 2} r={22} fill="url(#glow)" /> : null}
-          <Mira pose={stage.mira} light={stage.miraLight} />
-
-          {/* Town lights behind you */}
-          <G opacity={stage.sky === 'dawn' ? 0.35 : 0.8}>
-            <Rect x={20} y={176} width={3} height={3} fill={LANTERN} opacity={0.7} />
-            <Rect x={46} y={190} width={3} height={3} fill={LANTERN} opacity={0.5} />
-            <Rect x={74} y={182} width={3} height={3} fill={LANTERN} opacity={0.6} />
-          </G>
-          {stage.snow ? <Path d="M0 140 L118 136 L128 150 L0 152 Z M400 136 L284 132 L272 150 L400 150 Z" fill="#e6edf5" opacity={0.85} /> : null}
-          {stage.sky === 'frost' ? <Path d={`M${L.x} ${L.y} Q ${SAG.x} ${SAG.y} ${R.x} ${R.y}`} stroke="#e8f2ff" strokeWidth={0.6} opacity={0.6} fill="none" /> : null}
-        </Svg>
-        {stage.basket !== 'gone' ? (
-          <Animated.View style={[{ position: 'absolute', left: 0, top: 0, width: 18 * scale, height: 14 * scale }, basketStyle]} pointerEvents="none">
-            <Svg width={18 * scale} height={14 * scale} viewBox="0 0 18 14">
-              <Line x1={9} y1={0} x2={3} y2={5} stroke="#8b97ab" strokeWidth={0.8} />
-              <Line x1={9} y1={0} x2={15} y2={5} stroke="#8b97ab" strokeWidth={0.8} />
-              <Path d="M2 5 L16 5 L14 13 L4 13 Z" fill="#6b4a2c" stroke="#a37548" strokeWidth={0.8} />
-              <Line x1={3} y1={8} x2={15} y2={8} stroke="#a37548" strokeWidth={0.5} />
-            </Svg>
+          {!still ? <Lanterns stage={stage} scale={scale} reduced={reduced} /> : null}
+        </Animated.View>
+        {!still ? (
+          <Animated.View style={[box, foreStyle]} pointerEvents="none">
+            <Reeds width={width} height={height} scale={scale} reduced={reduced} snow={stage.snow} />
           </Animated.View>
         ) : null}
-        {stage.rain ? <Precip kind="rain" width={width} height={height} reduced={reduced} heavy={stage.sky === 'storm'} /> : null}
+        <Grade grade={direction.grade} sky={sky} width={width} height={height} />
+        {stage.rain ? <Precip kind="rain" width={width} height={height} reduced={reduced} heavy={sky === 'storm'} /> : null}
         {stage.snow ? <Precip kind="snow" width={width} height={height} reduced={reduced} /> : null}
-      </Animated.View>
+        {bust ? (
+          <Animated.View key={bust} entering={reduced ? undefined : FadeIn.duration(520)} exiting={reduced ? undefined : FadeOut.duration(420)} style={box} pointerEvents="none">
+            <Bust who={bust} mood={direction.mood} width={width} height={height} sky={sky} light={stage.miraLight || bust === 'hollis'} reduced={reduced} />
+          </Animated.View>
+        ) : null}
+      </View>
     </View>
   );
 }
 
 export const CrossingArt = memo(CrossingArtView);
+
+/** The new sky fades in over the last one, so time passes rather than cuts. */
+function SkyFade({ sky, night, width, height, reduced }: { sky: Sky; night: number; width: number; height: number; reduced: boolean }) {
+  const [shown, setShown] = useState(sky);
+  const [behind, setBehind] = useState<Sky | null>(null);
+  if (sky !== shown) {
+    setBehind(shown);
+    setShown(sky);
+  }
+  useEffect(() => {
+    if (!behind) return;
+    const h = setTimeout(() => setBehind(null), 2600);
+    return () => clearTimeout(h);
+  }, [behind]);
+  return (
+    <>
+      {behind ? <SkyLayer sky={behind} night={night} width={width} height={height} /> : null}
+      <Animated.View key={shown} entering={reduced || !behind ? undefined : FadeIn.duration(2400)} style={{ position: 'absolute', left: 0, top: 0, width, height }}>
+        <SkyLayer sky={shown} night={night} width={width} height={height} />
+      </Animated.View>
+    </>
+  );
+}
+
+const SkyLayer = memo(function SkyLayer({ sky, night, width, height }: { sky: Sky; night: number; width: number; height: number }) {
+  const [top, mid, low] = SKIES[sky];
+  const stars = sky === 'night' || sky === 'frost';
+  const id = `sky-${sky}`;
+  return (
+    <Svg width={width} height={height} viewBox={`0 0 ${ART_W} ${ART_H}`} style={{ position: 'absolute', left: 0, top: 0 }}>
+      <Defs>
+        <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={top} />
+          <Stop offset="0.55" stopColor={mid} />
+          <Stop offset="1" stopColor={low} />
+        </LinearGradient>
+        <RadialGradient id={`${id}-moon`} cx="50%" cy="50%" r="50%">
+          <Stop offset="0" stopColor="#f4f1e8" stopOpacity={0.9} />
+          <Stop offset="1" stopColor="#f4f1e8" stopOpacity={0} />
+        </RadialGradient>
+        <RadialGradient id={`${id}-sun`} cx="50%" cy="50%" r="50%">
+          <Stop offset="0" stopColor="#ffd9a8" stopOpacity={0.85} />
+          <Stop offset="1" stopColor="#ffd9a8" stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Rect width={ART_W} height={ART_H} fill={`url(#${id})`} />
+      {stars ? STARS.map(([x, y], i) => <Circle key={i} cx={x} cy={y} r={i % 3 === 0 ? 1.1 : 0.7} fill="#dfe8ff" opacity={0.75} />) : null}
+      {stars ? (
+        // The moon climbs a little across the sixteen nights: the one thing in the sky keeping count.
+        <G>
+          <Circle cx={318 - night * 2.4} cy={56 - night * 0.8} r={26} fill={`url(#${id}-moon)`} opacity={0.5} />
+          <Circle cx={318 - night * 2.4} cy={56 - night * 0.8} r={9} fill="#f3efe4" opacity={0.9} />
+        </G>
+      ) : null}
+      {sky === 'dusk' || sky === 'dawn' ? <Circle cx={sky === 'dusk' ? 70 : 318} cy={120} r={70} fill={`url(#${id}-sun)`} /> : null}
+    </Svg>
+  );
+});
+
+function Clouds({ sky, width, height, reduced }: { sky: Sky; width: number; height: number; reduced: boolean }) {
+  const x = useSharedValue(0);
+  const speed = sky === 'storm' ? 26000 : 90000;
+  useEffect(() => {
+    if (reduced) return;
+    x.set(0);
+    x.set(withRepeat(withTiming(-1, { duration: speed, easing: Easing.linear }), -1, false));
+    return () => cancelAnimation(x);
+  }, [reduced, speed, x]);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() * width }] }));
+  const color = sky === 'storm' ? '#0a0e18' : sky === 'dusk' || sky === 'dawn' ? '#3d2c49' : sky === 'frost' ? '#22344f' : '#0d1729';
+  const opacity = sky === 'storm' ? 0.95 : sky === 'dawn' ? 0.5 : 0.65;
+  const band = <Path d="M0 42 Q 40 26 88 40 T 176 34 T 270 44 T 400 36 L 400 58 Q 330 70 260 56 T 130 64 T 0 56 Z M30 88 Q 90 74 150 88 T 280 84 L 280 94 Q 200 104 130 96 T 30 96 Z" fill={color} opacity={opacity} />;
+  return (
+    <Animated.View style={[{ position: 'absolute', left: 0, top: 0, width: width * 2, height, flexDirection: 'row' }, style]} pointerEvents="none">
+      <Svg width={width} height={height} viewBox={`0 0 ${ART_W} ${ART_H}`}>{band}</Svg>
+      <Svg width={width} height={height} viewBox={`0 0 ${ART_W} ${ART_H}`}>{band}</Svg>
+    </Animated.View>
+  );
+}
+
+const Peaks = memo(function Peaks({ stage, width, height }: { stage: Stage; width: number; height: number }) {
+  const snowLine = stage.night >= 4;
+  const warmSky = stage.sky === 'dawn' || stage.sky === 'dusk';
+  return (
+    <Svg width={width} height={height} viewBox={`0 0 ${ART_W} ${ART_H}`} style={{ position: 'absolute', left: 0, top: 0 }}>
+      <Path d="M0 150 L40 112 L70 128 L112 84 L150 120 L188 96 L222 126 L262 80 L300 114 L338 92 L372 118 L400 104 L400 170 L0 170 Z" fill="#1a2438" opacity={warmSky ? 0.75 : 0.95} />
+      {/* The nearer ridge runs on down behind the gorge: looking across the gap you see far hillside, not open sky. */}
+      <Path d="M-60 158 L32 138 L66 150 L100 126 L140 148 L180 130 L232 150 L276 124 L320 146 L360 130 L460 148 L460 320 L-60 320 Z" fill={warmSky ? '#241d30' : '#111929'} />
+      {snowLine ? <Path d="M104 92 L112 84 L121 94 L114 91 Z M254 88 L262 80 L271 90 L263 87 Z M331 99 L338 92 L346 101 L339 98 Z" fill="#dfe7f2" opacity={0.8} /> : null}
+      {/* Orrin's Rest: one spark high on the far mountain, the place all of it is for. */}
+      <Circle cx={344} cy={108} r={0.9} fill={LANTERN} opacity={stage.sky === 'dawn' ? 0.3 : 0.85} />
+    </Svg>
+  );
+});
+
+const Gorge = memo(function Gorge({ sky, width, height }: { sky: Sky; width: number; height: number }) {
+  const rim = sky === 'dusk' || sky === 'dawn' ? '#e8a46b' : '#3b5a85';
+  return (
+    <Svg width={width} height={height} viewBox={`0 0 ${ART_W} ${ART_H}`} style={{ position: 'absolute', left: 0, top: 0 }}>
+      <Defs>
+        <LinearGradient id="gorge" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#050810" stopOpacity={0} />
+          <Stop offset="0.7" stopColor="#03050a" stopOpacity={0.9} />
+          <Stop offset="1" stopColor="#020306" />
+        </LinearGradient>
+      </Defs>
+      {/* Wider than the gap: the near cliffs move further than this layer, and sky must never show behind them. */}
+      <Path d="M-80 150 L480 150 L480 320 L-80 320 Z" fill="url(#gorge)" />
+      {/* Rock strata falling away on the far walls. */}
+      <Path d="M128 160 L146 204 L136 240 M272 160 L252 200 L264 244" stroke={rim} strokeOpacity={0.14} strokeWidth={1} fill="none" />
+      <Path d="M168 266 Q 200 258 232 266" stroke="#5b7fa6" strokeWidth={1} opacity={0.3} fill="none" />
+    </Svg>
+  );
+});
+
+function RiverLight({ width, height, scale, reduced, sky }: { width: number; height: number; scale: number; reduced: boolean; sky: Sky }) {
+  const x = useSharedValue(0);
+  useEffect(() => {
+    if (reduced) return;
+    x.set(0);
+    x.set(withRepeat(withTiming(1, { duration: 3200, easing: Easing.linear }), -1, false));
+    return () => cancelAnimation(x);
+  }, [reduced, x]);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() * 34 * scale }], opacity: 0.35 + 0.25 * Math.sin(x.get() * Math.PI) }));
+  const color = sky === 'dusk' || sky === 'dawn' ? '#f0b285' : '#7ea3cc';
+  return (
+    <View style={{ position: 'absolute', left: 150 * scale, top: 250 * scale, width: 100 * scale, height: 24 * scale, overflow: 'hidden' }} pointerEvents="none">
+      <Animated.View style={[{ width: 170 * scale, marginLeft: -40 * scale }, style]}>
+        <Svg width={170 * scale} height={24 * scale} viewBox="0 0 170 24">
+          <Path d="M0 8 h14 m10 0 h22 m12 0 h16 m10 0 h24 m14 0 h18 m8 0 h20 M6 15 h20 m12 0 h12 m14 0 h26 m12 0 h14 m10 0 h22" stroke={color} strokeWidth={0.9} strokeLinecap="round" fill="none" />
+        </Svg>
+      </Animated.View>
+    </View>
+  );
+}
+
+function Mist({ width, height, scale, reduced, level }: { width: number; height: number; scale: number; reduced: boolean; level: number }) {
+  const x = useSharedValue(0);
+  useEffect(() => {
+    if (reduced) return;
+    x.set(0);
+    x.set(withRepeat(withSequence(withTiming(1, { duration: 24000, easing: Easing.inOut(Easing.sin) }), withTiming(0, { duration: 24000, easing: Easing.inOut(Easing.sin) })), -1, false));
+    return () => cancelAnimation(x);
+  }, [reduced, x]);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateX: (x.get() - 0.5) * 60 * scale }] }));
+  return (
+    <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: -40 * scale, top: 186 * scale, width: width + 80 * scale, height: 74 * scale, opacity: level }, style]}>
+      <Svg width={width + 80 * scale} height={74 * scale} viewBox="0 0 480 74" preserveAspectRatio="none">
+        <Defs>
+          <RadialGradient id="mist" cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#c7d4e4" stopOpacity={0.55} />
+            <Stop offset="1" stopColor="#c7d4e4" stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Ellipse cx={240} cy={40} rx={150} ry={26} fill="url(#mist)" />
+        <Ellipse cx={170} cy={30} rx={110} ry={20} fill="url(#mist)" />
+        <Ellipse cx={320} cy={48} rx={120} ry={18} fill="url(#mist)" />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+const NearWorld = memo(function NearWorld({ stage, width, height }: { stage: Stage; width: number; height: number }) {
+  const warmSky = stage.sky === 'dusk' || stage.sky === 'dawn';
+  const rim = warmSky ? '#e8a46b' : '#3b5a85';
+  return (
+    <Svg width={width} height={height} viewBox={`0 0 ${ART_W} ${ART_H}`} style={{ position: 'absolute', left: 0, top: 0 }}>
+      <Defs>
+        <RadialGradient id="glow" cx="50%" cy="50%" r="50%">
+          <Stop offset="0" stopColor={LANTERN} stopOpacity={0.75} />
+          <Stop offset="0.4" stopColor={LANTERN} stopOpacity={0.22} />
+          <Stop offset="1" stopColor={LANTERN} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      {/* Cliffs */}
+      <Path d="M-40 140 L118 136 L128 150 L138 300 L-40 300 Z" fill="#0c1220" />
+      <Path d="M440 136 L284 132 L272 150 L262 300 L440 300 Z" fill="#0c1220" />
+      <Path d="M-40 140 L118 136 L128 150" stroke={rim} strokeWidth={1.4} opacity={0.6} fill="none" />
+      <Path d="M440 136 L284 132 L272 150" stroke={rim} strokeWidth={1.4} opacity={0.6} fill="none" />
+
+      {/* Luma: the lower town behind you, a few roofs on the far bank. */}
+      <G opacity={0.95}>
+        <Path d="M6 144 L6 128 L18 118 L30 128 L30 144 Z M34 146 L34 134 L44 126 L54 134 L54 146 Z M62 142 L62 124 L76 112 L90 124 L90 142 Z" fill="#141b2c" />
+        <Path d="M6 128 L18 118 L30 128 M62 124 L76 112 L90 124" stroke={rim} strokeWidth={0.6} opacity={0.5} fill="none" />
+        <Rect x={15} y={130} width={3} height={4} fill={LANTERN} opacity={stage.sky === 'dawn' ? 0.25 : 0.8} />
+        <Rect x={74} y={127} width={3} height={4} fill={LANTERN} opacity={stage.sky === 'dawn' ? 0.25 : 0.7} />
+        <Rect x={42} y={135} width={2.5} height={3} fill={LANTERN} opacity={stage.sky === 'dawn' ? 0.2 : 0.5} />
+        <Path d="M330 142 L330 128 L342 118 L354 128 L354 142 Z M366 144 L366 132 L378 124 L392 132 L392 144 Z" fill="#141b2c" />
+        <Rect x={340} y={130} width={2.5} height={3.5} fill={LANTERN} opacity={stage.sky === 'dawn' ? 0.2 : 0.55} />
+      </G>
+
+      {/* What is left of the Long Bridge: two broken ends, a few planks hanging from their ropes. */}
+      <Path d="M128 150 L154 160 L150 166 L130 158 Z M272 150 L246 160 L250 166 L270 158 Z" fill="#1f1812" />
+      <Path d="M138 153 L156 160 M262 153 L244 160" stroke="#5a4630" strokeWidth={0.9} />
+      <G stroke="#7a6346" strokeWidth={0.5}>
+        <Line x1={152} y1={162} x2={158} y2={186} />
+        <Line x1={146} y1={160} x2={148} y2={178} />
+        <Line x1={250} y1={162} x2={243} y2={190} />
+        <Line x1={256} y1={160} x2={255} y2={174} />
+      </G>
+      <G fill="#2d2318" stroke="#4b3a26" strokeWidth={0.3}>
+        <Rect x={153} y={185} width={9} height={2.4} transform="rotate(38 157 186)" />
+        <Rect x={143} y={177} width={9} height={2.4} transform="rotate(-24 148 178)" />
+        <Rect x={238} y={189} width={9} height={2.4} transform="rotate(-44 243 190)" />
+        <Rect x={250} y={173} width={9} height={2.4} transform="rotate(18 255 174)" />
+      </G>
+
+      <Built stage={stage} />
+      <Path d={`M${L.x} ${L.y} Q ${SAG.x} ${SAG.y} ${R.x} ${R.y}`} stroke="#8b97ab" strokeWidth={1.3} fill="none" />
+      {stage.sky === 'frost' ? <Path d={`M${L.x} ${L.y} Q ${SAG.x} ${SAG.y} ${R.x} ${R.y}`} stroke="#e8f2ff" strokeWidth={0.6} opacity={0.6} fill="none" /> : null}
+
+      {/* Posts and winches */}
+      <Rect x={L.x - 3} y={L.y - 2} width={6} height={20} fill="#2a2f3a" />
+      <Rect x={R.x - 3} y={R.y - 2} width={6} height={20} fill="#2a2f3a" />
+      <Circle cx={L.x - 9} cy={L.y + 12} r={4} fill="#2a2f3a" stroke="#4a5263" strokeWidth={0.8} />
+      <Circle cx={R.x + 9} cy={R.y + 12} r={4} fill="#2a2f3a" stroke="#4a5263" strokeWidth={0.8} />
+
+      {/* Your lantern and you, from behind */}
+      <Keeper x={L.x - 22} y={L.y + 4} />
+
+      {/* Mira's side */}
+      <Mira pose={stage.mira} light={stage.miraLight} />
+
+      {stage.snow ? <Path d="M-40 140 L118 136 L128 150 L-40 152 Z M440 136 L284 132 L272 150 L440 150 Z" fill="#e6edf5" opacity={0.85} /> : null}
+    </Svg>
+  );
+});
+
+/** Lantern light breathes very slightly. It's the one warm thing in the frame, and it should feel alive. */
+function Lanterns({ stage, scale, reduced }: { stage: Stage; scale: number; reduced: boolean }) {
+  const a = useSharedValue(1);
+  useEffect(() => {
+    if (reduced) return;
+    a.set(withRepeat(withSequence(withTiming(0.82, { duration: 1300, easing: Easing.inOut(Easing.sin) }), withTiming(1, { duration: 1700, easing: Easing.inOut(Easing.sin) })), -1, false));
+    return () => cancelAnimation(a);
+  }, [reduced, a]);
+  const style = useAnimatedStyle(() => ({ opacity: a.get() }));
+  const size = 52 * scale;
+  const glow = (key: string, cx: number, cy: number) => (
+    <Animated.View key={key} pointerEvents="none" style={[{ position: 'absolute', left: cx * scale - size / 2, top: cy * scale - size / 2, width: size, height: size }, style]}>
+      <Svg width={size} height={size} viewBox="0 0 52 52">
+        <Defs>
+          <RadialGradient id={`lantern-${key}`} cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor={LANTERN} stopOpacity={0.7} />
+            <Stop offset="0.4" stopColor={LANTERN} stopOpacity={0.2} />
+            <Stop offset="1" stopColor={LANTERN} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={26} cy={26} r={26} fill={`url(#lantern-${key})`} />
+      </Svg>
+    </Animated.View>
+  );
+  const raised = stage.mira === 'lantern-up';
+  return (
+    <>
+      {glow('near', L.x - 16, L.y + 10)}
+      {stage.miraLight && stage.mira !== 'crossing' ? glow('far', raised ? R.x + 18 : R.x + 22, raised ? R.y - 14 : R.y + 2) : null}
+      {stage.mira === 'crossing' ? glow('span', 230, 134) : null}
+    </>
+  );
+}
+
+function Reeds({ width, height, scale, reduced, snow }: { width: number; height: number; scale: number; reduced: boolean; snow: boolean }) {
+  const a = useSharedValue(0);
+  useEffect(() => {
+    if (reduced) return;
+    a.set(withRepeat(withSequence(withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }), withTiming(-1, { duration: 3100, easing: Easing.inOut(Easing.sin) })), -1, true));
+    return () => cancelAnimation(a);
+  }, [reduced, a]);
+  const sway = useAnimatedStyle(() => ({ transform: [{ rotate: `${a.get() * 2.4}deg` }] }));
+  const sway2 = useAnimatedStyle(() => ({ transform: [{ rotate: `${a.get() * -1.7}deg` }] }));
+  const color = snow ? '#2a3244' : '#080c15';
+  const clump = (d: string, w: number, h: number) => (
+    <Svg width={w * scale} height={h * scale} viewBox={`0 0 ${w} ${h}`}>
+      <Path d={d} stroke={color} strokeWidth={1.5} strokeLinecap="round" fill="none" />
+    </Svg>
+  );
+  return (
+    <View style={{ position: 'absolute', left: 0, top: 0, width, height }} pointerEvents="none">
+      <Animated.View style={[{ position: 'absolute', left: -6 * scale, bottom: -4 * scale, transformOrigin: 'bottom' }, sway]}>
+        {clump('M8 70 Q 6 40 2 20 M14 70 Q 15 34 22 6 M20 70 Q 24 44 34 26 M26 70 Q 32 52 44 42 M4 70 Q 0 54 -2 44', 50, 72)}
+      </Animated.View>
+      <Animated.View style={[{ position: 'absolute', right: -4 * scale, bottom: -4 * scale, transformOrigin: 'bottom' }, sway2]}>
+        {clump('M34 60 Q 36 36 42 18 M28 60 Q 26 34 18 16 M20 60 Q 16 44 6 34 M40 60 Q 44 46 48 40', 50, 62)}
+      </Animated.View>
+    </View>
+  );
+}
+
+/** Light over the whole frame. Warm only when something has been kept; cold when something hasn't. */
+function Grade({ grade, sky, width, height }: { grade: Direction['grade']; sky: Sky; width: number; height: number }) {
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width, height }}>
+      <View style={{ position: 'absolute', left: 0, top: 0, width, height, backgroundColor: '#ff9d4d', opacity: grade.warm * 0.16 }} />
+      <View style={{ position: 'absolute', left: 0, top: 0, width, height, backgroundColor: '#3f6fb5', opacity: grade.cold * 0.22 }} />
+      <View style={{ position: 'absolute', left: 0, top: 0, width, height, backgroundColor: '#000', opacity: grade.dark * 0.6 }} />
+      <Svg width={width} height={height} viewBox={`0 0 ${ART_W} ${ART_H}`}>
+        <Defs>
+          <RadialGradient id={`vig-${sky}`} cx="50%" cy="46%" r="72%">
+            <Stop offset="0.55" stopColor="#000" stopOpacity={0} />
+            <Stop offset="1" stopColor="#000" stopOpacity={0.55} />
+          </RadialGradient>
+        </Defs>
+        <Rect width={ART_W} height={ART_H} fill={`url(#vig-${sky})`} />
+      </Svg>
+    </View>
+  );
+}
 
 function Built({ stage }: { stage: Stage }) {
   const frayDash = stage.frayed ? '10 3 4 6' : undefined;
@@ -247,7 +560,7 @@ function Precip({ kind, width, height, reduced, heavy }: { kind: 'rain' | 'snow'
   useEffect(() => {
     if (reduced) return;
     y.set(0);
-    y.set(withRepeat(withTiming(1, { duration: kind === 'rain' ? (heavy ? 500 : 800) : 6000, easing: Easing.linear }), -1, false));
+    y.set(withDelay(0, withRepeat(withTiming(1, { duration: kind === 'rain' ? (heavy ? 500 : 800) : 6000, easing: Easing.linear }), -1, false)));
     return () => cancelAnimation(y);
   }, [reduced, kind, heavy, y]);
   const style = useAnimatedStyle(() => ({ transform: [{ translateY: (y.get() - 1) * height }, { translateX: kind === 'rain' ? (1 - y.get()) * 20 : Math.sin(y.get() * 6.28) * 6 }] }));
@@ -273,9 +586,10 @@ function Precip({ kind, width, height, reduced, heavy }: { kind: 'rain' | 'snow'
 }
 
 /** A text description of the illustration, for screen readers. */
-function describe(s: Stage): string {
+function describe(s: Stage, bust: 'mira' | 'hollis' | null): string {
   const sky = { dusk: 'Dusk', night: 'Night', storm: 'A storm', frost: 'A frosty night', dawn: 'Dawn' }[s.sky];
   const built = { none: 'a single cable crosses the gorge', rail: 'a cable and a thin hand-line cross the gorge', line2: 'a cable and a second guide line cross the gorge', span: 'a plank walkway now spans the gorge', cut: 'the guide line hangs cut against the cliff' }[s.built];
   const mira = { none: 'The far post is empty.', stand: 'Mira stands at the far post.', 'lantern-up': 'Mira raises her lantern.', turned: 'Mira has turned away.', crossing: 'Mira is out on the span.' }[s.mira];
-  return `${sky} over the Ashgill gorge; ${built}${s.frayed ? ', fraying' : ''}. ${mira}${s.snow ? ' Snow is falling.' : s.rain ? ' Rain.' : ''}`;
+  const close = bust === 'mira' ? ' A close view of Mira.' : bust === 'hollis' ? ' A close view of Hollis.' : '';
+  return `${sky} over the Ashgill gorge; ${built}${s.frayed ? ', fraying' : ''}. ${mira}${s.snow ? ' Snow is falling.' : s.rain ? ' Rain.' : ''}${close}`;
 }

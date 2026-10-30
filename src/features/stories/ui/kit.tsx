@@ -10,6 +10,7 @@ import { Button } from '@/src/components/ui/Button';
 import { ArrowRight, BookOpen, RotateCcw, X } from '@/src/components/ui/icons';
 import { MAX_CONTENT_WIDTH, radius, space } from '@/src/theme/tokens';
 import { haptic } from '@/src/utils/feedback';
+import { AudioButton } from './AudioSheet';
 
 /**
  * Pieces shared by both stories. Each story passes its own palette, so the two keep their own atmosphere while
@@ -54,12 +55,13 @@ export function StoryTopBar({ tone, title, progress, total }: { tone: StoryTone;
           <View key={i} style={[styles.dot, { backgroundColor: i <= progress ? tone.accent : 'rgba(255,255,255,0.22)' }]} />
         ))}
       </View>
+      <AudioButton tone={tone} />
     </View>
   );
 }
 
 /** A large, two-line choice: what you do, and what it means. */
-export function OptionButton({ tone, label, detail, onPress, selected, disabled }: { tone: StoryTone; label: string; detail?: string; onPress: () => void; selected?: boolean; disabled?: boolean }) {
+export function OptionButton({ tone, label, detail, onPress, selected, disabled, leading }: { tone: StoryTone; label: string; detail?: string; onPress: () => void; selected?: boolean; disabled?: boolean; leading?: ReactNode }) {
   return (
     <Pressable
       onPress={() => {
@@ -72,16 +74,22 @@ export function OptionButton({ tone, label, detail, onPress, selected, disabled 
       accessibilityLabel={detail ? `${label}. ${detail}` : label}
       style={({ pressed }) => [
         styles.option,
-        { backgroundColor: selected ? tone.accent : pressed ? tone.border : tone.panel, borderColor: selected ? tone.accent : tone.border, opacity: disabled && !selected ? 0.5 : 1 },
+        // A choice with its own symbol keeps a dark ground when selected, so the symbol stays legible.
+        { backgroundColor: selected ? (leading ? tone.border : tone.accent) : pressed ? tone.border : tone.panel, borderColor: selected ? tone.accent : tone.border, opacity: disabled && !selected ? 0.5 : 1 },
       ]}>
-      <AppText variant="bodyStrong" color={selected ? tone.bg : tone.text}>
-        {label}
-      </AppText>
-      {detail ? (
-        <AppText variant="small" color={selected ? tone.bg : tone.muted}>
-          {detail}
-        </AppText>
-      ) : null}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+        {leading}
+        <View style={{ flex: 1, gap: 2 }}>
+          <AppText variant="bodyStrong" color={selected && !leading ? tone.bg : tone.text}>
+            {label}
+          </AppText>
+          {detail ? (
+            <AppText variant="small" color={selected && !leading ? tone.bg : tone.muted}>
+              {detail}
+            </AppText>
+          ) : null}
+        </View>
+      </View>
     </Pressable>
   );
 }
@@ -120,7 +128,10 @@ export function Reflection({ tone, content, before, onReplay }: { tone: StoryTon
   const insets = useSafeAreaInsets();
   const enter = useEnter();
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: tone.bg }} contentContainerStyle={{ padding: space.xl, paddingTop: insets.top + space.huge, paddingBottom: insets.bottom + space.huge }}>
+    <ScrollView style={{ flex: 1, backgroundColor: tone.bg }} contentContainerStyle={{ padding: space.xl, paddingTop: insets.top + space.md, paddingBottom: insets.bottom + space.huge }}>
+      <View style={{ alignItems: 'flex-end', marginBottom: space.md }}>
+        <AudioButton tone={tone} />
+      </View>
       <View style={{ width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', gap: space.xl }}>
         {before}
         <View style={{ gap: space.lg }}>
@@ -208,8 +219,8 @@ const styles = StyleSheet.create({
   top: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, zIndex: 10 },
   close: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   chip: { flexShrink: 1, paddingHorizontal: space.md, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1 },
-  dots: { marginLeft: 'auto', flexDirection: 'row', gap: 4 },
-  dot: { width: 6, height: 6, borderRadius: 3 },
+  dots: { marginLeft: 'auto', flexDirection: 'row', gap: 3 },
+  dot: { width: 4, height: 4, borderRadius: 2 },
   option: { minHeight: 56, borderRadius: radius.lg, borderWidth: 1, paddingHorizontal: space.lg, paddingVertical: space.md, gap: 2, justifyContent: 'center' },
   continue: { minHeight: 52, borderRadius: radius.lg, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, paddingHorizontal: space.lg },
   takeaway: { flexDirection: 'row', gap: space.md, padding: space.lg, borderRadius: radius.lg, borderWidth: 1 },

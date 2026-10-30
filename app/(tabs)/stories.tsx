@@ -80,7 +80,7 @@ export default function StoriesScreen() {
                   body="A storm has split a town across a gorge. One cable, one basket, and a courier on the other side with her own reasons. What you send across becomes what you have."
                   status={crossingStatus + (endings > 0 ? ` · ${endings} of 3 endings seen` : '')}
                   accent="#F2A65A"
-                  art={<CrossingArt stage={{ night: 1, sky: 'dusk', rain: false, snow: false, mira: 'lantern-up', miraLight: true, basket: 'middle', built: 'none', frayed: false }} maxHeight={170} />}
+                  art={<CrossingArt stage={{ night: 1, sky: 'dusk', rain: false, snow: false, mira: 'lantern-up', miraLight: true, basket: 'middle', built: 'none', frayed: false }} maxHeight={170} still />}
                   onPress={() => openStory('crossing')}
                 />
               </Animated.View>
