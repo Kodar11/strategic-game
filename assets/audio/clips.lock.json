@@ -1,0 +1,1165 @@
+{
+  "version": 1,
+  "clips": {
+    "auctions.concept.line": {
+      "hash": "c501ad331602eea1",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 53280
+    },
+    "auctions.done.takeaway": {
+      "hash": "b5c9b0476e8ab9c5",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 38880
+    },
+    "auctions.intro.heading": {
+      "hash": "0aed3d3b9822e727",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 31392
+    },
+    "auctions.intro.line-1": {
+      "hash": "ac61be274babda55",
+      "voice": "en-IN-Chirp3-HD-Despina",
+      "bytes": 14304
+    },
+    "auctions.intro.line-2": {
+      "hash": "0159601bd0ebc65d",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 17088
+    },
+    "auctions.transfer.bargain": {
+      "hash": "1cfb690056807a2b",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 16032
+    },
+    "auctions.transfer.better": {
+      "hash": "ec58805676302c28",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 21312
+    },
+    "auctions.transfer.curse": {
+      "hash": "9de5bd25e8fefb91",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 24000
+    },
+    "bargaining.concept.line": {
+      "hash": "2ecad2bfe2b7887e",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 33120
+    },
+    "bargaining.done.takeaway": {
+      "hash": "cfe06c0a51436f7a",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 35040
+    },
+    "bargaining.intro.heading": {
+      "hash": "f94b2dacb5e1f6cf",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 37152
+    },
+    "bargaining.intro.line-1": {
+      "hash": "67dca428d885ce36",
+      "voice": "en-IN-Chirp3-HD-Callirrhoe",
+      "bytes": 12672
+    },
+    "bargaining.intro.line-2": {
+      "hash": "a3e7f9fdd1e1a735",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 20448
+    },
+    "bargaining.transfer.fair": {
+      "hash": "92e390f952e0e346",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 21792
+    },
+    "bargaining.transfer.need": {
+      "hash": "01256d284b6de376",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 23232
+    },
+    "bargaining.transfer.outside": {
+      "hash": "a358d00d69c6ed01",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 20832
+    },
+    "bayesian-uncertainty.concept.line": {
+      "hash": "417369d41450ef0f",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 40800
+    },
+    "bayesian-uncertainty.done.takeaway": {
+      "hash": "cf73bf061b1f9c94",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 35520
+    },
+    "bayesian-uncertainty.intro.heading": {
+      "hash": "417abf77662c2071",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 31872
+    },
+    "bayesian-uncertainty.intro.line-1": {
+      "hash": "aaaa671ddced83c1",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 22752
+    },
+    "bayesian-uncertainty.intro.line-2": {
+      "hash": "0b47760a25341d89",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 11616
+    },
+    "bayesian-uncertainty.transfer.99": {
+      "hash": "bc4bd8bde634bec1",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28800
+    },
+    "bayesian-uncertainty.transfer.ignore": {
+      "hash": "1063f967785108f6",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 27072
+    },
+    "bayesian-uncertainty.transfer.low": {
+      "hash": "4cc9c3fafddde849",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 24960
+    },
+    "best-response.concept.line": {
+      "hash": "af6aa7db68c38617",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 34272
+    },
+    "best-response.done.takeaway": {
+      "hash": "cb17165c8e587dae",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 25152
+    },
+    "best-response.intro.heading": {
+      "hash": "546511bd6ea070f9",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 36672
+    },
+    "best-response.intro.line-1": {
+      "hash": "7069bbce894dfb7a",
+      "voice": "en-IN-Chirp3-HD-Fenrir",
+      "bytes": 13536
+    },
+    "best-response.intro.line-2": {
+      "hash": "b3cf29cb0db86daf",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 11136
+    },
+    "best-response.transfer.stable": {
+      "hash": "ddda29cb63b73b87",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 34272
+    },
+    "best-response.transfer.unique": {
+      "hash": "1f86ff52c60568db",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 22560
+    },
+    "best-response.transfer.unstable": {
+      "hash": "735d7d8791e3e8d9",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28032
+    },
+    "brinkmanship.concept.line": {
+      "hash": "6f21f8f45e589194",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 34560
+    },
+    "brinkmanship.done.takeaway": {
+      "hash": "3ff564b6e6766408",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 29760
+    },
+    "brinkmanship.intro.heading": {
+      "hash": "005b6d543d523923",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28032
+    },
+    "brinkmanship.intro.line-1": {
+      "hash": "f1e516a5f3f2948b",
+      "voice": "en-IN-Chirp3-HD-Despina",
+      "bytes": 13632
+    },
+    "brinkmanship.intro.line-2": {
+      "hash": "b7fa36605f85cbd1",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 6624
+    },
+    "brinkmanship.transfer.attrition": {
+      "hash": "53bd135ee2da545d",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 17472
+    },
+    "brinkmanship.transfer.brink": {
+      "hash": "ae0e00d7f5055866",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 24000
+    },
+    "brinkmanship.transfer.credible": {
+      "hash": "d0856c3e5344f3af",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 18240
+    },
+    "coalitions.concept.line": {
+      "hash": "6f791f40e5bfb5e8",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 33312
+    },
+    "coalitions.done.takeaway": {
+      "hash": "d796faef4c8162c1",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 30240
+    },
+    "coalitions.intro.heading": {
+      "hash": "07473e672d5d9a25",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 36480
+    },
+    "coalitions.intro.line-1": {
+      "hash": "c37e41da41d89a96",
+      "voice": "en-IN-Chirp3-HD-Achernar",
+      "bytes": 10464
+    },
+    "coalitions.intro.line-2": {
+      "hash": "0027c629f2954a92",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 14784
+    },
+    "coalitions.transfer.equal": {
+      "hash": "6c4f741524fb5a9d",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 18240
+    },
+    "coalitions.transfer.safe": {
+      "hash": "de54462cedac4b50",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 23040
+    },
+    "coalitions.transfer.unsafe": {
+      "hash": "1a62fe0dddb03b54",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 27360
+    },
+    "credibility.concept.line": {
+      "hash": "faa03a2ae637396b",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 38400
+    },
+    "credibility.done.takeaway": {
+      "hash": "e0c35d946ae48e05",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 26112
+    },
+    "credibility.intro.heading": {
+      "hash": "7fc4285c493abda1",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 31872
+    },
+    "credibility.intro.line-1": {
+      "hash": "c3e9187ec3105d54",
+      "voice": "en-IN-Chirp3-HD-Fenrir",
+      "bytes": 9024
+    },
+    "credibility.intro.line-2": {
+      "hash": "28895cef70db67a9",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 7392
+    },
+    "credibility.transfer.reputation": {
+      "hash": "288ba415a254a496",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28032
+    },
+    "credibility.transfer.strong": {
+      "hash": "043427d578011dc7",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 21792
+    },
+    "credibility.transfer.weak": {
+      "hash": "fac445464ba4b6c1",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28800
+    },
+    "evolution.concept.line": {
+      "hash": "27748bc42dc0f577",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 29472
+    },
+    "evolution.done.takeaway": {
+      "hash": "9c10b59ba951e4d0",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 26400
+    },
+    "evolution.intro.heading": {
+      "hash": "efd234e17f7a2768",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 48192
+    },
+    "evolution.intro.line-1": {
+      "hash": "04da571f6aa4d7b6",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 18432
+    },
+    "evolution.intro.line-2": {
+      "hash": "2fa57f3b3a18d6aa",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 8544
+    },
+    "evolution.transfer.fade": {
+      "hash": "94830cec19b0c4e9",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 30912
+    },
+    "evolution.transfer.half": {
+      "hash": "11b9a22720e64e0c",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 20640
+    },
+    "evolution.transfer.win": {
+      "hash": "3a77a85b2b74fa94",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 17472
+    },
+    "iterated-dominance.concept.line": {
+      "hash": "29ec75ecfd4c8d31",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 48672
+    },
+    "iterated-dominance.done.takeaway": {
+      "hash": "4bfca87b8ad8590c",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 25440
+    },
+    "iterated-dominance.intro.heading": {
+      "hash": "30759f44407ac97d",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 34272
+    },
+    "iterated-dominance.intro.line-1": {
+      "hash": "b10f01a00472e24e",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 18144
+    },
+    "iterated-dominance.intro.line-2": {
+      "hash": "18f700e27b7cb91f",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 11424
+    },
+    "iterated-dominance.transfer.choose-8": {
+      "hash": "6e91836ff472195b",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 29280
+    },
+    "iterated-dominance.transfer.depends": {
+      "hash": "83f59819ec44dd6c",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 24000
+    },
+    "iterated-dominance.transfer.drop-9": {
+      "hash": "4d4cc562498ae473",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28800
+    },
+    "l1.caveat.arjun": {
+      "hash": "f5b516a1bab65bca",
+      "voice": "en-IN-Chirp3-HD-Orus",
+      "bytes": 20832
+    },
+    "l1.caveat.kavya": {
+      "hash": "60c61681bd413cc3",
+      "voice": "en-IN-Chirp3-HD-Callirrhoe",
+      "bytes": 18912
+    },
+    "l1.decide.aarav": {
+      "hash": "fa5eae10a8533cbc",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 16512
+    },
+    "l1.done.takeaway": {
+      "hash": "ae7cb80d983b9370",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28800
+    },
+    "l1.intro.heading": {
+      "hash": "be4762e43d546303",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 23040
+    },
+    "l1.intro.sen": {
+      "hash": "135076991969bddd",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 27552
+    },
+    "l1.matrix.dominant": {
+      "hash": "0e707dcfe05f2578",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 37152
+    },
+    "l1.penalty.flip": {
+      "hash": "3d9e624d4d1053a8",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 16800
+    },
+    "l1.reveal.aarav.bothcut": {
+      "hash": "287cdaae484e7bd8",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 14016
+    },
+    "l1.reveal.aarav.undercut": {
+      "hash": "af71719791be1296",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 10272
+    },
+    "l1.reveal.rohan.bothcut": {
+      "hash": "06159e22dba1f8c6",
+      "voice": "en-IN-Chirp3-HD-Fenrir",
+      "bytes": 10176
+    },
+    "l1.reveal.rohan.undercut": {
+      "hash": "263c0b3cdaf298b6",
+      "voice": "en-IN-Chirp3-HD-Fenrir",
+      "bytes": 8256
+    },
+    "l1.stakes.kavya": {
+      "hash": "a100fdb1e993e2d8",
+      "voice": "en-IN-Chirp3-HD-Callirrhoe",
+      "bytes": 17376
+    },
+    "l1.stakes.rohan": {
+      "hash": "392349f8740b5451",
+      "voice": "en-IN-Chirp3-HD-Fenrir",
+      "bytes": 17184
+    },
+    "l1.transfer.both-advertise": {
+      "hash": "6f756312145a148a",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 35712
+    },
+    "l1.transfer.both-hold": {
+      "hash": "89c8e459a19c996a",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 40992
+    },
+    "l1.transfer.first-mover": {
+      "hash": "5bbe995c559d2ed6",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28992
+    },
+    "l1.transfer.repeat": {
+      "hash": "601a9c470069b91c",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 47040
+    },
+    "l1.trap.rohan": {
+      "hash": "1a63d16720c0bc65",
+      "voice": "en-IN-Chirp3-HD-Fenrir",
+      "bytes": 22944
+    },
+    "l1.trap.sen": {
+      "hash": "d512c399cd691706",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 32160
+    },
+    "l1.why.cut-cut": {
+      "hash": "dff601b59fb886bf",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 39168
+    },
+    "l1.why.maintain-cut": {
+      "hash": "96d8c25ae0e1fa02",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 30720
+    },
+    "l2.done.takeaway": {
+      "hash": "4980225f1f7773c5",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 21312
+    },
+    "l2.example.aarav": {
+      "hash": "f4316e1db3d8703e",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 15456
+    },
+    "l2.guess2.maya": {
+      "hash": "5bf586ba3f57df40",
+      "voice": "en-IN-Chirp3-HD-Despina",
+      "bytes": 20352
+    },
+    "l2.intro.heading": {
+      "hash": "0beadf3b02f09548",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 27840
+    },
+    "l2.intro.maya": {
+      "hash": "a789164d06fad97f",
+      "voice": "en-IN-Chirp3-HD-Despina",
+      "bytes": 11904
+    },
+    "l2.intro.sen": {
+      "hash": "2d6017288f5a6b9a",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 24672
+    },
+    "l2.result.above": {
+      "hash": "aefbd780b749b8ad",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 13536
+    },
+    "l2.result.below": {
+      "hash": "3518885d0b12b7b1",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 12480
+    },
+    "l2.result.over": {
+      "hash": "a82dbe975407ce15",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 13536
+    },
+    "l2.result.under": {
+      "hash": "fe34237980299007",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 10752
+    },
+    "l2.result.won": {
+      "hash": "742b86a8d331acee",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 8640
+    },
+    "l2.theory.zero": {
+      "hash": "194e241644a06230",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 51840
+    },
+    "l2.transfer.advice": {
+      "hash": "4a8ca67fbf3efd18",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 31680
+    },
+    "l2.transfer.deepest": {
+      "hash": "639354d35d63f13d",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 30240
+    },
+    "l2.transfer.earliest": {
+      "hash": "3effd0d95355190b",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 29472
+    },
+    "l2.transfer.model": {
+      "hash": "5e7a4bed9766dc20",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 43200
+    },
+    "l2.transfer.others": {
+      "hash": "5b68d2a7b3642734",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 37632
+    },
+    "l2.transfer.ten": {
+      "hash": "27631ef7c1b2acf7",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 38112
+    },
+    "l2.transfer.value-only": {
+      "hash": "6224114673c3d901",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 22560
+    },
+    "l2.types.meera": {
+      "hash": "f10b6f5e29e8519f",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 45504
+    },
+    "l3.done.takeaway": {
+      "hash": "e44bab7d2269a866",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 27072
+    },
+    "l3.focal.sen": {
+      "hash": "2c5cb38338e86f57",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 35040
+    },
+    "l3.intro.aarav": {
+      "hash": "76b606492daca416",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 16992
+    },
+    "l3.intro.heading": {
+      "hash": "a3e044a7cedf122d",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 34272
+    },
+    "l3.matrix.equilibria": {
+      "hash": "5916f5fb891b5323",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 49152
+    },
+    "l3.pick2.aarav": {
+      "hash": "816a6e8ee82e9791",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 10944
+    },
+    "l3.pick2.nina": {
+      "hash": "65f365d72f6d4f9f",
+      "voice": "en-IN-Chirp3-HD-Achernar",
+      "bytes": 17472
+    },
+    "l3.reveal1.met": {
+      "hash": "b547bc20f87549f1",
+      "voice": "en-IN-Chirp3-HD-Achernar",
+      "bytes": 10656
+    },
+    "l3.reveal1.missed": {
+      "hash": "7a439f9779a4ac6e",
+      "voice": "en-IN-Chirp3-HD-Achernar",
+      "bytes": 15456
+    },
+    "l3.reveal2.met": {
+      "hash": "92c30d1d07585dcc",
+      "voice": "en-IN-Chirp3-HD-Achernar",
+      "bytes": 12192
+    },
+    "l3.reveal2.missed": {
+      "hash": "e09f4374146b4560",
+      "voice": "en-IN-Chirp3-HD-Achernar",
+      "bytes": 12384
+    },
+    "l3.transfer.announce": {
+      "hash": "77f33acf9c5e506a",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 45600
+    },
+    "l3.transfer.better-app": {
+      "hash": "10caad36c09848e7",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 43872
+    },
+    "l3.transfer.both": {
+      "hash": "85589fcf6c8abdce",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28032
+    },
+    "l3.transfer.clock": {
+      "hash": "f1aef44cad2d0cad",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 48000
+    },
+    "l3.transfer.kiosk": {
+      "hash": "1437a1813de5fa9d",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 22560
+    },
+    "l3.transfer.majority": {
+      "hash": "2ab1e416d64b2bee",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 46752
+    },
+    "l3.transfer.platform": {
+      "hash": "e9e032b5bbc69701",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 21312
+    },
+    "l4.caveat.sen": {
+      "hash": "d4c9c1b2f86f6635",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 48960
+    },
+    "l4.compare.patterns": {
+      "hash": "8aa65b1a6eef689a",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 59712
+    },
+    "l4.done.takeaway": {
+      "hash": "206142cd4d8ee6dc",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 19872
+    },
+    "l4.intro.heading": {
+      "hash": "5cc34c0337d6b4fa",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 29952
+    },
+    "l4.intro.maya": {
+      "hash": "8b15e03aa183d360",
+      "voice": "en-IN-Chirp3-HD-Despina",
+      "bytes": 14784
+    },
+    "l4.mixed.meera": {
+      "hash": "d88a7230a9d4cbb9",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 36288
+    },
+    "l4.review.few": {
+      "hash": "b1e5f0ed8cc97b69",
+      "voice": "en-IN-Chirp3-HD-Despina",
+      "bytes": 13344
+    },
+    "l4.review.read": {
+      "hash": "829450ebd99e728b",
+      "voice": "en-IN-Chirp3-HD-Despina",
+      "bytes": 14304
+    },
+    "l4.shot.goal-guess": {
+      "hash": "cf788d99f216b39e",
+      "voice": "en-IN-Chirp3-HD-Despina",
+      "bytes": 5664
+    },
+    "l4.shot.goal-read": {
+      "hash": "fe3cb44536008a27",
+      "voice": "en-IN-Chirp3-HD-Despina",
+      "bytes": 8064
+    },
+    "l4.shot.save-guess": {
+      "hash": "c14a676ffa8787ba",
+      "voice": "en-IN-Chirp3-HD-Despina",
+      "bytes": 9312
+    },
+    "l4.shot.save-read": {
+      "hash": "433f988d4824b05d",
+      "voice": "en-IN-Chirp3-HD-Despina",
+      "bytes": 5664
+    },
+    "l4.transfer.fixed": {
+      "hash": "f426becec1aa5f89",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 20832
+    },
+    "l4.transfer.random": {
+      "hash": "e8e9b842cbcdc969",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 32352
+    },
+    "l4.transfer.rotate": {
+      "hash": "2f3c70d420489820",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 30720
+    },
+    "l4.transfer.uniform": {
+      "hash": "5f9b433ca350484f",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 53472
+    },
+    "l4.transfer.weighted": {
+      "hash": "f91cc454cd4cb996",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 48480
+    },
+    "l5.designer.sen": {
+      "hash": "3f2ecbf5dfa85992",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 27360
+    },
+    "l5.done.takeaway": {
+      "hash": "e5966c61440b72b6",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 21792
+    },
+    "l5.enforce.arjun": {
+      "hash": "a80d466093a87238",
+      "voice": "en-IN-Chirp3-HD-Orus",
+      "bytes": 21888
+    },
+    "l5.intro.arjun": {
+      "hash": "6be6dd7a20c40270",
+      "voice": "en-IN-Chirp3-HD-Orus",
+      "bytes": 28992
+    },
+    "l5.intro.heading": {
+      "hash": "c4ecc115efb9b0f9",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 29280
+    },
+    "l5.levers.meera": {
+      "hash": "481bc5a3dc68435a",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 25344
+    },
+    "l5.proposal.arjun": {
+      "hash": "2b7b06878db9b390",
+      "voice": "en-IN-Chirp3-HD-Orus",
+      "bytes": 32160
+    },
+    "l5.proposal.result": {
+      "hash": "da485c0378cdbc70",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 68832
+    },
+    "l5.result.cut": {
+      "hash": "08b4fd579b423ded",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 42240
+    },
+    "l5.result.maintain": {
+      "hash": "073e8d6a34cff8f7",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 42240
+    },
+    "l5.rules.meera": {
+      "hash": "3b9cd410c8cb492c",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 24768
+    },
+    "l5.sandbox.flip": {
+      "hash": "9873703bb9195ffd",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 27360
+    },
+    "l5.side.competition": {
+      "hash": "4283e8e666968875",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 39840
+    },
+    "l5.side.customers": {
+      "hash": "3a4806802f7e4f9d",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 33120
+    },
+    "l5.side.enforcement": {
+      "hash": "cf48bfd5436199f5",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 40320
+    },
+    "l5.transfer.ask": {
+      "hash": "8ce23bf9717db90a",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28320
+    },
+    "l5.transfer.bigger-ranking": {
+      "hash": "b515d401e658a1d3",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 20832
+    },
+    "l5.transfer.drop-ranking": {
+      "hash": "93865cf2938ad835",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 52320
+    },
+    "l5.transfer.team-bonus": {
+      "hash": "9aee298dc5c4d6f5",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 38592
+    },
+    "market-competition.concept.line": {
+      "hash": "309ef5c233efbe14",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 35520
+    },
+    "market-competition.done.takeaway": {
+      "hash": "e0d01f6ef1f31f2c",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 26592
+    },
+    "market-competition.intro.heading": {
+      "hash": "49f7acc74c26d345",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 37152
+    },
+    "market-competition.intro.line-1": {
+      "hash": "89af3a7528421e79",
+      "voice": "en-IN-Chirp3-HD-Fenrir",
+      "bytes": 19584
+    },
+    "market-competition.intro.line-2": {
+      "hash": "acd0450395f50405",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 12000
+    },
+    "market-competition.transfer.profit": {
+      "hash": "8a20ab6e0638cbba",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 22560
+    },
+    "market-competition.transfer.respond": {
+      "hash": "1488335c28b99e22",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 21600
+    },
+    "market-competition.transfer.same": {
+      "hash": "66ef5191892aba37",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 17952
+    },
+    "market-quality.concept.line": {
+      "hash": "c7ff2a18a5e57907",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 43680
+    },
+    "market-quality.done.takeaway": {
+      "hash": "e9f4db950dab17a8",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 35520
+    },
+    "market-quality.intro.heading": {
+      "hash": "a9ef6b33bf3f7ec3",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 44640
+    },
+    "market-quality.intro.line-1": {
+      "hash": "972bb0bd9636a22a",
+      "voice": "en-IN-Chirp3-HD-Orus",
+      "bytes": 23424
+    },
+    "market-quality.intro.line-2": {
+      "hash": "aeaea40994fe8865",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 11040
+    },
+    "market-quality.transfer.adverse": {
+      "hash": "ed861c6d04191aa2",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28800
+    },
+    "market-quality.transfer.competition": {
+      "hash": "d0538ebbdc6e5c52",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 19680
+    },
+    "market-quality.transfer.stable": {
+      "hash": "560d74bc6ebefe7e",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 14400
+    },
+    "repeated-cooperation.concept.line": {
+      "hash": "c59c855479a8a4ac",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 44352
+    },
+    "repeated-cooperation.done.takeaway": {
+      "hash": "9dc545f94dff5e9d",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 27072
+    },
+    "repeated-cooperation.intro.heading": {
+      "hash": "ccff79fb19022f69",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28800
+    },
+    "repeated-cooperation.intro.line-1": {
+      "hash": "622762605370dac4",
+      "voice": "en-IN-Chirp3-HD-Orus",
+      "bytes": 14976
+    },
+    "repeated-cooperation.intro.line-2": {
+      "hash": "c1f13466e5c108c8",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 11136
+    },
+    "repeated-cooperation.transfer.cafe": {
+      "hash": "04f57079d2b80f3f",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 19872
+    },
+    "repeated-cooperation.transfer.same": {
+      "hash": "606a33c9fa1723f5",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 16320
+    },
+    "repeated-cooperation.transfer.tourist": {
+      "hash": "3cfe833f1cc24332",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 26112
+    },
+    "sequential-moves.concept.line": {
+      "hash": "6ae94ded3fd782c5",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 54240
+    },
+    "sequential-moves.done.takeaway": {
+      "hash": "ccc84fd03ccf42ad",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 27552
+    },
+    "sequential-moves.intro.heading": {
+      "hash": "4c7ae666035f04c2",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28512
+    },
+    "sequential-moves.intro.line-1": {
+      "hash": "6d1dafc0b62f02a1",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 25536
+    },
+    "sequential-moves.intro.line-2": {
+      "hash": "4e395e519f44fcbc",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 9984
+    },
+    "sequential-moves.transfer.cost": {
+      "hash": "41b7bfc5c859e192",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 16032
+    },
+    "sequential-moves.transfer.high": {
+      "hash": "94ded2f28e379e60",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 21312
+    },
+    "sequential-moves.transfer.outside": {
+      "hash": "7a17f890433ffff4",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 23520
+    },
+    "signaling.concept.line": {
+      "hash": "898158c7386ea89d",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 29472
+    },
+    "signaling.done.takeaway": {
+      "hash": "39db8e6c31330189",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28512
+    },
+    "signaling.intro.heading": {
+      "hash": "864a8dc3f2e09617",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 27072
+    },
+    "signaling.intro.line-1": {
+      "hash": "2da810b11215698b",
+      "voice": "en-IN-Chirp3-HD-Callirrhoe",
+      "bytes": 10176
+    },
+    "signaling.intro.line-2": {
+      "hash": "8e64fd9b10ac8a47",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 13056
+    },
+    "signaling.transfer.always": {
+      "hash": "e2944272038858e4",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 26400
+    },
+    "signaling.transfer.costly": {
+      "hash": "19c55c346fba3019",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 28800
+    },
+    "signaling.transfer.money": {
+      "hash": "ab8fd302ef60e7f4",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 15360
+    },
+    "strategic-practice.concept.line": {
+      "hash": "1e99f374a2a2c35b",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 40512
+    },
+    "strategic-practice.done.takeaway": {
+      "hash": "358aa552dc94103a",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 34560
+    },
+    "strategic-practice.intro.heading": {
+      "hash": "d194e690c7270ce5",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 40512
+    },
+    "strategic-practice.intro.line-1": {
+      "hash": "3059332ff19f5bd2",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 29760
+    },
+    "strategic-practice.intro.line-2": {
+      "hash": "0550cdf5b0fbea0d",
+      "voice": "en-IN-Chirp3-HD-Umbriel",
+      "bytes": 9504
+    },
+    "strategic-practice.transfer.fair": {
+      "hash": "473ebc036808092f",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 17280
+    },
+    "strategic-practice.transfer.payoff": {
+      "hash": "b6736e7eea3d3f9f",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 17472
+    },
+    "strategic-practice.transfer.timing": {
+      "hash": "a7e4da881ef3335e",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 24192
+    },
+    "voting.concept.line": {
+      "hash": "a567d813dd156df1",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 36672
+    },
+    "voting.done.takeaway": {
+      "hash": "61e5013d5c79a76c",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 23712
+    },
+    "voting.intro.heading": {
+      "hash": "c26edf5024c294c2",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 32832
+    },
+    "voting.intro.line-1": {
+      "hash": "b4e6f97411a85d74",
+      "voice": "en-IN-Chirp3-HD-Orus",
+      "bytes": 15264
+    },
+    "voting.intro.line-2": {
+      "hash": "91e41d1230be6f63",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 8160
+    },
+    "voting.transfer.first": {
+      "hash": "6214fd5b0ab2b5ba",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 21312
+    },
+    "voting.transfer.last": {
+      "hash": "000eeadbd9456f9d",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 21792
+    },
+    "voting.transfer.none": {
+      "hash": "ce2dd369dd6e7096",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 14880
+    },
+    "war-of-attrition.concept.line": {
+      "hash": "b697ae8720e1469a",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 42912
+    },
+    "war-of-attrition.done.takeaway": {
+      "hash": "261df3076fe2b24c",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 25440
+    },
+    "war-of-attrition.intro.heading": {
+      "hash": "0142c0cf3c3bb87a",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 38592
+    },
+    "war-of-attrition.intro.line-1": {
+      "hash": "6db3f36ea9caebfa",
+      "voice": "en-IN-Chirp3-HD-Fenrir",
+      "bytes": 12576
+    },
+    "war-of-attrition.intro.line-2": {
+      "hash": "38fb1379ac63aae2",
+      "voice": "en-IN-Chirp3-HD-Erinome",
+      "bytes": 14304
+    },
+    "war-of-attrition.transfer.forward": {
+      "hash": "f8970dfc71384924",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 30432
+    },
+    "war-of-attrition.transfer.sunk": {
+      "hash": "492c9581e437ae8b",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 20352
+    },
+    "war-of-attrition.transfer.total": {
+      "hash": "07787801050d3235",
+      "voice": "en-IN-Chirp3-HD-Sadaltager",
+      "bytes": 24000
+    }
+  }
+}

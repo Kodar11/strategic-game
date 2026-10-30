@@ -23,7 +23,7 @@ import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
 /**
  * One place for everything you can change, in a fixed order: who you are (nickname, goal), how the app behaves
- * (motion, haptics), your learning data (export, reset) and a way to your progress. Opened from the gear on every tab.
+ * (narration, motion, haptics), your learning data (export, reset) and a way to your progress. Opened from the gear on every tab.
  */
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -157,6 +157,12 @@ function ExperienceSection() {
   return (
     <Section label="Experience">
       <Card style={{ gap: space.lg }}>
+        <ToggleRow
+          title="Narration"
+          body="Prof. Sen and the cast read their lines aloud. All text stays on screen either way."
+          value={settings.narration}
+          onChange={(v) => setSetting('narration', v)}
+        />
         <ToggleRow
           title="Reduce motion"
           body={systemReduced ? 'On in your device settings.' : 'Turns off entrance and reveal animations.'}

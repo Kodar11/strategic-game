@@ -31,6 +31,8 @@ import { Button } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { Slider } from '@/src/components/ui/Slider';
 import type { LessonMeta } from '@/src/content/lessons';
+import type { ClipId } from '@/src/features/audio/clips';
+import { NarrateOn } from '@/src/features/audio/useNarration';
 import {
   BASE_PRICING_GAME,
   type IncentiveRules,
@@ -91,22 +93,25 @@ const fmt = (n: number) => String(Number(n.toFixed(2)));
 const EXAMPLE_FINE: IncentiveRules = { cutPenalty: 3, maintainReward: 0 };
 const EXAMPLE_REWARD: IncentiveRules = { cutPenalty: 0, maintainReward: 3 };
 
-const SIDE_EFFECTS: { id: string; character: CharacterId; title: string; body: string }[] = [
+const SIDE_EFFECTS: { id: string; character: CharacterId; title: string; body: string; clip: ClipId }[] = [
   {
     id: 'customers',
     character: 'kavya',
+    clip: 'l5.side.customers',
     title: 'Customers pay more',
     body: 'The price war was good for Kavya. A rule that ends it raises what customers pay. "Better for the companies" can be worse for the people they serve.',
   },
   {
     id: 'enforcement',
     character: 'arjun',
+    clip: 'l5.side.enforcement',
     title: 'Someone has to enforce it',
     body: 'Detecting "price cuts" means defining them and watching for disguised discounts, coupons and bundles. Enforcement costs money, and loopholes change the game again.',
   },
   {
     id: 'competition',
     character: 'rohan',
+    clip: 'l5.side.competition',
     title: 'Competition moves elsewhere',
     body: 'If price is off the table, Rohan may compete on speed, quality or marketing instead — not modelled here, but likely in reality. New rivals may also enter.',
   },
@@ -117,6 +122,7 @@ const TRANSFER: TransferOption[] = [
     id: 'team-bonus',
     label: 'Add a team bonus paid when the whole team hits its target',
     verdict: 'strong',
+    clip: 'l5.transfer.team-bonus',
     feedback:
       'This changes the payoffs: sharing now earns you something directly. Like the reward lever, it has a cost — and it can invite free-riding, so it needs designing with care.',
   },
@@ -124,6 +130,7 @@ const TRANSFER: TransferOption[] = [
     id: 'drop-ranking',
     label: 'Scrap the individual ranking bonus altogether',
     verdict: 'defensible',
+    clip: 'l5.transfer.drop-ranking',
     feedback:
       'That removes the reason to hoard — but also the reward for effort. People may stop hoarding and stop pushing, too. Taking away an incentive changes more than the one behaviour you were aiming at.',
   },
@@ -131,6 +138,7 @@ const TRANSFER: TransferOption[] = [
     id: 'ask',
     label: 'Remind everyone that collaboration matters',
     verdict: 'misconception',
+    clip: 'l5.transfer.ask',
     feedback:
       'Encouragement doesn’t change the table. If hoarding still wins the individual ranking, the incentive to hoard is unchanged.',
   },
@@ -138,6 +146,7 @@ const TRANSFER: TransferOption[] = [
     id: 'bigger-ranking',
     label: 'Make the top-performer prize even bigger',
     verdict: 'misconception',
+    clip: 'l5.transfer.bigger-ranking',
     feedback: 'That raises the reward for beating colleagues, making hoarding even more attractive.',
   },
 ];
@@ -175,8 +184,8 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
           <Animated.View entering={enter(0, 'fade')} style={{ borderRadius: 20, overflow: 'hidden' }}>
             <SceneArt scene="policy" height={180} />
           </Animated.View>
-          <StepHeading kicker={`Lesson ${lesson.number}`} title="Change the rules, change the game" body="QuickEats and FoodKart are back in the same market. This time you'll also get to rewrite its rules." />
-          <Dialogue character="arjun" expression="thinking">
+          <StepHeading kicker={`Lesson ${lesson.number}`} title="Change the rules, change the game" body="QuickEats and FoodKart are back in the same market. This time you'll also get to rewrite its rules." clip="l5.intro.heading" />
+          <Dialogue character="arjun" expression="thinking" clip="l5.intro.arjun">
             I advise the city&apos;s delivery council. Before anyone writes a rule, I want to see what it actually does to each company&apos;s choices.
           </Dialogue>
         </>
@@ -191,7 +200,7 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
           <Card>
             <PayoffMatrix game={BASE_PRICING_GAME} rowName="QuickEats" colName="FoodKart" rowLabels={ROW_LABELS} colLabels={COL_LABELS} showBestReplies />
           </Card>
-          <Dialogue character="meera" expression="explaining">
+          <Dialogue character="meera" expression="explaining" clip="l5.rules.meera">
             Cutting is each company&apos;s best reply in every case — by exactly {cutAdvantage(NO_RULES)} points. Keep that number in mind.
           </Dialogue>
         </>
@@ -207,7 +216,7 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
       render: () => (
         <>
           <StepHeading kicker="A proposal" title="Will a reward end the price war?" />
-          <Dialogue character="arjun" expression="explaining">
+          <Dialogue character="arjun" expression="explaining" clip="l5.proposal.arjun">
             One councillor wants to pay each company 1.5 points a week for keeping its prices. It sounds generous. Will it work?
           </Dialogue>
           <PredictionPrompt
@@ -242,7 +251,7 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
                 {fb.text}
               </PredictionResult>
             ) : null}
-            <Panel tone="insight" title="Close, but not enough">
+            <Panel tone="insight" title="Close, but not enough" clip="l5.proposal.result">
               {proposalExplanation()}
             </Panel>
             <Card style={{ gap: space.xs }}>
@@ -282,7 +291,7 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
               </View>
             </Card>
           </View>
-          <Dialogue character="sen" expression="happy" delay={120}>
+          <Dialogue character="sen" expression="happy" delay={120} clip="l5.designer.sen">
             Your goal: find rules under which rational companies maintain prices. Then ask whether those rules are worth it.
           </Dialogue>
         </>
@@ -300,6 +309,7 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
         return (
           <>
             <StepHeading kicker="Policy sandbox" title="Set the rules" body="Combine the two levers. Watch which payoffs move, and when the best replies flip." />
+            <NarrateOn clip="l5.sandbox.flip" trigger={ruleOk} />
             <Card style={{ gap: space.lg }}>
               <Slider label="Penalty for cutting (p)" tone="orange" value={data.penalty} min={PENALTY_RANGE.min} max={PENALTY_RANGE.max} step={PENALTY_RANGE.step} formatValue={(v) => v.toFixed(1)} onChange={(penalty) => setRules({ penalty })} />
               <Slider label="Reward for maintaining (r)" value={data.reward} min={REWARD_RANGE.min} max={REWARD_RANGE.max} step={REWARD_RANGE.step} formatValue={(v) => v.toFixed(1)} onChange={(reward) => setRules({ reward })} />
@@ -347,7 +357,7 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
               title="What if cuts aren't always caught?"
               body="Discounts can hide in coupons and bundles. Suppose only some price cuts are detected, and companies weigh a fine by their chance of paying it."
             />
-            <Dialogue character="arjun" expression="concerned">
+            <Dialogue character="arjun" expression="concerned" clip="l5.enforce.arjun">
               Every inspector costs the council money. I need to know how much checking your rule really needs.
             </Dialogue>
             <AppText variant="small" color={colors.textMuted}>
@@ -415,7 +425,7 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
               <LeverCard title="Penalty p = 3" icon="fine" profit={fine.companyPayoffs![0]} flow={`Collects ${fmt(fine.penaltiesCollected)}`} note="Nobody cuts, so the fine is never paid — if the threat is credible." />
               <LeverCard title="Reward r = 3" icon="reward" profit={reward.companyPayoffs![0]} flow={`Pays out ${fmt(reward.rewardsPaid)}`} note="Works only while someone keeps paying, every week." />
             </View>
-            <Dialogue character="meera" expression="satisfied">
+            <Dialogue character="meera" expression="satisfied" clip="l5.levers.meera">
               The behaviour flips at the same line — p + r &gt; 2 — but who bears the cost is completely different.
             </Dialogue>
           </>
@@ -431,6 +441,11 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
         <>
           <StepHeading kicker="Trade-offs" title="What the table doesn't count" body="Tap each perspective. None of these are in the numbers above — which is exactly why they matter." />
           {/* Read a perspective aloud when the learner opens it (the most recently opened one). */}
+          <NarrateOn
+            clip={SIDE_EFFECTS.find((s) => s.id === data.opened[data.opened.length - 1])?.clip}
+            trigger={data.opened.join(',')}
+            narrationKey={SIDE_EFFECTS.find((s) => s.id === data.opened[data.opened.length - 1])?.clip}
+          />
           <View style={{ gap: space.sm }}>
             {SIDE_EFFECTS.map((s) => {
               const open = data.opened.includes(s.id);
@@ -504,6 +519,7 @@ export default function IncentiveShift({ lesson }: { lesson: LessonMeta }) {
         <Completion
           lesson={lesson}
           takeaway="To change what people choose, change what their choices cost and earn — then check what else changes."
+          takeawayClip="l5.done.takeaway"
           remember={[
             'Find the gap that makes the unwanted choice attractive, and how big it is.',
             'Penalties and rewards can flip the same choice at very different costs.',

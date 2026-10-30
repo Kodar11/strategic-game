@@ -3,6 +3,8 @@ import { View } from 'react-native';
 import { AppText } from '@/src/components/ui/AppText';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
 import { Button } from '@/src/components/ui/Button';
+import type { ClipId } from '@/src/features/audio/clips';
+import { NarrateOn } from '@/src/features/audio/useNarration';
 import { colors, space } from '@/src/theme/tokens';
 import { FeedbackPanel, Panel } from './Panels';
 
@@ -16,6 +18,8 @@ export interface TransferOption {
    * `defensible` answers are reasonable but miss something, `misconception` answers misread the situation.
    */
   verdict: 'strong' | 'defensible' | 'misconception';
+  /** Narration of `feedback`, spoken when the learner checks their answer. */
+  clip?: ClipId;
 }
 
 /** What carries over from the lesson's model to the new situation, and where the comparison stops working. */
@@ -77,6 +81,8 @@ export function TransferQuestion({
               {strongest.feedback}
             </Panel>
           ) : null}
+          <NarrateOn clip={chosen.clip} trigger={checked} />
+          {!isStrong && strongest ? <NarrateOn clip={strongest.clip} trigger={checked} mode="queue" /> : null}
           {analogy ? (
             <View style={{ gap: space.sm, paddingTop: space.xs }}>
               <AppText variant="small">

@@ -32,6 +32,9 @@ import { Button } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
 import type { LessonMeta } from '@/src/content/lessons';
+import { getClip } from '@/src/features/audio/clips';
+import { meetupReactionClip } from '@/src/features/audio/reactions';
+import { NarrateOn } from '@/src/features/audio/useNarration';
 import { MEETUP_GAME, type MeetupResult, type Place, friendPolicy, resolveMeetup } from '@/src/game/coordination';
 import { payoffAt, rowBestResponses } from '@/src/game/payoff-matrix';
 import { useMotionReduced } from '@/src/utils/feedback';
@@ -77,6 +80,7 @@ const TRANSFER: TransferOption[] = [
     id: 'announce',
     label: 'The group admin posts: “From Monday, we’re all on Ping.”',
     verdict: 'strong',
+    clip: 'l3.transfer.announce',
     feedback:
       'A public announcement gives everyone the same expectation at once — and everyone knows everyone saw it. Chatter fans lose their favourite, but being on one app beats being split.',
   },
@@ -84,18 +88,21 @@ const TRANSFER: TransferOption[] = [
     id: 'majority',
     label: 'Everyone moves to whichever app more people already use',
     verdict: 'defensible',
+    clip: 'l3.transfer.majority',
     feedback: 'That can work as a shared rule — if everyone knows the numbers and expects the others to follow the same rule. If it is close, or people disagree about the count, the group can stay split.',
   },
   {
     id: 'better-app',
     label: 'Wait until everyone agrees which app is better',
     verdict: 'misconception',
+    clip: 'l3.transfer.better-app',
     feedback: 'People prefer different apps, so there may never be agreement on “better”. Like the café and the park, neither option is best for everyone — what matters is that you all pick the same one.',
   },
   {
     id: 'both',
     label: 'Stay on both apps — that keeps everyone happy',
     verdict: 'misconception',
+    clip: 'l3.transfer.both',
     feedback: 'Staying split is the outcome everyone wanted to avoid: messages get missed, like waiting at different meeting places.',
   },
 ];
@@ -133,8 +140,8 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
           <Animated.View entering={enter(0, 'fade')} style={{ borderRadius: 20, overflow: 'hidden' }}>
             <SceneArt scene="meetup" height={180} />
           </Animated.View>
-          <StepHeading kicker={`Lesson ${lesson.number}`} title="Two dead phones" body="You and Nina agreed to meet in the old town at six. Then both your phones died. You never said where." />
-          <Dialogue character="aarav" expression="concerned">
+          <StepHeading kicker={`Lesson ${lesson.number}`} title="Two dead phones" body="You and Nina agreed to meet in the old town at six. Then both your phones died. You never said where." clip="l3.intro.heading" />
+          <Dialogue character="aarav" expression="concerned" clip="l3.intro.aarav">
             There are only two places we&apos;d ever go: the Clocktower Café or Riverside Park.
           </Dialogue>
         </>
@@ -213,6 +220,7 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
       blockedHint: 'Reveal the best replies to continue.',
       render: () => (
         <>
+          <NarrateOn clip="l3.matrix.equilibria" trigger={data.showBR} />
           <StepHeading kicker="The table" title="Two ways to get it right" body="Tap any cell. Your enjoyment first, Nina's second." />
           <Card>
             <PayoffMatrix
@@ -275,10 +283,10 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
       render: () => (
         <>
           <StepHeading kicker="A week later" title="Same problem, one clue" body="Phones dead again. Same places, same preferences. But you remember something you both know." />
-          <Dialogue character="nina" expression="happy" align="right">
+          <Dialogue character="nina" expression="happy" align="right" clip="l3.pick2.nina">
             (Last month) &ldquo;Let&apos;s make the clocktower our usual spot — easy to remember.&rdquo;
           </Dialogue>
-          <Dialogue character="aarav" expression="thinking" delay={120}>
+          <Dialogue character="aarav" expression="thinking" delay={120} clip="l3.pick2.aarav">
             She&apos;ll remember that. And she knows I remember it too.
           </Dialogue>
           <PredictionPrompt
@@ -315,7 +323,7 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
       render: () => (
         <>
           <StepHeading kicker="The idea" title="Focal points" />
-          <Dialogue character="sen" expression="explaining">
+          <Dialogue character="sen" expression="explaining" clip="l3.focal.sen">
             When several outcomes would work, people coordinate on the one that stands out to everyone — and that everyone knows stands out. That&apos;s a focal point.
           </Dialogue>
           <Panel tone="insight" title="Shared, not best" delay={120}>
@@ -396,6 +404,7 @@ export default function CoordinationProblem({ lesson }: { lesson: LessonMeta }) 
         <Completion
           lesson={lesson}
           takeaway="When many outcomes could work, success depends on shared expectations — not on finding the single best option."
+          takeawayClip="l3.done.takeaway"
           remember={[
             'Ask what the other person expects you to expect.',
             'Look for what stands out to both of you: history, convention, prominence.',
@@ -487,18 +496,12 @@ function PlacePicker({ value, onChange, locked }: { value: Place | null; onChang
   );
 }
 
-/** Nina's line at the meetup. Round 1 she goes to her favourite (the park); round 2 to the shared spot (the café). */
-function meetupLine(round: 1 | 2, r: { friend: Place; met: boolean }): string | undefined {
-  if (round === 1 && r.friend === 'park') return r.met ? 'There you are! I hoped you’d pick the park.' : 'I waited by the river. I thought you’d come to the park.';
-  if (round === 2 && r.friend === 'cafe') return r.met ? 'Our usual spot. I knew you’d remember.' : 'I waited under the clocktower — our usual spot.';
-  return undefined;
-}
-
 /** The meetup reveal. `children` (prediction check, Nina's reasoning) appear only once both places are shown. */
 function MeetReveal({ round, result, children }: { round: 1 | 2; result: MeetupResult; children?: ReactNode }) {
   const { you, friend, met, payoffs } = result;
   const reduced = useMotionReduced();
-  const ninaLine = meetupLine(round, { friend, met });
+  const ninaClip = meetupReactionClip(round, { you, friend, met });
+  const ninaLine = ninaClip ? getClip(ninaClip)?.text : undefined;
   const enter = useEnter();
   const [shown, setShown] = useState(reduced);
   useEffect(() => {
@@ -535,7 +538,7 @@ function MeetReveal({ round, result, children }: { round: 1 | 2; result: MeetupR
         </Panel>
       ) : null}
       {shown && ninaLine ? (
-        <Dialogue character="nina" expression={met ? 'happy' : 'concerned'} align="right" delay={250}>
+        <Dialogue character="nina" expression={met ? 'happy' : 'concerned'} align="right" delay={250} clip={ninaClip} clipKey={`l3.reveal${round}`}>
           {ninaLine}
         </Dialogue>
       ) : null}

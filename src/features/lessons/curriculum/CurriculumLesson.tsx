@@ -12,6 +12,7 @@ import { useLessonFlow } from '@/src/components/lesson/useLessonFlow';
 import { AppText } from '@/src/components/ui/AppText';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import type { LessonMeta } from '@/src/content/lessons';
+import { useCurriculumClips } from '@/src/features/audio/useNarration';
 import { scenariosFor } from '@/src/features/scenarios';
 import { useProgress } from '@/src/store/progress';
 import { colors, space } from '@/src/theme/tokens';
@@ -38,6 +39,7 @@ export default function CurriculumLesson({ lesson }: { lesson: LessonMeta }) {
   const done = useProgress((s) => s.scenarioDone);
   const learning = useProgress((s) => s.learning);
   const enter = useEnter();
+  const clip = useCurriculumClips(lesson.id, spec);
 
   const steps: StepDef[] = [
     {
@@ -48,9 +50,9 @@ export default function CurriculumLesson({ lesson }: { lesson: LessonMeta }) {
           <Animated.View entering={enter(0, 'fade')} style={{ borderRadius: 20, overflow: 'hidden' }}>
             <LessonArt lesson={lesson.id} height={170} />
           </Animated.View>
-          <StepHeading kicker={spec.intro.kicker ?? `Lesson ${lesson.number}`} title={spec.intro.title} body={spec.intro.body} />
+          <StepHeading kicker={spec.intro.kicker ?? `Lesson ${lesson.number}`} title={spec.intro.title} body={spec.intro.body} clip={clip('intro.heading')} />
           {spec.intro.lines.map((l, i) => (
-            <Dialogue key={l.text} character={l.character} expression={l.expression} align={l.align} delay={80 + i * 80}>
+            <Dialogue key={l.text} character={l.character} expression={l.expression} align={l.align} delay={80 + i * 80} clip={clip(`intro.line-${i + 1}`)}>
               {l.text}
             </Dialogue>
           ))}
@@ -79,7 +81,7 @@ export default function CurriculumLesson({ lesson }: { lesson: LessonMeta }) {
       render: () => (
         <>
           <StepHeading kicker="The idea" title={spec.concept.title} />
-          <Dialogue character={spec.concept.line.character} expression={spec.concept.line.expression ?? 'explaining'}>
+          <Dialogue character={spec.concept.line.character} expression={spec.concept.line.expression ?? 'explaining'} clip={clip('concept.line')}>
             {spec.concept.line.text}
           </Dialogue>
           <LabView lab={lab} onExplored={() => update({ labDone: true })} />
@@ -102,7 +104,7 @@ export default function CurriculumLesson({ lesson }: { lesson: LessonMeta }) {
           <StepHeading kicker="Somewhere new" title="Check your reasoning" body="A different situation. No hints about which idea applies." />
           <TransferQuestion
             question={spec.transfer.question}
-            options={spec.transfer.options}
+            options={spec.transfer.options.map((o) => ({ ...o, clip: clip(`transfer.${o.id}`) }))}
             picked={data.transferPick}
             checked={data.transferChecked}
             onPick={(id) => !data.transferChecked && update({ transferPick: id })}
@@ -119,6 +121,7 @@ export default function CurriculumLesson({ lesson }: { lesson: LessonMeta }) {
           <Completion
             lesson={lesson}
             takeaway={spec.completion.takeaway}
+            takeawayClip={clip('done.takeaway')}
             remember={spec.completion.remember}
             onReplay={restart}
             recap={[

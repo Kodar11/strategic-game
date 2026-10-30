@@ -1,11 +1,13 @@
 export interface Settings {
   reduceMotion: boolean;
   haptics: boolean;
+  /** Spoken narration and character voices. On for new installs. */
+  narration: boolean;
   /** The first-session welcome (one decision against Maya, then a recommended lesson) was finished or skipped here. */
   onboarded: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { reduceMotion: false, haptics: true, onboarded: false };
+export const DEFAULT_SETTINGS: Settings = { reduceMotion: false, haptics: true, narration: true, onboarded: false };
 
 /**
  * Keep only known boolean settings from a saved state; anything missing or malformed gets its default.

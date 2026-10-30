@@ -35,6 +35,10 @@ yarn-error.*
 .env.*
 !.env.example
 
+# narration generation: audition files and interrupted writes
+.tts-audition/
+assets/audio/**/*.tmp
+
 # typescript
 *.tsbuildinfo
 
