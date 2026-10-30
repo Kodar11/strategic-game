@@ -124,3 +124,4 @@ export { default as Skull } from 'lucide-react-native/icons/skull';
 export { default as UserSearch } from 'lucide-react-native/icons/user-search';
 export { default as ScanEye } from 'lucide-react-native/icons/scan-eye';
 export { default as CircleHelp } from 'lucide-react-native/icons/circle-question-mark';
+export { default as ScrollText } from 'lucide-react-native/icons/scroll-text';

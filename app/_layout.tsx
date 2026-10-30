@@ -95,6 +95,7 @@ function AppStack({ reduced }: { reduced: boolean }) {
       <Stack.Screen name="games/play" options={{ gestureEnabled: false }} />
       <Stack.Screen name="arena/[gameId]" />
       <Stack.Screen name="arena/play" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="story/[storyId]" options={{ animation: reduced ? 'fade' : 'fade_from_bottom' }} />
       <Stack.Screen name="leaderboard" />
       <Stack.Screen name="report" />
       <Stack.Screen name="report/[skill]" />

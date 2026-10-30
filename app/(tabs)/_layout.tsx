@@ -5,13 +5,14 @@ import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FontsReadyContext } from '@/src/components/ui/AppText';
-import { BookOpen, Gamepad2, type LucideIcon, UserRound } from '@/src/components/ui/icons';
+import { BookOpen, Gamepad2, type LucideIcon, ScrollText, UserRound } from '@/src/components/ui/icons';
 import { useProgress } from '@/src/store/progress';
 import { colors, fonts, radius } from '@/src/theme/tokens';
 
 /**
- * Three top-level destinations: Learn (the curriculum, practice and daily challenge), Games (the five bot games,
- * Game of the Week and leaderboards) and Profile (the existing Thinking Profile, plus a separate game record).
+ * Four top-level destinations: Learn (the curriculum, practice and daily challenge), Games (the five bot games,
+ * Game of the Week and leaderboards), Stories (interactive narratives) and Profile (the existing Thinking Profile,
+ * plus a separate game record).
  * Everything else is pushed on the root stack above the tabs, so lessons and games get the full screen and Android
  * back returns to the tab you came from.
  */
@@ -33,6 +34,7 @@ export default function TabsLayout() {
       }}>
       <Tabs.Screen name="index" options={{ title: 'Learn', tabBarAccessibilityLabel: 'Learn: lessons, practice and the daily challenge', tabBarIcon: ({ focused }) => <TabIcon icon={BookOpen} focused={focused} /> }} />
       <Tabs.Screen name="games" options={{ title: 'Games', tabBarAccessibilityLabel: 'Games: play bots, Game of the Week and leaderboards', tabBarIcon: ({ focused }) => <TabIcon icon={Gamepad2} focused={focused} /> }} />
+      <Tabs.Screen name="stories" options={{ title: 'Stories', tabBarAccessibilityLabel: 'Stories: interactive narratives about trust and strategy', tabBarIcon: ({ focused }) => <TabIcon icon={ScrollText} focused={focused} /> }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarAccessibilityLabel: 'Your strategic thinking profile and game record', tabBarIcon: ({ focused }) => <TabIcon icon={UserRound} focused={focused} /> }} />
     </Tabs>
   );
