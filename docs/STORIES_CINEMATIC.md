@@ -42,6 +42,23 @@ Preserved untouched: `src/stories/crossing/story.ts` (script, branching, endings
 - **The tournament is watched** (`replayFrames`): pairings are revealed and the table re-sorts as they land. Every frame is computed from the real results, and a test checks the last frame equals the final standings exactly. Skippable. Conclusions wait until it's done, so you see the result before it's explained.
 - Each hall has its own piece and air; the fog bed only plays in the room that actually has noise.
 
+## Playback controls
+
+Previous, Play/Pause and Next replace the Continue button in both stories (`features/stories/ui/PlaybackBar.tsx`). Tapping the text still moves on. Autoplay is off when a story opens, and it isn't saved: it lasts as long as the screen is open.
+
+**When autoplay moves on.** Only `AdvanceGate` (`src/stories/playback.ts`) can advance a story by itself. It fires once per beat, when the beat has been up for its minimum time, nobody is speaking, and a short breath has passed. It's cancelled by a new beat, Pause, leaving the story, or leaving the app. It also waits while sound is paused, the sound sheet is open, or the player is scrolling. Silent lines get reading time based on their length. There is no other timer.
+
+| Moment | Behaviour |
+|---|---|
+| A decision | Autoplay holds and the control shows Play. If autoplay was on, the Play icon stays lit, and it carries on after the choice. Tapping it there turns that off or on. |
+| Story Two's rule-building steps | Both *Choose your entrant* and *Your final entrant* wait for Next, even when complete, so you can still change your mind. |
+| Pause | Stops advancing only. The voice carries on; pausing audio is a separate control in the sound sheet. |
+| Previous | Turns autoplay off. A revisited beat is voiced again, without its held silence or sound effects. |
+| A decision you return to | Shows what you chose, disabled. No decision can be reversed. |
+| Next | Keeps autoplay as it was. Disabled while a decision is open, and in Story Two until a result has finished showing. |
+| The three halls in Story Two | Autoplay tours each hall before moving on, because the comparison is the point of the step. |
+| The last beat | Autoplay stops and Play is disabled. Next remains, because it's the only way on. The ending card and reflection have no playback bar, and are only opened by hand. |
+
 ## Verified, and how
 
 | Check | Result |

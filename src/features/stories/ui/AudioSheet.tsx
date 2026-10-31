@@ -14,7 +14,11 @@ const percent = (v: number) => `${Math.round(v * 100)}%`;
 
 /** A small speaker in the corner of the story. Everything else stays out of the way until it is asked for. */
 export function AudioButton({ tone }: { tone: StoryTone }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
+  const setOpen = (value: boolean) => {
+    setOpenState(value);
+    useStoryAudio.setState({ sheetOpen: value });
+  };
   const muted = useStoryAudio((s) => s.muted);
   const paused = useStoryAudio((s) => s.paused);
   const Icon = muted ? VolumeX : paused ? Pause : Volume2;

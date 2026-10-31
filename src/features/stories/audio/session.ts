@@ -22,6 +22,8 @@ interface StoryAudioState extends StoryAudioPrefs {
   paused: boolean;
   /** A voice is playing now. */
   speaking: boolean;
+  /** The sound settings are open; the story waits. */
+  sheetOpen: boolean;
   setPrefs: (patch: Partial<StoryAudioPrefs>) => void;
   setPaused: (paused: boolean) => void;
   replayLine: () => void;
@@ -35,6 +37,7 @@ export const useStoryAudio = create<StoryAudioState>()((set, get) => ({
   ...PREF_DEFAULTS,
   paused: false,
   speaking: false,
+  sheetOpen: false,
   setPrefs: (patch) => {
     set(patch);
     const { voice, music, ambience, sfx, muted } = get();

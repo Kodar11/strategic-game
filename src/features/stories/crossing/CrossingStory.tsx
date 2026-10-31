@@ -6,8 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '@/src/components/ui/AppText';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import type { ClipId } from '@/src/features/audio/clips';
-import { NarrateOnMount, NarrationScope, useNarrateOnMount } from '@/src/features/audio/useNarration';
+import { NarrateOnMount, NarrationScope, hasClipAudio, useNarrateOnMount } from '@/src/features/audio/useNarration';
 import { direct, sfxBetween } from '@/src/stories/crossing/direction';
+import { beatTiming, decisionPending, isFinalBeat, previous, progressIndex } from '@/src/stories/crossing/playback';
 import { beatClip } from '@/src/stories/crossing/narration';
 import {
   type Beat,
@@ -27,11 +28,13 @@ import {
   sceneApplies,
 } from '@/src/stories/crossing/story';
 import { CROSSING_REFLECTION_LINES } from '@/src/stories/meridian/narration';
+import { useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, radius, space } from '@/src/theme/tokens';
 import { haptic, useMotionReduced } from '@/src/utils/feedback';
 import type { StorySound } from '../audio/assets';
 import { storyCue, storySfx, useStoryAudio, useStoryAudioSession } from '../audio/session';
 import { useStories } from '../store';
+import { PlaybackBar, useAutoAdvance } from '../ui/PlaybackBar';
 import { ContinueButton, OptionButton, Reflection, type ReflectionContent, StoryIntro, type StoryTone, StoryTopBar } from '../ui/kit';
 import { CrossingArt, LANTERN, MIRA_AMBER } from './CrossingArt';
 
@@ -179,7 +182,12 @@ function PlayerBody({ onEnd }: { onEnd: () => void }) {
     return { beat: b, prev: p, dir: direct(pos, c, p) };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pos is captured by its key
   }, [key, choicesKey]);
-  const hold = dir?.holdMs ?? 0;
+  // Each arrival at a beat is one visit. Ground already covered gets its voice again, but no held silence and no
+  // repeated sound effects: those belong to the first time something happens.
+  const reached = progressIndex(pos, choices);
+  const [visit, setVisit] = useState({ key, count: 0, fresh: true, furthest: reached });
+  if (visit.key !== key) setVisit({ key, count: visit.count + 1, fresh: reached > visit.furthest, furthest: Math.max(reached, visit.furthest) });
+  const hold = visit.fresh ? (dir?.holdMs ?? 0) : 0;
 
   // A held beat: the picture changes first, and the words and the voice come after a moment of nothing.
   const [releasedKey, setReleasedKey] = useState<string | null>(null);
@@ -196,14 +204,15 @@ function PlayerBody({ onEnd }: { onEnd: () => void }) {
   useEffect(() => {
     if (!beat || !dir) return;
     storyCue({ music: dir.music ? music(dir.music) : null, musicLevel: dir.musicLevel, beds: bedsOf(dir.beds), fadeMs: dir.fadeMs });
-    if (lastKey.current !== null && lastKey.current !== key) {
+    if (visit.fresh && lastKey.current !== null && lastKey.current !== key) {
       for (const s of sfxBetween(lastBeat.current, beat)) storySfx(`crossing/sfx/${s.sound}` as StorySound, s.gain);
     }
     lastKey.current = key;
     lastBeat.current = beat;
-  }, [key, beat, dir]);
+  }, [key, beat, dir, visit.fresh]);
 
-  useNarrateOnMount(revealed && beat ? (beatClip(beat) as ClipId | null) : null, key);
+  const clip = revealed && beat ? (beatClip(beat) as ClipId | null) : null;
+  useNarrateOnMount(clip, `${key}#${visit.count}`);
 
   // With no voice (narration off, or no file), screen readers still announce each new line.
   useEffect(() => {
@@ -217,16 +226,33 @@ function PlayerBody({ onEnd }: { onEnd: () => void }) {
   useEffect(() => {
     const was = nightSeen.current;
     nightSeen.current = night;
-    if (was === null || was === night || reduced) return;
+    if (was === null || was === night || reduced || !visit.fresh) return;
     const show = setTimeout(() => setNightCard(night), 0);
     const hide = setTimeout(() => setNightCard(null), 1900);
     return () => {
       clearTimeout(show);
       clearTimeout(hide);
     };
-  }, [night, reduced]);
+  }, [night, reduced, visit.fresh]);
 
   const [picked, setPicked] = useState<string | null>(null);
+  const pickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (pickTimer.current) clearTimeout(pickTimer.current);
+  }, []);
+
+  // Off until the player asks for it, and only for as long as this screen is open.
+  const [auto, setAuto] = useState(false);
+  const narrationOn = useProgress((s) => s.settings.narration);
+  const pending = !!beat && decisionPending(beat, choices);
+  const final = isFinalBeat(pos, choices);
+  const timing = beat ? beatTiming(beat, prev, narrationOn && !!clip && hasClipAudio(clip), !prev) : { minMs: 0, breathMs: 0 };
+  const carryOn = () => {
+    const n = next(pos, choices);
+    if (n) useStories.getState().saveCrossing(n, choices);
+  };
+  // The ending is never opened automatically: the last beat stays until the player moves on.
+  useAutoAdvance({ beatKey: `${key}#${visit.count}`, enabled: auto && revealed && !pending && !final && !picked, timing, onAdvance: carryOn });
 
   if (!beat || !dir) return <MessageScreen title="Something went wrong" body="This part of the story couldn’t be found. Starting over will fix it." onRetry={() => useStories.getState().restart('crossing')} />;
 
@@ -248,7 +274,16 @@ function PlayerBody({ onEnd }: { onEnd: () => void }) {
     if (reduced) return commit(id, value);
     // A moment to see what you chose, before the story answers.
     setPicked(value);
-    setTimeout(() => commit(id, value), 380);
+    pickTimer.current = setTimeout(() => commit(id, value), 380);
+  };
+
+  const back = previous(pos, choices);
+  const goBack = () => {
+    if (!back || picked) return;
+    // Going back is reading: autoplay stops, so the story doesn't carry on from under you.
+    setAuto(false);
+    useStoryAudio.getState().setPaused(false);
+    useStories.getState().saveCrossing(back, choices);
   };
 
   const applicable = SCENES.filter((s) => sceneApplies(s, choices) && s !== 'e2' && s !== 'g2');
@@ -292,15 +327,29 @@ function PlayerBody({ onEnd }: { onEnd: () => void }) {
             ) : null}
             {beat.kind === 'choice' && revealed ? (
               <View style={{ gap: space.sm }}>
-                {beat.options.map((o) => (
-                  <OptionButton key={o.value} tone={CROSSING_TONE} label={o.label} detail={o.detail} selected={picked === o.value} disabled={!!picked && picked !== o.value} onPress={() => pick(beat.id, o.value)} />
-                ))}
+                {beat.options.map((o) => {
+                  // Coming back to a decision shows what was chosen. It can't be chosen again.
+                  const made = choices[beat.id];
+                  return <OptionButton key={o.value} tone={CROSSING_TONE} label={o.label} detail={o.detail} selected={picked === o.value || made === o.value} disabled={made !== undefined || (!!picked && picked !== o.value)} onPress={() => pick(beat.id, o.value)} />;
+                })}
               </View>
             ) : null}
           </Pressable>
         </ScrollView>
         <View style={{ paddingHorizontal: space.xl, paddingTop: space.md, width: '100%', maxWidth: MAX_CONTENT_WIDTH + space.xl * 2, alignSelf: 'center', gap: space.sm }}>
-          {beat.kind === 'line' ? <ContinueButton tone={CROSSING_TONE} onPress={advance} /> : null}
+          <PlaybackBar
+            tone={CROSSING_TONE}
+            variant="quiet"
+            auto={auto && !final}
+            held={pending}
+            canPrevious={!!back && !picked}
+            canNext={!pending && !picked}
+            canPlay={!final}
+            onPrevious={goBack}
+            onToggle={() => setAuto(!auto)}
+            onNext={advance}
+            nextLabel={final ? 'Go to the ending' : 'Next'}
+          />
         </View>
       </View>
     </View>

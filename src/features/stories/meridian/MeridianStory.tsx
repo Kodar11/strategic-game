@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,7 +36,8 @@ import { MAX_CONTENT_WIDTH, radius, space } from '@/src/theme/tokens';
 import { haptic, useMotionReduced } from '@/src/utils/feedback';
 import { storyCue, storySfx, useStoryAudio, useStoryAudioSession } from '../audio/session';
 import { useStories } from '../store';
-import { ContinueButton, OptionButton, Reflection, type ReflectionContent, StoryIntro, type StoryTone, StoryTopBar } from '../ui/kit';
+import { OptionButton, Reflection, type ReflectionContent, StoryIntro, type StoryTone, StoryTopBar } from '../ui/kit';
+import { PlaybackBar, useAutoAdvance } from '../ui/PlaybackBar';
 import { BarList, Glyph, HallArt, MERIDIAN, MatchStrip, MatchTotals, MoveToken, PopulationChart, STRATEGY_COLOR, moveWord, nameOf, ordinal } from './MeridianArt';
 import { AfterReveal, Arena, Encounter, LivingSigil, PlayedStrip, TournamentReplay } from './MeridianStage';
 
@@ -154,15 +155,48 @@ function ReflectSound() {
   return null;
 }
 
+/** What every step's frame needs to move through the story. */
+interface Playback {
+  /** The player has asked to keep moving on automatically. Off until they do, and only while this screen is open. */
+  auto: boolean;
+  setAuto: (on: boolean) => void;
+  advance: () => void;
+  back: (() => void) | null;
+  /** This step has been seen before. Results are shown as they stand, decisions stay as made, sounds don't repeat. */
+  review: boolean;
+}
+
+const PlaybackContext = createContext<Playback | null>(null);
+
 function Steps({ run, onFinish }: { run: MeridianRun; onFinish: () => void }) {
   const step = STEPS[run.step];
+  const [auto, setAuto] = useState(false);
+  const [visit, setVisit] = useState({ step: run.step, review: false, furthest: run.step });
+  if (visit.step !== run.step) setVisit({ step: run.step, review: run.step <= visit.furthest, furthest: Math.max(run.step, visit.furthest) });
   const update = (patch: Partial<MeridianRun>) => useStories.getState().saveMeridian({ ...run, ...patch });
   const advance = () => {
     useStoryAudio.getState().setPaused(false);
     if (run.step >= STEPS.length - 1) onFinish();
     else update({ step: run.step + 1 });
   };
-  const props = { run, update, advance };
+  const back =
+    run.step > 0
+      ? () => {
+          // Going back is reading: autoplay stops, so the story doesn't carry on from under you.
+          setAuto(false);
+          useStoryAudio.getState().setPaused(false);
+          update({ step: run.step - 1 });
+        }
+      : null;
+  const props = { run, update, advance, review: visit.review };
+  return (
+    <PlaybackContext.Provider value={{ auto, setAuto, advance, back, review: visit.review }}>
+      <StepView step={step} {...props} />
+    </PlaybackContext.Provider>
+  );
+}
+
+function StepView({ step, ...props }: StepProps & { step: (typeof STEPS)[number] }) {
   switch (step) {
     case 'enter':
       return <Enter {...props} />;
@@ -191,18 +225,61 @@ interface StepProps {
   run: MeridianRun;
   update: (patch: Partial<MeridianRun>) => void;
   advance: () => void;
+  review: boolean;
 }
 
 /**
  * A step's frame: the arena, the top bar, scrolling content and a footer action. It also carries the step's sound: the
  * cue it sets, and the lines it speaks (`voice`; new lines queue, and a new `voiceKey` cuts off the old ones).
+ *
+ * The footer is the playback bar. A step says what moving on means here: `held` while it needs the player's decision,
+ * `ready` once its result has finished showing, `minMs` for the words nobody is reading aloud.
  */
-function Frame({ run, children, footer, cue, voice = [], voiceKey }: { run: MeridianRun; children: ReactNode; footer: ReactNode; cue?: StepCue; voice?: MeridianClip[]; voiceKey?: string }) {
+function Frame({
+  run,
+  children,
+  cue,
+  voice = [],
+  voiceKey,
+  held = false,
+  ready = true,
+  canNext = true,
+  minMs = 2000,
+  onNext,
+  onAuto,
+  nextLabel,
+  last = false,
+}: {
+  run: MeridianRun;
+  children: ReactNode;
+  cue?: StepCue;
+  voice?: MeridianClip[];
+  voiceKey?: string;
+  held?: boolean;
+  ready?: boolean;
+  canNext?: boolean;
+  minMs?: number;
+  onNext?: () => void;
+  /** What autoplay does here, when that differs from Next. */
+  onAuto?: () => void;
+  nextLabel?: string;
+  /** The end of the experiment: autoplay stops, and the reflection is only opened by hand. */
+  last?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   const reduced = useMotionReduced();
+  const playback = useContext(PlaybackContext)!;
+  const [dragging, setDragging] = useState(false);
+  const next = onNext ?? playback.advance;
   const c = cue ?? stepCue(STEPS[run.step]);
   const mix = JSON.stringify(toMix(c));
   useEffect(() => storyCue(JSON.parse(mix)), [mix]);
+  useAutoAdvance({
+    beatKey: voiceKey ?? STEPS[run.step],
+    enabled: playback.auto && !held && ready && canNext && !last && !dragging,
+    timing: { minMs, breathMs: 900 },
+    onAdvance: onAuto ?? next,
+  });
   return (
     <NarrationScope step={voiceKey ?? STEPS[run.step]}>
       {voice.map((clip) => (
@@ -211,13 +288,25 @@ function Frame({ run, children, footer, cue, voice = [], voiceKey }: { run: Meri
       <View style={{ flex: 1, backgroundColor: T.bg }}>
         <Arena theme={c.theme} />
         <StoryTopBar tone={T} title={STEP_TITLE[STEPS[run.step]]} progress={run.step} total={STEPS.length} />
-        <ScrollView contentContainerStyle={{ paddingHorizontal: space.xl, paddingTop: insets.top + 64, paddingBottom: space.xl }}>
+        <ScrollView onScrollBeginDrag={() => setDragging(true)} onScrollEndDrag={() => setDragging(false)} contentContainerStyle={{ paddingHorizontal: space.xl, paddingTop: insets.top + 64, paddingBottom: space.xl }}>
           <Animated.View key={run.step} entering={reduced ? undefined : FadeIn.duration(500)} style={{ width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', gap: space.lg }}>
             {children}
           </Animated.View>
         </ScrollView>
-        <View style={{ paddingHorizontal: space.xl, paddingTop: space.md, paddingBottom: insets.bottom + space.lg, borderTopWidth: 1, borderTopColor: T.border, backgroundColor: 'rgba(7,8,24,0.72)' }}>
-          <View style={{ width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', gap: space.sm }}>{footer}</View>
+        <View style={{ paddingHorizontal: space.xl, paddingTop: space.sm, paddingBottom: insets.bottom + space.md, borderTopWidth: 1, borderTopColor: T.border, backgroundColor: 'rgba(7,8,24,0.72)' }}>
+          <PlaybackBar
+            tone={T}
+            variant="arena"
+            auto={playback.auto && !last}
+            held={held}
+            canPrevious={!!playback.back}
+            canNext={canNext}
+            canPlay={!last}
+            onPrevious={() => playback.back?.()}
+            onToggle={() => playback.setAuto(!playback.auto)}
+            onNext={next}
+            nextLabel={nextLabel}
+          />
         </View>
       </View>
     </NarrationScope>
@@ -255,20 +344,20 @@ function Insight({ children }: { children: ReactNode }) {
   );
 }
 
-function Choice<V extends string>({ label, options, value, onChange }: { label: string; options: { value: V; label: string; detail?: string }[]; value?: V; onChange: (v: V) => void }) {
+function Choice<V extends string>({ label, options, value, onChange, locked }: { label: string; options: { value: V; label: string; detail?: string }[]; value?: V; onChange: (v: V) => void; locked?: boolean }) {
   return (
     <View style={{ gap: space.sm }} accessibilityRole="radiogroup" accessibilityLabel={label}>
       <AppText variant="overline" color={T.accentText}>
         {label}
       </AppText>
       {options.map((o) => (
-        <OptionButton key={o.value} tone={T} label={o.label} detail={o.detail} selected={value === o.value} onPress={() => onChange(o.value)} />
+        <OptionButton key={o.value} tone={T} label={o.label} detail={o.detail} selected={value === o.value} disabled={locked} onPress={() => onChange(o.value)} />
       ))}
     </View>
   );
 }
 
-function Pills<V extends string>({ label, options, value, onChange }: { label: string; options: { value: V; label: string }[]; value?: V; onChange: (v: V) => void }) {
+function Pills<V extends string>({ label, options, value, onChange, locked }: { label: string; options: { value: V; label: string }[]; value?: V; onChange: (v: V) => void; locked?: boolean }) {
   return (
     <View style={{ gap: space.xs }}>
       <AppText variant="caption" color={T.muted}>
@@ -279,7 +368,7 @@ function Pills<V extends string>({ label, options, value, onChange }: { label: s
           const on = o.value === value;
           return (
             <View key={o.value} style={{ flexGrow: 1, flexBasis: 0, minWidth: 90 }}>
-              <OptionButton tone={T} label={o.label} selected={on} onPress={() => (on ? undefined : onChange(o.value))} />
+              <OptionButton tone={T} label={o.label} selected={on} disabled={locked} onPress={() => (on ? undefined : onChange(o.value))} />
             </View>
           );
         })}
@@ -290,9 +379,9 @@ function Pills<V extends string>({ label, options, value, onChange }: { label: s
 
 // ---------------------------------------------------------------------------------------------------------------
 
-function Enter({ run, advance }: StepProps) {
+function Enter({ run }: StepProps) {
   return (
-    <Frame run={run} voice={['mer.enter.1', 'mer.enter.2', 'mer.enter.3', 'mer.enter.4']} footer={<ContinueButton tone={T} label="Step into the hall" onPress={advance} />}>
+    <Frame run={run} voice={['mer.enter.1', 'mer.enter.2', 'mer.enter.3', 'mer.enter.4']} nextLabel="Step into the hall">
       <H>The hall</H>
       <P>{L['mer.enter.1']}</P>
       <P>{L['mer.enter.2']}</P>
@@ -302,15 +391,17 @@ function Enter({ run, advance }: StepProps) {
   );
 }
 
-function Pick({ run, update, advance }: StepProps) {
+function Pick({ run, update, review }: StepProps) {
   const ready = !!run.pick && !!run.predict && !!run.why;
+  // Once submitted, this is a record of what you entered.
+  const locked = review && ready;
   return (
-    <Frame run={run} voice={['mer.pick.1']} footer={<ContinueButton tone={T} label="Submit your rule" onPress={advance} disabled={!ready} />}>
+    <Frame run={run} voice={['mer.pick.1']} held={!locked} canNext={ready} nextLabel="Submit your rule">
       <H>Choose your entrant</H>
       <P muted>{L['mer.pick.1']}</P>
       <View style={{ gap: space.sm }} accessibilityRole="radiogroup" accessibilityLabel="Your entrant">
         {STARTERS.map((id) => (
-          <OptionButton key={id} tone={T} label={STARTER_LABEL[id]} detail={STRATEGIES[id].rule} selected={run.pick === id} leading={<LivingSigil id={id} />} onPress={() => update({ pick: id })} />
+          <OptionButton key={id} tone={T} label={STARTER_LABEL[id]} detail={STRATEGIES[id].rule} selected={run.pick === id} disabled={locked} leading={<LivingSigil id={id} />} onPress={() => update({ pick: id })} />
         ))}
       </View>
       {run.pick ? (
@@ -319,12 +410,14 @@ function Pick({ run, update, advance }: StepProps) {
             label={`Twelve entrants. Where will ${STARTER_LABEL[run.pick]} finish?`}
             options={BANDS.map((b) => ({ value: b, label: BAND_LABEL[b] }))}
             value={run.predict}
+            locked={locked}
             onChange={(predict) => update({ predict })}
           />
           <Choice
             label="And what do you expect usually wins a contest like this?"
             options={(['clever', 'tough', 'kind'] as const).map((w) => ({ value: w, ...WHY_LABEL[w] }))}
             value={run.why}
+            locked={locked}
             onChange={(why) => update({ why })}
           />
         </>
@@ -383,12 +476,12 @@ function Matrix({ you, them }: { you?: Move; them?: Move }) {
   );
 }
 
-function Single({ run, update, advance }: StepProps) {
+function Single({ run, update, review }: StepProps) {
   // The stranger is the Mirror; in a single meeting it simply opens by sharing.
   const them: Move = 'C';
   const voice: MeridianClip[] = run.single ? [run.single === 'D' ? 'mer.single.took' : 'mer.single.shared', 'mer.single.2', 'mer.single.3', 'mer.single.insight', 'mer.single.name'] : ['mer.single.1'];
   return (
-    <Frame run={run} voice={voice} voiceKey={run.single ? 'single:after' : 'single'} footer={run.single ? <ContinueButton tone={T} onPress={advance} /> : <AppText variant="caption" color={T.muted} align="center">Choose to share or take.</AppText>}>
+    <Frame run={run} voice={voice} voiceKey={run.single ? 'single:after' : 'single'} held={!run.single} canNext={!!run.single} minMs={4000}>
       <H>One encounter</H>
       <P>{L['mer.single.1']}</P>
       <Matrix you={run.single} them={run.single ? them : undefined} />
@@ -399,7 +492,7 @@ function Single({ run, update, advance }: StepProps) {
         </View>
       ) : (
         <>
-          <Encounter roundKey="single" you={run.single} them={them} youPoints={run.single === 'C' ? PAYOFFS.R : PAYOFFS.T} themPoints={run.single === 'C' ? PAYOFFS.R : PAYOFFS.S} themName="The stranger" />
+          <Encounter quiet={review} roundKey="single" you={run.single} them={them} youPoints={run.single === 'C' ? PAYOFFS.R : PAYOFFS.T} themPoints={run.single === 'C' ? PAYOFFS.R : PAYOFFS.S} themName="The stranger" />
           <P>{run.single === 'D' ? L['mer.single.took'] : L['mer.single.shared']}</P>
           <P>{L['mer.single.2']}</P>
           <P>{L['mer.single.3']}</P>
@@ -411,7 +504,7 @@ function Single({ run, update, advance }: StepProps) {
   );
 }
 
-function Repeat({ run, update, advance }: StepProps) {
+function Repeat({ run, update, review }: StepProps) {
   const k = run.moves.length;
   const done = k >= REPEAT_ROUNDS;
   const guess = run.guesses[k];
@@ -423,10 +516,10 @@ function Repeat({ run, update, advance }: StepProps) {
   const tookOnce = run.moves.slice(0, -1).includes('D');
   const latest = reveals[k - 1];
   return (
-    <Frame run={run} voice={done ? ['mer.repeat.insight'] : []} voiceKey={done ? 'repeat:done' : 'repeat'} footer={done ? <ContinueButton tone={T} onPress={advance} /> : <AppText variant="caption" color={T.muted} align="center">Round {k + 1} of {REPEAT_ROUNDS}</AppText>}>
+    <Frame run={run} voice={done ? ['mer.repeat.insight'] : []} voiceKey={done ? 'repeat:done' : 'repeat'} held={!done} canNext={done} minMs={5500}>
       <H>The same opponent, again</H>
       <P>Now it is a different arrangement: one opponent, {REPEAT_ROUNDS} rounds in a row. Same table, same choices. Before each round, guess what they’ll do.</P>
-      {latest ? <Encounter roundKey={k} you={latest.you} them={latest.them} youPoints={pay(latest.you, latest.them)} themPoints={pay(latest.them, latest.you)} /> : null}
+      {latest ? <Encounter quiet={review} roundKey={k} you={latest.you} them={latest.them} youPoints={pay(latest.you, latest.them)} themPoints={pay(latest.them, latest.you)} /> : null}
       <Card>
         <View style={{ gap: space.sm }}>
           {(['you', 'them'] as const).map((side) => (
@@ -483,7 +576,7 @@ function Repeat({ run, update, advance }: StepProps) {
   );
 }
 
-function Echo({ run, advance }: StepProps) {
+function Echo({ run, review }: StepProps) {
   type Partner = 'mirror' | 'patient' | 'long-memory';
   const [partner, setPartner] = useState<Partner>('mirror');
   const match = useMemo(() => {
@@ -493,11 +586,11 @@ function Echo({ run, advance }: StepProps) {
   const partnerName = partner === 'mirror' ? 'Mirror B' : partner === 'long-memory' ? 'The Long Memory' : 'A patient Mirror';
   const perfect = ECHO.rounds * PAYOFFS.R;
   return (
-    <Frame run={run} voice={['mer.echo.1', `mer.echo.${partner}` as MeridianClip, 'mer.echo.insight']} voiceKey={partner === 'mirror' ? 'echo' : `echo:${partner}`} footer={<ContinueButton tone={T} onPress={advance} />}>
+    <Frame run={run} voice={['mer.echo.1', `mer.echo.${partner}` as MeridianClip, 'mer.echo.insight']} voiceKey={partner === 'mirror' ? 'echo' : `echo:${partner}`} minMs={3500}>
       <H>The echo</H>
       <P>{L['mer.echo.1']}</P>
       <Card>
-        <PlayedStrip key={partner} match={match} a={{ id: 'mirror', name: 'Mirror A' }} b={{ id: partner === 'long-memory' ? 'long-memory' : partner === 'patient' ? 'gentle-mirror' : 'mirror', name: partnerName }} />
+        <PlayedStrip key={partner} quiet={review} match={match} a={{ id: 'mirror', name: 'Mirror A' }} b={{ id: partner === 'long-memory' ? 'long-memory' : partner === 'patient' ? 'gentle-mirror' : 'mirror', name: partnerName }} />
         <MatchTotals match={match} a="Mirror A" b={partnerName} />
         <AppText variant="caption" color={T.muted}>A gold ring marks the slip. Two sharers would have made {perfect} each.</AppText>
       </Card>
@@ -521,12 +614,12 @@ function entrantName(run: MeridianRun) {
   return run.pick ? `You (${STARTER_LABEL[run.pick]})` : 'You';
 }
 
-function OpenTrials({ run, advance }: StepProps) {
+function OpenTrials({ run, advance, review }: StepProps) {
   const pick = run.pick ?? 'mirror';
   const t = useMemo(() => runRoom(ROOMS.open, yours(STARTER_DESIGN[pick])), [pick]);
   const [selected, setSelected] = useState<StrategyId | null>(null);
-  const [seenQualities, setSeenQualities] = useState(false);
-  const [finished, setFinished] = useState(false);
+  const [seenQualities, setSeenQualities] = useState(review);
+  const [finished, setFinished] = useState(review);
   const mine = standingOf(t, 'yours');
   const band = bandIn(t, 'yours');
   const top = t.standings[0];
@@ -540,10 +633,14 @@ function OpenTrials({ run, advance }: StepProps) {
       run={run}
       voice={voice}
       voiceKey={seenQualities ? 'trials:why' : 'trials'}
-      footer={finished ? <ContinueButton tone={T} label={seenQualities ? 'Continue' : 'Why did that happen?'} onPress={() => (seenQualities ? advance() : setSeenQualities(true))} /> : <AppText variant="caption" color={T.muted} align="center">The hall is playing…</AppText>}>
+      ready={finished}
+      canNext={finished}
+      minMs={seenQualities ? 7000 : 13000}
+      onNext={() => (seenQualities ? advance() : setSeenQualities(true))}
+      nextLabel={seenQualities ? 'Next' : 'Why did that happen?'}>
       <H>The Open Trials</H>
       <P muted>{L['mer.trials.1']}</P>
-      <TournamentReplay t={t} yoursName={entrantName(run)} onDone={() => setFinished(true)} onSelect={(id) => setSelected(id === 'yours' ? null : id)} selected={selected} />
+      <TournamentReplay autoStart={!review} t={t} yoursName={entrantName(run)} onDone={() => setFinished(true)} onSelect={(id) => setSelected(id === 'yours' ? null : id)} selected={selected} />
       <AfterReveal ready={finished}>
         {sel && selected ? (
           <Card>
@@ -600,6 +697,7 @@ const ROOM_TABS: { value: Hall; label: string }[] = [
 
 function Rooms({ run, advance }: StepProps) {
   const [room, setRoom] = useState<Hall>('friendly');
+  const [visited, setVisited] = useState<Hall[]>(['friendly']);
   const [who, setWho] = useState<StarterId>(run.pick ?? 'mirror');
   const [ready, setReady] = useState(false);
   const mineE = useMemo(() => yours(STARTER_DESIGN[who]), [who]);
@@ -610,11 +708,18 @@ function Rooms({ run, advance }: StepProps) {
   const enterRoom = (r: Hall) => {
     setReady(false);
     setRoom(r);
+    setVisited((v) => (v.includes(r) ? v : [...v, r]));
     storySfx('meridian/sfx/roomshift');
+  };
+  // The experiment is the point of this step, so autoplay walks through every hall before moving on.
+  const tour = () => {
+    const unseen = ROOM_TABS.find((h) => !visited.includes(h.value));
+    if (unseen) enterRoom(unseen.value);
+    else advance();
   };
   const here = `mer.rooms.${room}` as MeridianClip;
   return (
-    <Frame run={run} cue={roomCue(room)} voice={room === 'friendly' ? ['mer.rooms.1', here] : [here]} voiceKey={`rooms:${room}`} footer={<ContinueButton tone={T} onPress={advance} />}>
+    <Frame run={run} cue={roomCue(room)} voice={room === 'friendly' ? ['mer.rooms.1', here] : [here]} voiceKey={`rooms:${room}`} ready={ready} minMs={9000} onAuto={tour}>
       <H>Change the room</H>
       <P>{L['mer.rooms.1']}</P>
       <Pills label="Hall" options={ROOM_TABS} value={room} onChange={enterRoom} />
@@ -690,7 +795,7 @@ const POP_ROOMS: { value: 'open' | 'noisy' | 'hostile'; label: string }[] = [
   { value: 'hostile', label: 'Iron' },
 ];
 
-function Population({ run, advance }: StepProps) {
+function Population({ run }: StepProps) {
   const [room, setRoom] = useState<'open' | 'noisy' | 'hostile'>('open');
   const pick = run.pick ?? 'mirror';
   const t = useMemo(() => runRoom(ROOMS[room], yours(STARTER_DESIGN[pick])), [room, pick]);
@@ -702,7 +807,7 @@ function Population({ run, advance }: StepProps) {
   const base = stepCue('population');
   const cue: StepCue = room === 'open' ? base : { ...roomCue(room), musicLevel: 0.75 };
   return (
-    <Frame run={run} cue={cue} voice={['mer.population.1', 'mer.population.insight']} voiceKey="population" footer={<ContinueButton tone={T} onPress={advance} />}>
+    <Frame run={run} cue={cue} voice={['mer.population.1', 'mer.population.insight']} voiceKey="population" minMs={7000}>
       <H>The room changes back</H>
       <P>{L['mer.population.1']}</P>
       <Pills
@@ -738,25 +843,29 @@ const RESPONSES: { value: Design['response']; label: string; detail: string }[] 
   { value: 'always-d', label: 'Always take', detail: 'Like the Iron Wall.' },
 ];
 
-function DesignStep({ run, update, advance }: StepProps) {
+function DesignStep({ run, update, review }: StepProps) {
   const d: Design = run.design ?? STARTER_DESIGN[run.pick ?? 'mirror'];
   const set = (patch: Partial<Design>) => update({ design: { ...d, ...patch } });
   const forgivable = d.response === 'copy' || d.response === 'two' || d.response === 'grudge';
+  const ready = !!run.finalPredict && !!run.design;
+  // You build this rule at your own pace; it's entered when you say so. Once entered, it's a record.
+  const locked = review && ready;
   return (
-    <Frame run={run} voice={['mer.design.1']} footer={<ContinueButton tone={T} label="Enter the last trial" onPress={advance} disabled={!run.finalPredict || !run.design} />}>
+    <Frame run={run} voice={['mer.design.1']} held={!locked} canNext={ready} nextLabel="Enter the last trial">
       <H>Your final entrant</H>
       <P>{L['mer.design.1']}</P>
-      <Pills label="First move" options={[{ value: 'C', label: 'Share' }, { value: 'D', label: 'Take' }]} value={d.opening} onChange={(opening) => set({ opening })} />
-      <Choice label="After that" options={RESPONSES} value={d.response} onChange={(response) => set({ response, forgive: response === 'always-c' || response === 'always-d' ? 0 : d.forgive })} />
+      <Pills label="First move" options={[{ value: 'C', label: 'Share' }, { value: 'D', label: 'Take' }]} value={d.opening} locked={locked} onChange={(opening) => set({ opening })} />
+      <Choice label="After that" options={RESPONSES} value={d.response} locked={locked} onChange={(response) => set({ response, forgive: response === 'always-c' || response === 'always-d' ? 0 : d.forgive })} />
       {forgivable ? (
         <Pills
           label="Forgiveness: chance of sharing anyway when the rule says take"
           options={[{ value: '0', label: 'Never' }, { value: '0.1', label: '1 in 10' }, { value: '0.3', label: '3 in 10' }]}
           value={String(d.forgive)}
+          locked={locked}
           onChange={(v) => set({ forgive: Number(v) })}
         />
       ) : null}
-      <Choice label="Where will it finish in the Open Trials?" options={BANDS.map((b) => ({ value: b, label: BAND_LABEL[b] }))} value={run.finalPredict} onChange={(finalPredict) => update({ finalPredict, design: d })} />
+      <Choice label="Where will it finish in the Open Trials?" options={BANDS.map((b) => ({ value: b, label: BAND_LABEL[b] }))} value={run.finalPredict} locked={locked} onChange={(finalPredict) => update({ finalPredict, design: d })} />
     </Frame>
   );
 }
@@ -779,7 +888,7 @@ function whyNote(why: Why, open: ReturnType<typeof runRoom>): string {
   return `Kindness alone isn’t enough: an Open Hand finishes ${ordinal(hand.rank)} of ${hand.of} in the Iron Hall. The rules that did well across the halls were kind first, and hit back when hit.`;
 }
 
-function Final({ run, advance }: StepProps) {
+function Final({ run, review }: StepProps) {
   const reduced = useMotionReduced();
   const d = run.design ?? STARTER_DESIGN.mirror;
   const mine = useMemo(() => yours(d), [d]);
@@ -791,7 +900,7 @@ function Final({ run, advance }: StepProps) {
   const worst = results[ranks.reduce((wi, r, i) => (r.rank / r.of > ranks[wi].rank / ranks[wi].of ? i : wi), 0)];
   const preset = STARTERS.find((s) => isStarterDesign(d, s));
   const why = run.why ?? 'clever';
-  const [shown, setShown] = useState(reduced ? results.length : 0);
+  const [shown, setShown] = useState(reduced || review ? results.length : 0);
   useEffect(() => {
     if (reduced || shown >= results.length) return;
     const h = setTimeout(() => {
@@ -803,7 +912,7 @@ function Final({ run, advance }: StepProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shown, reduced, results.length]);
   return (
-    <Frame run={run} voice={shown >= results.length ? ['mer.final.insight'] : []} voiceKey={shown >= results.length ? 'final:done' : 'final'} footer={<ContinueButton tone={T} label="Leave the hall" onPress={advance} />}>
+    <Frame run={run} voice={shown >= results.length ? ['mer.final.insight'] : []} voiceKey={shown >= results.length ? 'final:done' : 'final'} last nextLabel="Leave the hall">
       <H>The last trial</H>
       <P muted>Your rule: {describeDesign(d)}{preset ? ` — the same as ${STARTER_LABEL[preset]}.` : '.'}</P>
       <View style={{ gap: space.sm }}>

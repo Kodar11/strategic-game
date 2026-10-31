@@ -168,7 +168,7 @@ export function LivingSigil({ id, size = 44 }: { id: StarterId; size?: number })
  * One round, played out: both moves arrive from their own sides and meet. Sharing lights up the space between them;
  * a lone take goes through the sharer, who dims; two takes knock each other back. The numbers are the matrix's.
  */
-export function Encounter({ you, them, youPoints, themPoints, themName = 'Opponent', roundKey }: { you: Move; them: Move; youPoints: number; themPoints: number; themName?: string; roundKey: string | number }) {
+export function Encounter({ you, them, youPoints, themPoints, themName = 'Opponent', roundKey, quiet }: { you: Move; them: Move; youPoints: number; themPoints: number; themName?: string; roundKey: string | number; /** Seen before: no sound this time. */ quiet?: boolean }) {
   const reduced = useMotionReduced();
   const p = useSharedValue(reduced ? 1 : 0);
   const hit = useSharedValue(reduced ? 1 : 0);
@@ -185,6 +185,7 @@ export function Encounter({ you, them, youPoints, themPoints, themName = 'Oppone
     hit.set(withDelay(420, withTiming(1, { duration: 520, easing: Easing.out(Easing.cubic) })));
     const h = setTimeout(() => {
       setLanded(true);
+      if (quiet) return;
       storySfx(`meridian/sfx/${encounterSound(you, them)}`);
       haptic.commit();
     }, 420);
@@ -192,7 +193,7 @@ export function Encounter({ you, them, youPoints, themPoints, themName = 'Oppone
       clearTimeout(h);
       setLanded(false);
     };
-  }, [roundKey, you, them, reduced, p, hit]);
+  }, [roundKey, you, them, reduced, p, hit, quiet]);
 
   const gap = 70;
   const sideStyle = (dir: -1 | 1, mine: Move, other: Move) => {
@@ -255,7 +256,7 @@ export function Encounter({ you, them, youPoints, themPoints, themName = 'Oppone
 }
 
 /** A match drawn token by token, so you can watch one move set off the next. A ring and a small sound mark a slip. */
-export function PlayedStrip({ match, a, b, stepMs = 150 }: { match: MatchResult; a: { id: StrategyId; name: string }; b: { id: StrategyId; name: string }; stepMs?: number }) {
+export function PlayedStrip({ match, a, b, stepMs = 150, quiet }: { match: MatchResult; a: { id: StrategyId; name: string }; b: { id: StrategyId; name: string }; stepMs?: number; quiet?: boolean }) {
   const reduced = useMotionReduced();
   const { width } = useWindowDimensions();
   const n = match.rounds.length;
@@ -267,8 +268,8 @@ export function PlayedStrip({ match, a, b, stepMs = 150 }: { match: MatchResult;
   }, [n, stepMs, reduced]);
   useEffect(() => {
     const r = match.rounds[shown - 1];
-    if (r && (r.a !== r.ia || r.b !== r.ib)) storySfx('meridian/sfx/slip');
-  }, [shown, match]);
+    if (!quiet && r && (r.a !== r.ia || r.b !== r.ib)) storySfx('meridian/sfx/slip');
+  }, [shown, match, quiet]);
   const size = Math.max(6, Math.min(18, Math.floor((Math.min(width - space.xl * 2 - space.lg * 2, 520) - 30) / n) - 2));
   const label = `${a.name} scored ${match.a}, ${b.name} scored ${match.b} over ${n} rounds. ${a.name}: ${match.rounds.map((r) => moveWord(r.a)).join(', ')}. ${b.name}: ${match.rounds.map((r) => moveWord(r.b)).join(', ')}.`;
   const row = (side: 'a' | 'b') => (
@@ -318,10 +319,10 @@ export function TournamentReplay({ t, yoursName, stepMs = 150, onDone, onSelect,
     if (frame > 0 && frame % 4 === 0 && !done) storySfx('meridian/sfx/tick', 0.7);
     if (done && !notified.current) {
       notified.current = true;
-      if (frame > 0 && !reduced) storySfx('meridian/sfx/crown');
+      if (frame > 0 && !reduced && autoStart) storySfx('meridian/sfx/crown');
       onDone?.();
     }
-  }, [frame, done, reduced, onDone]);
+  }, [frame, done, reduced, onDone, autoStart]);
 
   const f = frames[frame];
   const n = t.standings.length;

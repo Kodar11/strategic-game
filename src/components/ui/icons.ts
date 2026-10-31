@@ -126,3 +126,5 @@ export { default as ScanEye } from 'lucide-react-native/icons/scan-eye';
 export { default as CircleHelp } from 'lucide-react-native/icons/circle-question-mark';
 export { default as ScrollText } from 'lucide-react-native/icons/scroll-text';
 export { default as Pause } from 'lucide-react-native/icons/pause';
+export { default as SkipBack } from 'lucide-react-native/icons/skip-back';
+export { default as SkipForward } from 'lucide-react-native/icons/skip-forward';
