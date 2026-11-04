@@ -83,6 +83,18 @@ export function spread(fire: readonly number[], breaks: ReadonlySet<number>): nu
   return next;
 }
 
+/**
+ * Where the fire goes if nothing else changes: the teammate's announced plan plus the public spread rule. It can't show
+ * new ignitions, which stay hidden, and the player's own action comes on top of it.
+ */
+export function previewFire(fire: readonly number[], plan: Plan | null): number[] {
+  const next = [...fire];
+  const breaks = new Set<number>();
+  if (plan?.kind === 'douse') next[plan.d] = Math.max(0, next[plan.d] - 2);
+  if (plan?.kind === 'firebreak') breaks.add(plan.d);
+  return spread(next, breaks);
+}
+
 /** How dangerous a district is for the next round: its fire plus what its burning neighbours can push into it. */
 const threat = (fire: readonly number[], d: number) => (alive(fire[d]) ? fire[d] * 2 + neighbours(d).filter((x) => fire[x] >= 2 && alive(fire[x])).length : -1);
 
@@ -102,8 +114,9 @@ const hottest = (fire: readonly number[], skip: number | null = null) => {
  * Planner — looks a round ahead: douses the district with the highest threat (its fire plus burning neighbours); if
  *   no district is above 1, firebreaks the calm district most exposed to burning neighbours; refills when water ≤ 1.
  * Emergency Responder — douses the hottest district, every round; refills only when the water is gone.
- * Resource Guardian — protects the supply: refills whenever water ≤ 3; douses only districts at 3 (one step from
- *   burning out); otherwise firebreaks the calm neighbour of the hottest district.
+ * Resource Guardian — protects the supply: refills whenever water ≤ 2 (a district at 3 comes first while any water is
+ *   left); douses districts at 3, and at 2 when the tanks are comfortable (5 or more); otherwise firebreaks the calm
+ *   neighbour of the hottest district.
  * Opportunistic Coordinator — fills the gap you leave: if you doused a district last round it takes the hottest
  *   *other* district; with two or more districts at 3 it douses the worst; refills when water ≤ 2 and nothing is at 3.
  */
@@ -127,10 +140,11 @@ export function teammatePlan(s: StandState): Plan {
     return hot >= 0 ? { kind: 'douse', d: hot } : { kind: 'refill' };
   }
   if (persona === 'guardian') {
-    if (w <= 3) return { kind: 'refill' };
-    if (atThree.length) return { kind: 'douse', d: atThree[0] };
+    if (atThree.length && w > 0) return { kind: 'douse', d: atThree[0] };
+    if (w <= 2) return { kind: 'refill' };
     const hot = hottest(fire);
     if (hot < 0) return { kind: 'refill' };
+    if (w >= 5 && fire[hot] >= 2) return { kind: 'douse', d: hot };
     const calm = neighbours(hot).filter((x) => alive(fire[x])).sort((a, b) => fire[a] - fire[b] || a - b)[0];
     return calm !== undefined ? { kind: 'firebreak', d: calm } : { kind: 'douse', d: hot };
   }

@@ -6,11 +6,11 @@ import { type ArenaGameId, draw } from './core.ts';
  * - **Mystery opponent.** With `persona=mystery` the play screen picks one of the game's opponents from the match seed
  *   (`hiddenOpponent`), so a rematch (a new seed) draws again and nothing in the URL, name, icon or colour gives the
  *   personality away. Bots get the same policy either way; the pick only decides which policy.
- * - **Prediction.** Optional. It opens once `READ_RULES[game].after(total)` rounds are complete — enough decisions to
- *   tell the personalities apart — and may be changed until the match ends; the last guess before the end is the one
- *   scored. If the match ends without a guess the player is offered one, once, before the reveal (skippable).
- * - **Scoring.** Right, wrong or unscored (`scoreRead`). Nothing else: no points, no effect on the bot, the match score
- *   or the outcome. Changing a guess is free, and only the final one counts, so guessing repeatedly earns nothing.
+ * - **Prediction.** Optional, one per match, locked when made: the same rule as the classic games (src/games/read-rules.ts).
+ *   It opens once `READ_RULES[game].after(total)` rounds are complete — enough decisions to tell the personalities
+ *   apart. If the match ends without one the player is offered one, once, before the reveal (skippable).
+ * - **Scoring.** Right, wrong or unscored (`scoreRead`). A right read shows Insight Points at the reveal; the local record
+ *   keeps counting right and wrong reads as before. No effect on the bot, the match score or the outcome.
  * - **Reveal.** The result screen names the real personality, the guess and the verdict, then the evidence the engine's
  *   debrief (`opponentRead`) cites from this match's recorded decisions.
  */

@@ -5,9 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
-import { Badge } from '@/src/components/ui/Card';
-import { IconButton } from '@/src/components/ui/Button';
-import { ArrowLeft } from '@/src/components/ui/icons';
+import { LeaveGuard } from '@/src/components/game/LeaveGuard';
+import { MatchHeader, ScoreLine } from '@/src/components/game/MatchChrome';
+import { MatchLog } from '@/src/components/game/MatchLog';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { ARENA, LENGTH_LABEL, LEVEL_LABEL, opponentName } from '@/src/arena/catalog';
 import { type ArenaGameId, CODENAMES, type Level, type MatchLength, type Setup, isArenaId, isLength, isLevel } from '@/src/arena/core';
@@ -23,7 +23,9 @@ import { AuctionBoard } from '@/src/features/arena/ui/AuctionBoard';
 import { CooperationMatch } from '@/src/features/arena/ui/CooperationMatch';
 import { LIBRARY_BOARDS, TEAM_GAMES } from '@/src/features/arena/ui/library';
 import { MarketBoard } from '@/src/features/arena/ui/MarketBoard';
-import { CoachTip, ScoreStrip } from '@/src/features/arena/ui/parts';
+import { CoachTip } from '@/src/features/arena/ui/parts';
+import { suspectName, type MoleState } from '@/src/arena/mole';
+import { crewName, type SaboteurState } from '@/src/arena/saboteur';
 import { ReadPanel } from '@/src/features/arena/ui/ReadPanel';
 import { SignalBoard } from '@/src/features/arena/ui/SignalBoard';
 import { UltimatumGameBoard } from '@/src/features/arena/ui/UltimatumGameBoard';
@@ -109,6 +111,9 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
   const change = (next: { persona?: string; level?: Level }) => router.setParams({ persona: next.persona ?? (mystery ? MYSTERY : persona), level: next.level ?? level });
 
   const live = result ?? engine.result(state);
+  const finished = over && !!result && read.revealed && !repeat.holding;
+  const challenge = g.variants.find((v) => v.id === variant && v.challenge);
+  const roundLabel = g.roundWord === 'lots' ? 'Lot' : g.roundWord === 'turns' ? 'Turn' : 'Round';
   const tip = !coached && !tipHidden && !over ? g.coach[Math.min(playedRounds, g.coach.length - 1)] : null;
   const showTip = tip && playedRounds < g.coach.length;
   // In a mystery auction or market the other bidders are personalities too; mask them all until the reveal.
@@ -137,44 +142,25 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Backdrop />
-      <ScrollView ref={scroll} contentContainerStyle={{ padding: space.lg, paddingTop: insets.top + space.md, paddingBottom: insets.bottom + space.huge }} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scroll} contentContainerStyle={{ padding: space.lg, paddingTop: insets.top + space.xs, paddingBottom: insets.bottom + space.huge }} keyboardShouldPersistTaps="handled">
         <View style={styles.column}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-            <IconButton icon={ArrowLeft} label="Back" onPress={close} />
-            <AppText variant="heading" accessibilityRole="header" style={{ flex: 1 }} numberOfLines={1}>
-              {g.title}
-            </AppText>
-          </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}>
-            <Badge label={hidden ? (team ? 'Mystery teammate' : 'Mystery opponent') : name} tone="orange" />
-            <Badge label={LEVEL_LABEL[level]} />
-            <Badge label={`${LENGTH_LABEL[length]} · ${total} ${g.roundWord}`} tone="blue" />
-            {g.variants.find((v) => v.id === variant)?.challenge ? <Badge label={g.variants.find((v) => v.id === variant)!.name} tone="amber" /> : null}
-          </View>
-          {NO_STRIP.has(game) ? null : (
-            <ScoreStrip
-              you={live.player}
-              rival={field ? live.rival : live.standings.find((s) => !s.isPlayer)!.score}
-              rivalName={field ? 'Best rival' : name}
-              round={playedRounds + (over ? 0 : 1)}
-              total={total}
-              roundWord={g.roundWord === 'lots' ? 'Lot' : g.roundWord === 'turns' ? 'Turn' : 'Round'}
-              unit={g.unit}
-            />
-          )}
+          <LeaveGuard started={playedRounds > 0} over={over} />
+          <MatchHeader title={g.title} meta={[hidden ? (team ? 'Mystery teammate' : 'Mystery opponent') : name, LEVEL_LABEL[level], LENGTH_LABEL[length], challenge?.name].filter(Boolean).join(' · ')} progress={`${roundLabel} ${Math.min(playedRounds + (over ? 0 : 1), total)}/${total}`} onBack={close} />
+          {NO_STRIP.has(game) || finished ? null : <ScoreLine you={live.player} rival={field ? live.rival : live.standings.find((s) => !s.isPlayer)!.score} rivalName={field ? 'Best rival' : hidden ? (team ? 'Teammate' : 'Opponent') : name} unit={g.unit} />}
           {showTip ? <CoachTip text={tip} onDismiss={() => setTipHidden(true)} /> : null}
           {refusal ? (
             <AppText variant="small" color={colors.danger} accessibilityLiveRegion="assertive">
               {refusal}
             </AppText>
           ) : null}
-          <View style={repeat.running ? { pointerEvents: 'none' } : undefined}>{board}</View>
+          {finished ? null : <View style={repeat.running ? { pointerEvents: 'none' } : undefined}>{board}</View>}
           {repeatable ? <RepeatPanel repeat={repeat} roundWord={g.roundWord} /> : null}
           <ReadPanel game={game} read={readShown} played={playedRounds} />
           {over && result && read.revealed && repeat.holding ? <RepeatDone repeat={repeat} roundWord={g.roundWord} /> : null}
-          {over && result && read.revealed && !repeat.holding ? (
-            <View onLayout={(e) => toResult(e.nativeEvent.layout.y)}>
+          {finished && result ? (
+            <View onLayout={(e) => toResult(e.nativeEvent.layout.y)} style={{ gap: space.md }}>
               <ArenaResult
+                unmasked={game === 'mole' || game === 'saboteur' ? unmaskedLine(game, state) : null}
                 game={game}
                 result={result}
                 debrief={engine.debrief(state)}
@@ -187,6 +173,9 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
                 read={mystery && read.verdict ? { guess: read.guess, verdict: read.verdict } : null}
                 reflection={<MatchReflection game={game} record={state} />}
               />
+              <MatchLog title="Final board" summary="How the match ended">
+                {board}
+              </MatchLog>
             </View>
           ) : null}
         </View>
@@ -195,6 +184,16 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
   );
 }
 
+/** The hidden-role games' own final reveal, for the top of the results. */
+function unmaskedLine(game: 'mole' | 'saboteur', state: unknown): string | null {
+  if (game === 'mole') {
+    const s = state as MoleState;
+    return s.accused === null ? null : `The Mole was ${suspectName(s.mole)}. You accused ${suspectName(s.accused)}.`;
+  }
+  const s = state as SaboteurState;
+  return s.accused === null ? null : `The saboteur was ${crewName(s.saboteur)}. You accused ${crewName(s.accused)}.`;
+}
+
 const styles = StyleSheet.create({
-  column: { maxWidth: MAX_CONTENT_WIDTH, width: '100%', alignSelf: 'center', gap: space.lg },
+  column: { maxWidth: MAX_CONTENT_WIDTH, width: '100%', alignSelf: 'center', gap: space.sm },
 });

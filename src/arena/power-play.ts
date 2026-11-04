@@ -170,8 +170,9 @@ export function botAction(s: PowerState, u: number): PowerMove {
  * Honest Operator — challenges only near-impossible claims (odds under 10 %; Easy never).
  * Calculated Bluffer — challenges below 25 % odds.
  * Suspicious Challenger — challenges below 45 % (Easy: any claim after you've made two of the same kind).
- * Strategic Manipulator — avoids confrontation: below 10 %, or when losing would not cost it the game and your claim
- *   would win you the game.
+ * Strategic Manipulator — avoids confrontation: below 10 %.
+ * On Normal and Hard every personality challenges a claim that would win you the game on the spot: letting it stand
+ * loses anyway, so even a true claim is worth testing.
  */
 export function botChallenges(s: PowerState, role: Role): boolean {
   const { persona, level } = s.setup;
@@ -183,11 +184,12 @@ export function botChallenges(s: PowerState, role: Role): boolean {
   const easyGuess = 0.5;
   const odds = level === 'easy' ? easyGuess : p;
   if (p === 0) return true; // every copy is accounted for: certainly a bluff
+  const gain = role === 'treasurer' ? 3 : role === 'thief' ? Math.min(2, s.bot.coins) : 0;
+  if ((level !== 'easy' || (persona === 'manipulator' && s.bot.hand.length > 1)) && gain > 0 && s.player.coins + gain >= WIN_COINS) return true;
   if (persona === 'honest') return level !== 'easy' && odds < 0.1;
   if (persona === 'bluffer') return odds < 0.25;
   if (persona === 'challenger') return level === 'easy' ? habits(s).claimsOf(role) >= 2 : odds < 0.45;
-  const decisive = role === 'treasurer' && s.player.coins + 3 >= WIN_COINS;
-  return odds < 0.1 || (decisive && s.bot.hand.length > 1);
+  return odds < 0.1;
 }
 
 /**

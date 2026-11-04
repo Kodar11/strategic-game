@@ -9,7 +9,9 @@ import { Button } from '@/src/components/ui/Button';
 import { Eye, Gamepad2, Lightbulb, RotateCcw, Sparkles, Trophy } from '@/src/components/ui/icons';
 import { ARENA, LEVEL_LABEL } from '@/src/arena/catalog';
 import { LEVELS, type Level, type MatchResult } from '@/src/arena/core';
-import { COOP_NAME, type CoopState } from '@/src/arena/cooperation';
+import { COOP_NAME, COOP_PAYOFFS, type CoopState } from '@/src/arena/cooperation';
+import { sharedOutcome } from '@/src/games/shared-outcome';
+import { MatchLog } from '@/src/components/game/MatchLog';
 import { coopInsights, coopLessons, coopOpponentReveal, coopStats } from '@/src/arena/cooperation-analysis';
 import { MatchReflection } from '@/src/features/reflections/ReflectionCard';
 import { haptic } from '@/src/utils/feedback';
@@ -33,7 +35,7 @@ export function CoopResults({ state, result, newBest, onRematch, onChange, onLib
   const insights = coopInsights(state, st);
   const lessons = coopLessons(state, st);
   const win = result.outcome === 'win';
-  const headline = win ? 'You won' : result.outcome === 'loss' ? `${name} won` : 'A draw';
+  const frame = sharedOutcome({ kind: 'cooperate', you: st.player, them: st.bot, rounds: st.rounds, joint: st.mutualC, jointEach: COOP_PAYOFFS[state.setup.variant].R, themName: name });
 
   return (
     <Animated.View entering={enter(0)} style={{ gap: space.lg }}>
@@ -46,7 +48,7 @@ export function CoopResults({ state, result, newBest, onRematch, onChange, onLib
           {newBest ? <Badge label="New best" tone="amber" /> : null}
         </Row>
         <AppText variant="title" accessibilityRole="header">
-          {headline}
+          {frame.headline}
         </AppText>
         <Row style={{ alignItems: 'flex-end' }}>
           <View style={{ flex: 1 }}>
@@ -69,11 +71,21 @@ export function CoopResults({ state, result, newBest, onRematch, onChange, onLib
             </AppText>
           </View>
         </Row>
+        <AppText variant="small" color={colors.textBody}>
+          {frame.shared} {frame.tradeoff}
+        </AppText>
         <AppText variant="caption" color={colors.textMuted}>
-          Higher score wins; equal scores draw.
+          The match goes to the higher score: {result.outcome === 'win' ? 'yours' : result.outcome === 'loss' ? 'theirs' : 'level'}.
         </AppText>
       </View>
 
+      {read ? <PersonalityReveal game="cooperation" persona={persona} read={read} evidence={coopOpponentReveal(state)} /> : null}
+
+      <MatchReflection game="cooperation" record={state} />
+
+      <Button label={read ? 'Play again · new mystery opponent' : 'Play again'} icon={RotateCcw} iconPosition="left" onPress={onRematch} />
+
+      <MatchLog title="Full match analysis" summary={st.pattern}>
       <View style={styles.grid}>
         <Stat label="Mutual cooperation" value={`${st.mutualC}`} sub="rounds" />
         <Stat label="Mutual defection" value={`${st.mutualD}`} sub="rounds" />
@@ -122,8 +134,6 @@ export function CoopResults({ state, result, newBest, onRematch, onChange, onLib
         ))}
       </View>
 
-      {read ? <PersonalityReveal game="cooperation" persona={persona} read={read} evidence={coopOpponentReveal(state)} /> : null}
-
       <View style={styles.panel}>
         <Row>
           <Eye size={16} color={colors.rivalText} />
@@ -136,10 +146,9 @@ export function CoopResults({ state, result, newBest, onRematch, onChange, onLib
         </AppText>
       </View>
 
-      <MatchReflection game="cooperation" record={state} />
+      </MatchLog>
 
       <View style={{ gap: space.md }}>
-        <Button label={read ? 'Rematch · new mystery opponent' : `Rematch ${name}`} icon={RotateCcw} iconPosition="left" onPress={onRematch} />
         <View style={{ gap: space.xs }}>
           <AppText variant="caption" color={colors.textMuted}>
             Try another personality
@@ -171,7 +180,7 @@ export function CoopResults({ state, result, newBest, onRematch, onChange, onLib
                 onPress={() => (l === level ? onRematch() : onChange({ level: l }))}
                 accessibilityRole="button"
                 accessibilityState={{ selected: l === level }}
-                accessibilityLabel={`${LEVEL_LABEL[l]}${l === level ? ', current — rematch' : ''}`}
+                accessibilityLabel={`${LEVEL_LABEL[l]} rematch`}
                 style={({ pressed }) => [styles.level, l === level && { borderColor: colors.rival, backgroundColor: colors.rivalSoft }, pressed && { backgroundColor: colors.surfaceHigh }]}>
                 <AppText variant="small" weight="semibold" color={l === level ? colors.rivalText : colors.text}>
                   {LEVEL_LABEL[l]}
@@ -180,7 +189,7 @@ export function CoopResults({ state, result, newBest, onRematch, onChange, onLib
             ))}
           </View>
         </View>
-        <Button label="Back to Games" variant="ghost" icon={Gamepad2} iconPosition="left" onPress={onLibrary} />
+        <Button label="Game library" variant="ghost" icon={Gamepad2} iconPosition="left" onPress={onLibrary} />
       </View>
     </Animated.View>
   );

@@ -673,7 +673,7 @@ const aClaim = (role: string) => `${/^[AEIOU]/.test(role) ? 'an' : 'a'} ${role} 
 
 export const POWER_PLAY: GameReflections<PowerState> = {
   game: 'power-play',
-  lesson: null,
+  lesson: 'credibility',
   rules: [
     rule({
       id: 'challenge-lost',
@@ -759,7 +759,7 @@ export const POWER_PLAY: GameReflections<PowerState> = {
 
 export const LAST_STAND: GameReflections<StandState> = {
   game: 'last-stand',
-  lesson: null,
+  lesson: 'coordination-problem',
   rules: [
     rule({
       id: 'burned-out',

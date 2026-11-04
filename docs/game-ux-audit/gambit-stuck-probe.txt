@@ -1,0 +1,25 @@
+// Audit probe: can the player be left with no legal Gambit move while the match is still open?
+const R = 'file:///C:/Users/ADMIN/Documents/Computer%20Science/React%20Native/strategic-game/src/';
+const gam: any = await import(R + 'arena/gambit.ts');
+const { gambit, legalMoves, square } = gam;
+let rng = 99;
+const rnd = () => { rng = (rng * 1664525 + 1013904223) >>> 0; return rng / 4294967296; };
+const policies: Record<string, (ms: any[]) => any> = {
+  random: (ms) => ms[Math.floor(rnd() * ms.length)],
+  dashFirst: (ms) => ms.filter((m) => m.kind === 'dash').sort((a, b) => b.from[0] - a.from[0])[0] ?? ms.find((m) => m.kind === 'step' && m.to[0] > m.from[0]) ?? ms[0],
+  forwardOnly: (ms) => ms.find((m) => m.kind === 'step' && m.to[0] > m.from[0]) ?? ms[0],
+};
+for (const [name, pol] of Object.entries(policies)) {
+  let stuck = 0, games = 0; let sample: any = null;
+  for (const persona of gambit.opponents) for (const level of ['easy', 'normal', 'hard']) for (let i = 0; i < 2000; i++) {
+    let s = gambit.create({ persona, level, length: 'standard', variant: 'standard', seed: (i * 2654435761 + 97) >>> 0 });
+    games++;
+    while (!gambit.isOver(s)) {
+      const ms = legalMoves(s, 'player');
+      if (!ms.length) { stuck++; sample ??= { persona, level, seed: s.setup.seed, turns: s.turns.length, home: s.home, pieces: s.pieces.map((p: any) => `${p.side[0]}:${square(p.r, p.c)}`) }; break; }
+      const m = pol(ms);
+      s = gambit.apply(s, { from: m.from, to: m.to });
+    }
+  }
+  console.log(name, { games, stuck, rate: (stuck / games).toFixed(4), sample });
+}

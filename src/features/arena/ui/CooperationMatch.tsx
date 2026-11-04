@@ -2,9 +2,11 @@ import { router } from 'expo-router';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
+import Svg, { Line, Polyline } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedNumber } from '@/src/components/lesson/AnimatedNumber';
+import { LeaveGuard } from '@/src/components/game/LeaveGuard';
 import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Badge } from '@/src/components/ui/Card';
@@ -13,7 +15,7 @@ import { ArrowLeft, BookOpen, Check, ChevronDown, Link2, Lock, Unlink } from '@/
 import { ARENA, LENGTH_LABEL, LEVEL_LABEL, opponentInfo } from '@/src/arena/catalog';
 import type { Level, MatchLength } from '@/src/arena/core';
 import { COOP_NAME, COOP_PAYOFFS, type CoopMove, type CoopOpponent, type CoopRound, type CoopSetup, type CoopState, type CoopVariant, cooperation, coopPayoff } from '@/src/arena/cooperation';
-import { coopBriefing, coopOutcomeText, coopRevealNote, opponentPatterns } from '@/src/arena/cooperation-analysis';
+import { coopBriefing, coopOutcomeText, coopRelationship, coopRevealNote, opponentPatterns } from '@/src/arena/cooperation-analysis';
 import { MiniMatrix } from '@/src/features/games/ui/common';
 import { RepeatDone, RepeatPanel } from '@/src/features/repeat/RepeatPanel';
 import { useRepeat } from '@/src/features/repeat/useRepeat';
@@ -122,8 +124,9 @@ export function CooperationMatch({
       <Backdrop />
       <ScrollView ref={scroll} contentContainerStyle={{ padding: space.lg, paddingTop: insets.top + space.md, paddingBottom: insets.bottom + space.huge }}>
         <View style={styles.column}>
+          <LeaveGuard started={h.length > 0} over={over} />
           <Row>
-            <IconButton icon={ArrowLeft} label="Back — leaving ends this match" onPress={close} />
+            <IconButton icon={ArrowLeft} label="Back" onPress={close} />
             <AppText variant="heading" accessibilityRole="header" style={{ flex: 1 }} numberOfLines={1}>
               {g.title}
             </AppText>
@@ -146,6 +149,7 @@ export function CooperationMatch({
               {rulesOpen ? <RulesCard variant={variant} total={state.total} /> : null}
               <ScoreHeader state={state} view={view} name={name} round={shownRound} />
               <Timeline h={h} total={state.total} current={view === 'decide' ? h.length : -1} />
+              <TrustLine h={h} total={state.total} />
               {tip ? <CoachTip text={tip} onDismiss={() => setTipHidden(true)} /> : null}
               {view === 'decide' ? <Decision key={h.length} state={state} name={name} onCommit={commit} locked={repeat.running} /> : <Reveal state={state} name={name} onNext={next} hideNext={finalHold} />}
               <RepeatPanel repeat={repeat} hidden={view !== 'decide'} />
@@ -226,6 +230,32 @@ const Timeline = memo(function Timeline({ h, total, current }: { h: readonly Coo
           </View>
         );
       })}
+    </View>
+  );
+});
+
+/**
+ * The relationship as a line, from the moves alone: up when both cooperated, down when one betrayed the other, and flat
+ * when both defected. It is a picture of what happened, not a score: nothing in the game reads it.
+ */
+const TrustLine = memo(function TrustLine({ h, total }: { h: readonly CoopRound[]; total: number }) {
+  const [w, setW] = useState(0);
+  if (h.length < 2) return null;
+  const H = 34;
+  const path = coopRelationship(h);
+  const hi = Math.max(1, ...path.map(Math.abs));
+  const x = (i: number) => 4 + ((w - 8) * i) / Math.max(1, total);
+  const y = (v: number) => H / 2 - ((H / 2 - 3) * v) / hi;
+  const joint = h.filter((r) => r.p === 'C' && r.b === 'C').length;
+  const broken = h.filter((r) => r.p !== r.b).length;
+  return (
+    <View onLayout={(e) => setW(e.nativeEvent.layout.width)} style={{ height: H }} accessible accessibilityLabel={`Relationship so far: both cooperated in ${joint} rounds, one betrayed the other in ${broken}.`}>
+      {w > 0 ? (
+        <Svg width={w} height={H}>
+          <Line x1={0} x2={w} y1={H / 2} y2={H / 2} stroke={colors.border} strokeDasharray="3 3" />
+          <Polyline points={path.map((v, i) => `${x(i)},${y(v)}`).join(' ')} fill="none" stroke={colors.insight} strokeWidth={2} />
+        </Svg>
+      ) : null}
     </View>
   );
 });
@@ -336,6 +366,9 @@ function Reveal({ state, name, onNext, hideNext }: { state: CoopState; name: str
         <AppText variant="bodyStrong" accessibilityLiveRegion="polite">
           {coopOutcomeText(r)}
         </AppText>
+        <AppText variant="caption" color={colors.textMuted} tabular>
+          You {signed(r.ps)} · them {signed(r.bs)} · together {signed(r.ps + r.bs)} of a possible {signed(COOP_PAYOFFS[state.setup.variant].R * 2)}
+        </AppText>
         {slip ? (
           <AppText variant="small" color={colors.insight}>
             {slip}
@@ -410,7 +443,7 @@ function MatchHistory({ h, name }: { h: readonly CoopRound[]; name: string }) {
   let them = 0;
   return (
     <View style={styles.card}>
-      <Pressable onPress={() => setOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: open }} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 32 }}>
+      <Pressable onPress={() => setOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: open }} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44 }}>
         <AppText variant="overline" color={colors.textMuted} style={{ flex: 1 }}>
           Match history · {h.length} round{h.length === 1 ? '' : 's'}
         </AppText>
@@ -473,7 +506,7 @@ function RulesCard({ variant, total }: { variant: CoopVariant; total: number }) 
 
 const styles = StyleSheet.create({
   column: { maxWidth: MAX_CONTENT_WIDTH, width: '100%', alignSelf: 'center', gap: space.lg },
-  rulesBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  rulesBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   score: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgRaised },
   cell: { width: 22, height: 30, borderRadius: 6, borderWidth: 1, borderColor: colors.borderStrong, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   half: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' },

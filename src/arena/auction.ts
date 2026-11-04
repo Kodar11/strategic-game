@@ -83,6 +83,9 @@ export function posteriorMean(lot: Lot, estimate: number): number {
   return a <= b ? (a + b) / 2 : (lot.lo + lot.hi) / 2;
 }
 
+/** The bid slider's start: the bottom of the public range. How far to go above it is the player's call, not the screen's. */
+export const openingBid = (lot: Lot, cash: number) => Math.max(0, Math.min(cash, lot.lo));
+
 /** Average winning bid as a share of the lot's range midpoint, from revealed lots (public). */
 function roomRatio(h: readonly AuctionRound[], fallback: number): number {
   const won = h.filter((r) => r.winner !== null);

@@ -7,52 +7,6 @@ import { DIFFICULTY_LABEL, personality } from '@/src/games/catalog';
 import type { Difficulty, GameId } from '@/src/games/core';
 import { colors, radius, space } from '@/src/theme/tokens';
 
-/** "You 14 · 9 The Counter", with the round count. */
-export function ScoreBar({
-  you,
-  bot,
-  botName,
-  round,
-  total,
-  unit,
-}: {
-  you: number;
-  bot: number;
-  botName: string;
-  round: number;
-  total: number;
-  unit?: string;
-}) {
-  return (
-    <View style={styles.score} accessible accessibilityLabel={`Round ${Math.min(round, total)} of ${total}. You ${you}${unit ? ` ${unit}` : ''}, ${botName} ${bot}.`}>
-      <View style={styles.side}>
-        <AppText variant="caption" color={colors.primaryText}>
-          You
-        </AppText>
-        <AppText variant="title" tabular>
-          {you}
-        </AppText>
-      </View>
-      <View style={{ alignItems: 'center', gap: 2 }}>
-        <AppText variant="overline" color={colors.textMuted}>
-          Round
-        </AppText>
-        <AppText variant="bodyStrong" tabular>
-          {Math.min(round, total)}/{total}
-        </AppText>
-      </View>
-      <View style={[styles.side, { alignItems: 'flex-end' }]}>
-        <AppText variant="caption" color={colors.rivalText} numberOfLines={1}>
-          {botName}
-        </AppText>
-        <AppText variant="title" tabular>
-          {bot}
-        </AppText>
-      </View>
-    </View>
-  );
-}
-
 export type TrackMark = 'win' | 'loss' | 'draw' | 'pending';
 
 const MARK: Record<TrackMark, { bg: string; fg: string; label: string }> = {
@@ -101,18 +55,6 @@ export function Panel({ children, tone }: { children: ReactNode; tone?: 'insight
 }
 
 const styles = StyleSheet.create({
-  score: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: space.md,
-    padding: space.lg,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bgRaised,
-  },
-  side: { flex: 1, gap: 2 },
   track: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   dot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   dotPending: { borderWidth: 1.5, borderColor: colors.borderStrong },

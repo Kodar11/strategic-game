@@ -107,9 +107,12 @@ function playerHabits(s: BluffState) {
  *   of the time.
  * Confident Risk Taker — presses to 5 (Easy), to 4 (Normal, 5 if the value so far is low); claims value + 2 (Easy +3).
  *   Hard sizes the bluff to your calling: +3 if you rarely call, +1 if you call often.
- * Observant Challenger — honest by default: presses to 3; claims its value. Hard adds +1 when you have never called.
+ * Observant Challenger — honest by default: presses to 3; claims its value. Hard adds +1 when you have never called and
+ *   the claim would still look ordinary for its token count.
  * Unpredictable Performer — presses a random 2–5 tokens (seeded); claims value + 0–3 at random. Hard keeps the bluff
  *   below 3 × tokens − 1 so its claims are never impossible on their face.
+ * On Normal and Hard the Risk Taker and the Performer stop bluffing a player who has called most of its claims (two
+ * calls or more): a call-everything habit then costs that player, as it should.
  */
 export function botTurn(s: BluffState, n: number): { tokens: Token[]; bust: boolean; claim: number | null } {
   const { persona, level } = s.setup;
@@ -131,16 +134,18 @@ export function botTurn(s: BluffState, n: number): { tokens: Token[]; bust: bool
   }
   const v = valueOf(tokens);
   const cap = 3 * tokens.length;
+  const calledTimes = s.rounds.filter((r) => r.claimant === 'bot' && r.call).length;
+  const wary = level !== 'easy' && calledTimes >= 2 && habits.callRate > 0.55;
   let claim = v;
   if (persona === 'cautious') {
     if (level === 'normal' && u(1) < 0.2) claim = v + 1;
     if (level === 'hard' && habits.callRate < 1 / 3) claim = v + 1;
   } else if (persona === 'risk-taker') {
-    claim = v + (level === 'easy' ? 3 : level === 'normal' ? 2 : habits.callRate < 0.3 ? 3 : habits.callRate > 0.5 ? 1 : 2);
+    claim = wary ? v : v + (level === 'easy' ? 3 : level === 'normal' ? 2 : habits.callRate < 0.3 ? 3 : habits.callRate > 0.5 ? 1 : 2);
   } else if (persona === 'observant') {
-    if (level === 'hard' && s.rounds.every((r) => r.claimant !== 'bot' || !r.call)) claim = v + 1;
+    if (level === 'hard' && s.rounds.every((r) => r.claimant !== 'bot' || !r.call) && v + 1 <= EXPECTED_TOKEN * tokens.length) claim = v + 1;
   } else {
-    claim = v + Math.floor(u(2) * 4);
+    claim = wary ? v : v + Math.floor(u(2) * 4);
     if (level === 'hard') claim = Math.min(claim, cap - 1);
   }
   return { tokens, bust: false, claim: Math.min(cap, Math.max(0, claim)) };

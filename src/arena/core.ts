@@ -1,7 +1,7 @@
 import { type Outcome, draw } from '../games/core.ts';
 
 /**
- * Strategy Arena — the shared contract for five deeper, fully local strategy games (src/arena/<game>.ts).
+ * Strategy Arena — the shared contract for its fully local strategy games, listed in ARENA_IDS (src/arena/<game>.ts).
  *
  * These are separate from the weekly-competition games in src/games/: those have exact SQL ports on the server and a
  * fixed GameId set in Supabase. Arena games run entirely on the device, never call the backend during a match and keep

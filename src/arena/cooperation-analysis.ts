@@ -1,5 +1,5 @@
 import type { Debrief } from './core.ts';
-import { COOP_NAME, COOP_PAYOFFS, type CoopRound, type CoopState, predictPlayer, profilePlayer, type PlayerProfile } from './cooperation.ts';
+import { COOP_NAME, COOP_PAYOFFS, type CoopRound, type CoopState, predictPlayer, profilePlayer, type PlayerProfile } from './cooperation-model.ts';
 
 /**
  * Everything the Cooperation Game says about a match — round briefings, the opponent-history panel, final statistics,
@@ -9,6 +9,13 @@ import { COOP_NAME, COOP_PAYOFFS, type CoopRound, type CoopState, predictPlayer,
  * Moves: statistics count what was delivered (`p`, `b`), which is what scored. "Your response" counts use what the
  * player chose (`pi`), which is what they decided.
  */
+
+/** The relationship line: starts at 0, +1 when both cooperated, −1 when one betrayed the other, unchanged when both defected. */
+export function coopRelationship(h: readonly Pick<CoopRound, 'p' | 'b'>[]): number[] {
+  const out = [0];
+  for (const r of h) out.push(out[out.length - 1] + (r.p === 'C' && r.b === 'C' ? 1 : r.p !== r.b ? -1 : 0));
+  return out;
+}
 
 const pctOf = (k: number, n: number) => Math.round((k / n) * 100);
 const times = (n: number) => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);

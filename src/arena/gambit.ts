@@ -59,6 +59,8 @@ export interface GambitState extends Position {
   setup: Setup<GambitVariant, GambitPersona>;
   total: number;
   turns: GTurn[];
+  /** Turns a side had to skip because it had no legal move, in order. `at`: how many moves had been made by then. */
+  skipped: { side: Side; at: number }[];
 }
 
 const dir = (side: Side) => (side === 'player' ? 1 : -1);
@@ -209,7 +211,33 @@ export function gambitBotMove(s: GambitState, u: number): GMove | null {
 }
 
 const gameOver = (s: Position) => s.home.player >= HOME_TO_WIN || s.home.bot >= HOME_TO_WIN || !s.pieces.some((x) => x.side === 'player') || !s.pieces.some((x) => x.side === 'bot');
-const isOver = (s: GambitState) => gameOver(s) || s.turns.filter((t) => t.side === 'player').length >= s.total;
+const playerTurns = (s: GambitState) => s.turns.filter((t) => t.side === 'player').length + s.skipped.filter((x) => x.side === 'player').length;
+/** Neither side can move: the position can never change, so the match ends and is settled like the turn limit. */
+export const deadlocked = (s: Position) => !legalMoves(s, 'player').length && !legalMoves(s, 'bot').length;
+const isOver = (s: GambitState) => gameOver(s) || deadlocked(s) || playerTurns(s) >= s.total;
+
+/** The bot's move, if it has one; a bot with no legal move skips its turn. */
+function botTurn(s: GambitState): GambitState {
+  const n = s.turns.length + s.skipped.length;
+  const bm = gambitBotMove(s, draw(s.setup.seed, n, 2));
+  if (!bm) return { ...s, skipped: [...s.skipped, { side: 'bot', at: s.turns.length }] };
+  const bok = draw(s.setup.seed, n, 0) < odds(bm.kind);
+  const br = resolveMove(s, 'bot', bm, bok);
+  return { ...s, ...br.pos, turns: [...s.turns, { side: 'bot', move: bm, success: bok, captured: br.captured, home: br.home }] };
+}
+
+/**
+ * Hands the turn back to the player. If the player has no legal move, that turn is skipped (it still counts toward the
+ * turn limit) and the bot moves again, until the player can move or the match is over. Nothing is moved on the player's
+ * behalf. It ends: every skip uses up a player turn, and two stuck sides are a deadlock.
+ */
+export function settleTurns(start: GambitState): GambitState {
+  let s = start;
+  while (!isOver(s) && !legalMoves(s, 'player').length) {
+    s = botTurn({ ...s, skipped: [...s.skipped, { side: 'player', at: s.turns.length }] });
+  }
+  return s;
+}
 
 const same = (a: GMove, b: { from: [number, number]; to: [number, number] }) => a.from[0] === b.from[0] && a.from[1] === b.from[1] && a.to[0] === b.to[0] && a.to[1] === b.to[1];
 
@@ -224,18 +252,14 @@ function validate(s: GambitState, a: { from: [number, number]; to: [number, numb
 function apply(s: GambitState, a: { from: [number, number]; to: [number, number] }): GambitState {
   const why = validate(s, a);
   if (why) throw new Error(`gambit: ${why}`);
-  const n = s.turns.length;
+  const n = s.turns.length + s.skipped.length;
   const m = legalMoves(s, 'player').find((x) => same(x, a))!;
   const ok = draw(s.setup.seed, n, 0) < odds(m.kind);
   const r = resolveMove(s, 'player', m, ok);
   let next: GambitState = { ...s, ...r.pos, turns: [...s.turns, { side: 'player', move: m, success: ok, captured: r.captured, home: r.home }] };
   if (gameOver(next)) return next;
-  const bm = gambitBotMove(next, draw(s.setup.seed, n + 1, 2));
-  if (!bm) return next;
-  const bok = draw(s.setup.seed, n + 1, 0) < odds(bm.kind);
-  const br = resolveMove(next, 'bot', bm, bok);
-  next = { ...next, ...br.pos, turns: [...next.turns, { side: 'bot', move: bm, success: bok, captured: br.captured, home: br.home }] };
-  return next;
+  next = botTurn(next);
+  return settleTurns(next);
 }
 
 export function gambitOutcome(s: GambitState): Outcome {
@@ -260,7 +284,7 @@ function gambitDebrief(s: GambitState): Debrief {
   const lucky = mine.find(({ x }) => x.move.kind !== 'step' && x.success && x.captured);
   const unlucky = mine.find(({ x }) => x.move.kind !== 'step' && !x.success);
   if (lucky) moments.push({ at: lucky.i, text: `Turn ${lucky.turn}: your strike from ${square(...lucky.x.move.from)} landed (${Math.round(STRIKE_P * 100)}% odds) and took a piece.` });
-  if (unlucky) moments.push({ at: unlucky.i, text: `Turn ${unlucky.turn}: your ${unlucky.x.move.kind} from ${square(...unlucky.x.move.from)} failed — a ${Math.round(odds(unlucky.x.move.kind) * 100)}% move doesn’t fail often, but it does.` });
+  if (unlucky) moments.push({ at: unlucky.i, text: `Turn ${unlucky.turn}: your ${unlucky.x.move.kind} from ${square(...unlucky.x.move.from)} failed. A ${Math.round(odds(unlucky.x.move.kind) * 100)}% move misses about ${100 - Math.round(odds(unlucky.x.move.kind) * 100)}% of the time, so that alone doesn’t make it a bad choice.` });
   const theirCap = t.find(({ x }) => x.side === 'bot' && x.captured);
   if (theirCap && moments.length < 3) moments.push({ at: theirCap.i, text: `Turn ${theirCap.turn}: it struck your piece on ${square(...theirCap.x.move.to)}.` });
   const homeRun = mine.find(({ x }) => x.home);
@@ -298,17 +322,17 @@ export const gambit: ArenaEngine<GambitState, { from: [number, number]; to: [num
   variants: GAMBIT_VARIANTS,
   rounds: gambitRounds,
   endsEarly: true,
-  create: (setup) => ({ setup: setup as Setup<GambitVariant, GambitPersona>, total: gambitRounds(setup.length), pieces: startPieces(), home: { player: 0, bot: 0 }, turns: [] }),
+  create: (setup) => ({ setup: setup as Setup<GambitVariant, GambitPersona>, total: gambitRounds(setup.length), pieces: startPieces(), home: { player: 0, bot: 0 }, turns: [], skipped: [] }),
   validate,
   apply,
   isOver,
-  played: (s) => s.turns.filter((t) => t.side === 'player').length,
+  played: playerTurns,
   result(s) {
     const o = gambitOutcome(s);
     return {
       outcome: o,
       par: null,
-      note: !gameOver(s) ? 'Turn limit reached: pieces home, then pieces in play, then progress.' : null,
+      note: gameOver(s) ? null : deadlocked(s) ? 'Neither side could move: pieces home, then pieces in play, then progress.' : 'Turn limit reached: pieces home, then pieces in play, then progress.',
       player: s.home.player,
       rival: s.home.bot,
       standings: [

@@ -3,7 +3,7 @@
 Five replayable strategic games against bots, a weekly competition on one of them, leaderboards, a Hall of Fame, and
 shareable friend challenges. All of it is separate from the lessons, scenarios, practice challenges and the learning
 record: nothing here reads or writes lesson progress, and the Thinking Profile shows the game record as its own card.
-The five on-device Strategy Arena games listed below these on the Games tab are documented in [ARENA.md](ARENA.md).
+The on-device Strategy Arena games on the Games tab are documented in [ARENA.md](ARENA.md).
 
 | Piece | Where |
 |---|---|
@@ -35,7 +35,7 @@ every difficulty; difficulty only changes how a bot reasons (memory, prediction 
 | Game | Match | Scoring | Bots |
 |---|---|---|---|
 | Rock, Paper, Scissors | 12 rounds | win 3, tie 1, loss 0 (both sides) | Repeater, Counter, Mind Reader, Randomizer |
-| Two-Thirds Guess | 5 rounds, player + 8 simulated bots | per round: 10 sole win / 5 shared win + closeness max(0, 10 − ⌊distance⌋); max 100 | Crowd Followers, Shallow, Deep, Chaos (5 of the chosen type + 1 of each other) |
+| Two-Thirds Guess | 5 rounds, player + 8 simulated bots (hidden until the reveal in a mystery match) | per round: 10 sole win / 5 shared win + closeness max(0, 10 − ⌊distance⌋); max 100 | Crowd Followers, Shallow, Deep, Chaos (5 of the chosen type + 1 of each other) |
 | Split or Steal | 10 rounds | 5/5 · 8/0 · 0/8 · 1/1 | Cooperator, Opportunist, Retaliator, Strategist |
 | The Ultimatum | 6 rounds, roles alternate (player proposes in 1, 3, 5) | split 10 coins; offers 1–9 whole coins; rejection = 0/0 | Maximizer, Fair Player, Hardliner, Negotiator |
 | Stag Hunt | 8 rounds | stag+stag 5/5 · stag alone 0 vs hare 3 · hare+hare 3/3 | Cautious, Optimist, Opportunistic, Conditional Partner |
@@ -181,8 +181,8 @@ verified in `app.json` and an `assetlinks.json` / `apple-app-site-association` o
 The Rock, Paper, Scissors read now applies to all five practice games (`src/games/reads.ts`; engines and SQL untouched,
 so rules versions are unchanged):
 
-- Practice starts with a mystery opponent in every game (`opponent=mystery`); "Choose a specific opponent" is
-  deliberate practice with no read.
+- Practice starts with a mystery opponent in every game (`opponent=mystery`); "Customize" on the setup screen
+  chooses a specific opponent, which is deliberate practice with no read.
 - One locked read per mystery match, open after `CLASSIC_READ[game].minRounds` (Split or Steal 4, Stag Hunt 3,
   Ultimatum 4 — two offers each way — Two-Thirds 2, Rock, Paper, Scissors 4). If none was made, the reveal waits.
 - The options describe each personality at the match's difficulty and restate the engine's documented policy

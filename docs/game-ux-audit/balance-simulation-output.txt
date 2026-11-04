@@ -1,0 +1,149 @@
+
+## cooperation (standard, classic; 200 seeds per opponent x level; win/draw/loss %)
+- alwaysC: E 0/56/44 [colla:0 retal:0 oppor:0 chame:0] you=23.04 rds=10.0 | N 0/50/50 [colla:0 retal:0 oppor:0 chame:0] you=24.75 rds=10.0 | H 0/50/50 [colla:0 retal:0 oppor:0 chame:0] you=21.00 rds=10.0
+- alwaysD: E 100/0/0 [colla:100 retal:100 oppor:100 chame:100] you=30.89 rds=10.0 | N 100/0/0 [colla:100 retal:100 oppor:100 chame:100] you=20.04 rds=10.0 | H 100/0/0 [colla:100 retal:100 oppor:100 chame:100] you=16.11 rds=10.0
+- tft: E 0/69/31 [colla:0 retal:0 oppor:0 chame:0] you=27.41 rds=10.0 | N 0/100/0 [colla:0 retal:0 oppor:0 chame:0] you=29.25 rds=10.0 | H 0/50/50 [colla:0 retal:0 oppor:0 chame:0] you=25.50 rds=10.0
+- cThenDLast: E 56/10/34 [colla:100 retal:100 oppor:0 chame:24] you=24.76 rds=10.0 | N 50/25/25 [colla:100 retal:100 oppor:0 chame:0] you=26.50 rds=10.0 | H 50/0/50 [colla:100 retal:100 oppor:0 chame:0] you=22.50 rds=10.0
+
+## ultimatum-game (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- offer40 acceptAll: E 79/1/20 [inves:100 banke:100 dealm:100 oppor:14] rds=6.0 | N 61/5/35 [inves:43 banke:100 dealm:100 oppor:0] rds=6.0 | H 46/9/45 [inves:43 banke:43 dealm:99 oppor:0] rds=6.0
+- offer50 acceptAll: E 37/19/44 [inves:25 banke:25 dealm:97 oppor:0] rds=6.0 | N 6/10/84 [inves:0 banke:0 dealm:25 oppor:0] rds=6.0 | H 0/0/100 [inves:0 banke:0 dealm:0 oppor:0] rds=6.0
+- offer20 acceptAll: E 99/1/0 [inves:100 banke:100 dealm:99 oppor:98] rds=6.0 | N 19/18/63 [inves:0 banke:35 dealm:42 oppor:0] rds=6.0 | H 22/4/74 [inves:47 banke:0 dealm:0 oppor:43] rds=6.0
+- offer40 reject<40%: E 100/0/0 [inves:100 banke:100 dealm:100 oppor:100] rds=6.0 | N 91/3/6 [inves:63 banke:100 dealm:100 oppor:100] rds=6.0 | H 84/5/11 [inves:68 banke:68 dealm:99 oppor:100] rds=6.0
+- offer0 acceptAll: E 45/30/25 [inves:42 banke:42 dealm:99 oppor:0] rds=6.0 | N 10/17/73 [inves:0 banke:0 dealm:42 oppor:0] rds=6.0 | H 0/0/100 [inves:0 banke:0 dealm:0 oppor:0] rds=6.0
+
+## auction (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- pass: E 0/0/100 [inves:0 banke:0 dealm:0 oppor:0] profit=0.00 rds=5.0 | N 0/0/100 [inves:0 banke:0 dealm:0 oppor:0] profit=0.00 rds=5.0 | H 0/0/100 [inves:0 banke:0 dealm:0 oppor:0] profit=0.00 rds=5.0
+- UI default (mean-0.6u): E 33/1/66 [inves:30 banke:31 dealm:34 oppor:36] profit=20.93 rds=5.0 | N 38/3/59 [inves:36 banke:37 dealm:38 oppor:40] profit=8.59 rds=5.0 | H 37/4/59 [inves:37 banke:40 dealm:37 oppor:35] profit=7.69 rds=5.0
+- raw estimate: E 8/1/91 [inves:8 banke:9 dealm:9 oppor:6] profit=3.52 rds=5.0 | N 10/1/89 [inves:9 banke:12 dealm:13 oppor:8] profit=-5.33 rds=5.0 | H 8/1/91 [inves:9 banke:7 dealm:10 oppor:7] profit=-6.45 rds=5.0
+- mean-1.0u: E 56/2/42 [inves:57 banke:57 dealm:54 oppor:56] profit=29.60 rds=5.0 | N 38/4/58 [inves:39 banke:43 dealm:38 oppor:33] profit=11.38 rds=5.0 | H 34/3/63 [inves:35 banke:33 dealm:34 oppor:36] profit=9.93 rds=5.0
+
+## market (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- fixed 10: E 96/1/3 [inves:98 banke:98 dealm:98 oppor:92] profit=1363.56 rds=8.0 | N 90/10/0 [inves:89 banke:89 dealm:93 oppor:90] profit=1124.21 rds=8.0 | H 92/8/0 [inves:90 banke:92 dealm:96 oppor:90] profit=1146.58 rds=8.0
+- fixed 11 (UI default cost+5): E 36/2/62 [inves:53 banke:39 dealm:54 oppor:0] profit=1406.39 rds=8.0 | N 0/15/85 [inves:0 banke:0 dealm:0 oppor:0] profit=1149.12 rds=8.0 | H 0/0/100 [inves:0 banke:0 dealm:0 oppor:0] profit=1134.09 rds=8.0
+- fixed 12: E 17/0/83 [inves:35 banke:0 dealm:32 oppor:0] profit=1401.99 rds=8.0 | N 0/0/100 [inves:0 banke:0 dealm:0 oppor:0] profit=1098.97 rds=8.0 | H 0/0/100 [inves:0 banke:0 dealm:0 oppor:0] profit=1074.05 rds=8.0
+- fixed 15: E 0/0/100 [inves:0 banke:0 dealm:0 oppor:0] profit=936.83 rds=8.0 | N 0/0/100 [inves:0 banke:0 dealm:0 oppor:0] profit=751.17 rds=8.0 | H 0/0/100 [inves:0 banke:0 dealm:0 oppor:0] profit=744.16 rds=8.0
+- fixed 7: E 0/0/100 [inves:0 banke:0 dealm:0 oppor:0] profit=507.79 rds=8.0 | N 0/0/100 [inves:0 banke:0 dealm:0 oppor:0] profit=475.54 rds=8.0 | H 0/0/100 [inves:0 banke:0 dealm:0 oppor:0] profit=477.49 rds=8.0
+- match lowest rival: E 45/3/52 [inves:51 banke:50 dealm:63 oppor:17] profit=1394.41 rds=8.0 | N 5/20/75 [inves:2 banke:5 dealm:11 oppor:5] profit=1169.75 rds=8.0 | H 4/2/95 [inves:2 banke:2 dealm:7 oppor:3] profit=1156.59 rds=8.0
+
+## signal (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- honest send, always pass: E 0/9/91 [inves:0 banke:0 dealm:0 oppor:0] you=3.88 rds=8.0 | N 0/9/91 [inves:0 banke:2 dealm:0 oppor:0] you=3.85 rds=8.0 | H 0/9/91 [inves:0 banke:0 dealm:0 oppor:0] you=3.88 rds=8.0
+- honest send, always invest: E 6/5/89 [inves:6 banke:6 dealm:6 oppor:6] you=1.90 rds=8.0 | N 6/5/89 [inves:6 banke:8 dealm:6 oppor:6] you=1.87 rds=8.0 | H 6/5/89 [inves:6 banke:6 dealm:6 oppor:6] you=1.90 rds=8.0
+- always pitch, invest unless warned: E 82/6/12 [inves:78 banke:92 dealm:87 oppor:71] you=15.24 rds=8.0 | N 68/9/23 [inves:84 banke:80 dealm:70 oppor:39] you=12.63 rds=8.0 | H 73/1/26 [inves:84 banke:84 dealm:80 oppor:45] you=12.39 rds=8.0
+- always pitch, pass: E 52/25/23 [inves:69 banke:0 dealm:69 oppor:69] you=6.00 rds=8.0 | N 46/19/36 [inves:51 banke:42 dealm:49 oppor:42] you=4.39 rds=8.0 | H 50/5/44 [inves:52 banke:39 dealm:58 oppor:53] you=4.10 rds=8.0
+- pitch, invest if prior>=.5: E 49/14/37 [inves:56 banke:28 dealm:56 oppor:56] you=7.17 rds=8.0 | N 40/7/53 [inves:41 banke:35 dealm:46 oppor:38] you=5.56 rds=8.0 | H 41/1/58 [inves:42 banke:35 dealm:46 oppor:41] you=5.27 rds=8.0
+
+## mole (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- exact Bayes (camera+nervous): E 79/0/22 [inves:79 socia:79 decei:79 oppor:79] right=0.79 rds=5.0 | N 79/0/22 [inves:79 socia:79 decei:79 oppor:79] right=0.79 rds=5.0 | H 79/0/22 [inves:79 socia:79 decei:79 oppor:79] right=0.79 rds=5.0
+- most camera sightings: E 66/0/34 [inves:66 socia:66 decei:66 oppor:66] right=0.66 rds=5.0 | N 66/0/34 [inves:66 socia:66 decei:66 oppor:66] right=0.66 rds=5.0 | H 66/0/34 [inves:66 socia:66 decei:66 oppor:66] right=0.66 rds=5.0
+- most accused: E 69/0/31 [inves:68 socia:66 decei:72 oppor:72] right=0.69 rds=5.0 | N 69/0/31 [inves:68 socia:66 decei:69 oppor:72] right=0.69 rds=5.0 | H 67/0/33 [inves:67 socia:66 decei:68 oppor:69] right=0.67 rds=5.0
+- least accused: E 4/0/96 [inves:5 socia:4 decei:6 oppor:4] right=0.04 rds=5.0 | N 4/0/96 [inves:5 socia:4 decei:4 oppor:4] right=0.04 rds=5.0 | H 4/0/96 [inves:4 socia:4 decei:4 oppor:4] right=0.04 rds=5.0
+- random: E 22/0/78 [inves:18 socia:26 decei:23 oppor:21] right=0.22 rds=5.0 | N 26/0/74 [inves:28 socia:27 decei:24 oppor:25] right=0.26 rds=5.0 | H 24/0/76 [inves:29 socia:25 decei:20 oppor:23] right=0.24 rds=5.0
+
+## commons (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- take 0: E 0/100/0 [conse:0 free-:0 condi:0 maxim:0] collapse=0.00 rds=8.0 | N 0/100/0 [conse:0 free-:0 condi:0 maxim:0] collapse=0.00 rds=8.0 | H 0/76/24 [conse:0 free-:0 condi:0 maxim:0] collapse=0.24 rds=8.0
+- take 3: E 89/11/0 [conse:86 free-:86 condi:100 maxim:86] collapse=0.00 rds=8.0 | N 23/78/0 [conse:28 free-:0 condi:31 maxim:31] collapse=0.00 rds=8.0 | H 26/25/50 [conse:32 free-:0 condi:35 maxim:35] collapse=0.50 rds=7.5
+- take 4: E 94/0/6 [conse:100 free-:94 condi:92 maxim:92] collapse=0.06 rds=8.0 | N 75/14/12 [conse:99 free-:67 condi:68 maxim:65] collapse=0.12 rds=8.0 | H 0/0/100 [conse:0 free-:0 condi:0 maxim:0] collapse=1.00 rds=7.0
+- take 5: E 59/0/41 [conse:79 free-:47 condi:59 maxim:54] collapse=0.41 rds=7.8 | N 98/0/2 [conse:100 free-:99 condi:97 maxim:98] collapse=0.02 rds=8.0 | H 25/0/75 [conse:33 free-:33 condi:33 maxim:0] collapse=0.75 rds=6.8
+- take 7: E 0/0/100 [conse:0 free-:0 condi:0 maxim:0] collapse=1.00 rds=6.3 | N 24/0/76 [conse:30 free-:8 condi:32 maxim:28] collapse=0.76 rds=7.9 | H 0/0/100 [conse:0 free-:0 condi:0 maxim:0] collapse=1.00 rds=6.0
+- take 10: E 0/0/100 [conse:0 free-:0 condi:0 maxim:0] collapse=1.00 rds=4.6 | N 0/0/100 [conse:0 free-:0 condi:0 maxim:0] collapse=1.00 rds=6.3 | H 0/0/100 [conse:0 free-:0 condi:0 maxim:0] collapse=1.00 rds=4.2
+
+## coalition (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- sample moves random: E 11/2/87 [loyal:11 broke:11 switc:10 fair:13] failedBills=2.41 rds=8.0 | N 13/1/87 [loyal:13 broke:12 switc:13 fair:14] failedBills=3.40 rds=8.0 | H 14/1/85 [loyal:15 broke:12 switc:13 fair:16] failedBills=3.38 rds=8.0
+- fair split, accept all: E 17/4/79 [loyal:24 broke:12 switc:17 fair:18] failedBills=0.53 rds=8.0 | N 18/3/80 [loyal:24 broke:11 switc:16 fair:20] failedBills=1.44 rds=8.0 | H 22/1/77 [loyal:24 broke:22 switc:20 fair:24] failedBills=1.70 rds=8.0
+- half split, accept all: E 3/5/93 [loyal:1 broke:4 switc:8 fair:0] failedBills=3.88 rds=8.0 | N 1/9/90 [loyal:0 broke:2 switc:4 fair:0] failedBills=4.88 rds=8.0 | H 2/8/90 [loyal:0 broke:2 switc:5 fair:0] failedBills=4.80 rds=8.0
+
+## inspector (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- comply+trust: E 32/16/52 [stric:77 calcu:0 rule-:49 risk-:3] rds=8.0 | N 26/10/64 [stric:57 calcu:1 rule-:45 risk-:3] rds=8.0 | H 12/6/82 [stric:0 calcu:1 rule-:45 risk-:3] rds=8.0
+- comply+inspect: E 34/7/60 [stric:37 calcu:0 rule-:0 risk-:99] rds=8.0 | N 59/3/39 [stric:52 calcu:52 rule-:32 risk-:99] rds=8.0 | H 48/4/48 [stric:0 calcu:62 rule-:32 risk-:99] rds=8.0
+- cut+inspect: E 47/0/53 [stric:8 calcu:0 rule-:89 risk-:90] rds=8.0 | N 25/0/75 [stric:6 calcu:14 rule-:5 risk-:77] rds=8.0 | H 25/0/75 [stric:0 calcu:12 rule-:5 risk-:85] rds=8.0
+- cut+trust: E 31/2/68 [stric:5 calcu:0 rule-:89 risk-:28] rds=8.0 | N 4/1/95 [stric:4 calcu:1 rule-:0 risk-:11] rds=8.0 | H 3/1/96 [stric:0 calcu:0 rule-:0 risk-:12] rds=8.0
+- equilibrium mix: E 48/6/46 [stric:36 calcu:50 rule-:61 risk-:46] rds=8.0 | N 44/6/50 [stric:35 calcu:47 rule-:50 risk-:44] rds=8.0 | H 40/8/53 [stric:34 calcu:44 rule-:42 risk-:39] rds=8.0
+
+## travelers (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- always 20: E 25/0/75 [puris:0 coope:100 under:0 adapt:0] you=119.75 rds=8.0 | N 25/0/75 [puris:0 coope:100 under:0 adapt:0] you=107.45 rds=8.0 | H 25/0/75 [puris:0 coope:100 under:0 adapt:0] you=107.50 rds=8.0
+- always 19: E 52/4/44 [puris:8 coope:100 under:100 adapt:0] you=124.64 rds=8.0 | N 25/0/75 [puris:0 coope:100 under:0 adapt:0] you=105.45 rds=8.0 | H 25/0/75 [puris:0 coope:100 under:0 adapt:0] you=104.50 rds=8.0
+- always 15: E 51/5/44 [puris:3 coope:100 under:100 adapt:0] you=103.59 rds=8.0 | N 25/0/75 [puris:0 coope:100 under:0 adapt:0] you=83.45 rds=8.0 | H 25/0/75 [puris:0 coope:100 under:0 adapt:0] you=82.25 rds=8.0
+- always 2: E 0/100/0 [puris:0 coope:0 under:0 adapt:0] you=25.77 rds=8.0 | N 0/100/0 [puris:0 coope:0 under:0 adapt:0] you=20.90 rds=8.0 | H 0/100/0 [puris:0 coope:0 under:0 adapt:0] you=19.00 rds=8.0
+- mirror last: E 25/6/68 [puris:1 coope:100 under:0 adapt:0] you=119.38 rds=8.0 | N 25/4/71 [puris:0 coope:100 under:0 adapt:0] you=107.89 rds=8.0 | H 50/0/50 [puris:0 coope:100 under:0 adapt:100] you=111.75 rds=8.0
+- undercut last by 1: E 76/14/10 [puris:2 coope:100 under:100 adapt:100] you=122.32 rds=8.0 | N 75/21/4 [puris:0 coope:100 under:100 adapt:100] you=107.85 rds=8.0 | H 50/25/25 [puris:0 coope:100 under:0 adapt:100] you=92.75 rds=8.0
+
+## saboteur (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- card 2, accuse most failed: E 56/0/44 [plann:61 inves:52 oppor:56 decei:56] rightAccuse=0.60 rds=6.0 | N 55/0/45 [plann:57 inves:56 oppor:51 decei:56] rightAccuse=0.65 rds=6.0 | H 54/0/46 [plann:56 inves:52 oppor:51 decei:56] rightAccuse=0.59 rds=6.0
+- card 3, accuse most failed: E 47/0/53 [plann:37 inves:53 oppor:53 decei:46] rightAccuse=0.57 rds=6.0 | N 56/0/45 [plann:53 inves:68 oppor:56 decei:46] rightAccuse=0.68 rds=6.0 | H 55/0/45 [plann:53 inves:68 oppor:56 decei:46] rightAccuse=0.68 rds=6.0
+- card 2, suspicion(): E 65/0/35 [plann:66 inves:55 oppor:64 decei:77] rightAccuse=0.75 rds=6.0 | N 74/0/26 [plann:78 inves:80 oppor:63 decei:77] rightAccuse=0.88 rds=6.0 | H 72/0/28 [plann:69 inves:79 oppor:63 decei:77] rightAccuse=0.81 rds=6.0
+- card 2, random accuse: E 39/0/61 [plann:70 inves:19 oppor:38 decei:28] rightAccuse=0.34 rds=6.0 | N 31/0/69 [plann:33 inves:28 oppor:30 decei:32] rightAccuse=0.33 rds=6.0 | H 33/0/67 [plann:46 inves:34 oppor:24 decei:30] rightAccuse=0.32 rds=6.0
+
+## bluff (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- honest, no press, believe: E 31/5/64 [cauti:50 risk-:11 obser:45 perfo:20] pts=10.56 rds=8.0 | N 28/5/68 [cauti:24 risk-:13 obser:53 perfo:20] pts=10.56 rds=8.0 | H 17/3/80 [cauti:14 risk-:13 obser:21 perfo:19] pts=10.56 rds=8.0
+- honest, no press, always call: E 54/2/45 [cauti:6 risk-:100 obser:12 perfo:96] pts=9.98 rds=8.0 | N 62/2/36 [cauti:37 risk-:100 obser:14 perfo:96] pts=11.27 rds=8.0 | H 66/2/32 [cauti:6 risk-:100 obser:62 perfo:96] pts=11.77 rds=8.0
+- value+2, no press, always call: E 44/0/56 [cauti:8 risk-:91 obser:1 perfo:78] pts=5.25 rds=8.0 | N 46/1/54 [cauti:14 risk-:90 obser:0 perfo:78] pts=4.27 rds=8.0 | H 43/1/56 [cauti:4 risk-:90 obser:1 perfo:78] pts=5.11 rds=8.0
+- value+1, press to 3, always call: E 49/3/48 [cauti:19 risk-:100 obser:5 perfo:74] pts=9.29 rds=8.0 | N 53/2/45 [cauti:38 risk-:100 obser:1 perfo:74] pts=9.01 rds=8.0 | H 50/2/48 [cauti:10 risk-:100 obser:6 perfo:84] pts=9.54 rds=8.0
+- claim 4 on 2 tokens, always call: E 51/3/46 [cauti:19 risk-:100 obser:1 perfo:85] pts=10.17 rds=8.0 | N 62/1/37 [cauti:60 risk-:100 obser:1 perfo:85] pts=11.46 rds=8.0 | H 54/1/46 [cauti:20 risk-:100 obser:10 perfo:86] pts=12.01 rds=8.0
+- claim max, no press, always call: E 26/3/71 [cauti:0 risk-:22 obser:0 perfo:84] pts=-1.62 rds=8.0 | N 26/4/70 [cauti:0 risk-:21 obser:0 perfo:84] pts=-0.33 rds=8.0 | H 26/4/70 [cauti:0 risk-:21 obser:0 perfo:84] pts=0.17 rds=8.0
+- honest, call if claim far above odds: E 64/4/32 [cauti:37 risk-:97 obser:37 perfo:86] pts=11.99 rds=8.0 | N 65/3/32 [cauti:36 risk-:94 obser:45 perfo:86] pts=12.41 rds=8.0 | H 77/3/20 [cauti:48 risk-:96 obser:78 perfo:86] pts=13.42 rds=8.0
+
+## defusal (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- perfect-logic human: E 96/0/4 [metho:98 cauti:98 bold:92 share:98] teammateCutLive=0.03 rds=4.0 | N 87/0/13 [metho:91 cauti:91 bold:74 share:91] teammateCutLive=0.11 rds=4.0 | H 65/0/35 [metho:72 cauti:72 bold:45 share:72] teammateCutLive=0.24 rds=4.0
+
+## defusal (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- perfect-logic human: E 96/0/4 [metho:98 cauti:98 bold:92 share:98] youCutLive=0.01 rds=4.0 | N 87/0/13 [metho:91 cauti:91 bold:74 share:91] youCutLive=0.03 rds=4.0 | H 65/0/35 [metho:72 cauti:72 bold:45 share:72] youCutLive=0.11 rds=4.0
+
+## defusal (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- random: E 31/0/69 [metho:33 cauti:28 bold:27 share:38] rds=2.7 | N 32/0/69 [metho:33 cauti:33 bold:30 share:31] rds=2.7 | H 27/0/73 [metho:30 cauti:20 bold:24 share:33] rds=2.7
+
+## power-play (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- always Treasury, allow: E 49/0/52 [hones:69 bluff:69 chall:34 manip:23] myTurns=3.38 rds=6.2 | N 42/0/58 [hones:69 bluff:63 chall:13 manip:23] myTurns=3.25 rds=5.9 | H 43/0/57 [hones:69 bluff:63 chall:16 manip:23] myTurns=3.27 rds=5.9
+- always Treasury, challenge all: E 12/0/88 [hones:15 bluff:15 chall:7 manip:11] myTurns=2.17 rds=4.1 | N 13/0/87 [hones:15 bluff:14 chall:14 manip:11] myTurns=2.06 rds=3.7 | H 12/0/88 [hones:15 bluff:14 chall:10 manip:11] myTurns=2.07 rds=3.7
+- Income only, allow: E 11/3/86 [hones:17 bluff:10 chall:14 manip:4] myTurns=4.23 rds=8.5 | N 10/5/85 [hones:17 bluff:4 chall:14 manip:4] myTurns=4.26 rds=8.5 | H 10/5/85 [hones:17 bluff:4 chall:14 manip:4] myTurns=4.26 rds=8.5
+- honest roles, allow: E 41/2/57 [hones:43 bluff:28 chall:67 manip:25] myTurns=3.92 rds=7.5 | N 34/3/63 [hones:43 bluff:27 chall:40 manip:25] myTurns=3.94 rds=7.6 | H 39/3/58 [hones:43 bluff:27 chall:61 manip:25] myTurns=3.94 rds=7.5
+- always Steal, allow: E 12/6/82 [hones:34 bluff:0 chall:13 manip:3] myTurns=4.39 rds=8.4 | N 15/6/78 [hones:34 bluff:0 chall:25 manip:3] myTurns=4.21 rds=8.1 | H 12/6/81 [hones:34 bluff:0 chall:12 manip:3] myTurns=4.21 rds=8.1
+
+## last-stand (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- refill every round (no effort): E 79/0/21 [plann:100 respo:100 guard:15 coord:100] rds=6.8 | N 9/0/91 [plann:12 respo:12 guard:1 coord:12] rds=3.7 | H 2/0/98 [plann:3 respo:3 guard:0 coord:3] rds=3.0
+- sensible (douse other hottest): E 100/0/0 [plann:100 respo:100 guard:100 coord:100] rds=8.0 | N 83/0/17 [plann:94 respo:94 guard:51 coord:94] rds=7.6 | H 44/0/56 [plann:53 respo:53 guard:14 coord:57] rds=6.6
+
+## liars-dice (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- open then always call: E 16/0/84 [calcu:0 aggre:63 conse:2 psych:1] rounds=5.08 rds=5.1 | N 11/0/89 [calcu:3 aggre:1 conse:25 psych:17] rounds=5.65 rds=5.6 | H 1/0/100 [calcu:0 aggre:0 conse:0 psych:2] rounds=5.04 rds=5.0
+- never call (raise): E 52/0/48 [calcu:23 aggre:5 conse:98 psych:82] rounds=5.16 rds=5.2 | N 83/0/17 [calcu:93 aggre:64 conse:97 psych:81] rounds=5.71 rds=5.7 | H 54/0/46 [calcu:71 aggre:4 conse:96 psych:48] rounds=5.57 rds=5.6
+- prob-aware call <50%: E 43/0/57 [calcu:9 aggre:70 conse:61 psych:32] rounds=5.94 rds=5.9 | N 44/0/56 [calcu:41 aggre:20 conse:72 psych:42] rounds=6.17 rds=6.2 | H 22/0/78 [calcu:13 aggre:8 conse:52 psych:18] rounds=5.78 rds=5.8
+
+## codebreaker (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- link-aware, take n guesses: E 78/0/22 [liter:68 assoc:80 risk-:80 creat:84] team=7.62 rds=6.0 | N 74/0/26 [liter:63 assoc:79 risk-:75 creat:79] team=7.36 rds=6.0 | H 70/0/30 [liter:56 assoc:75 risk-:73 creat:76] team=7.17 rds=6.0
+- link-aware, stop after 1: E 53/0/47 [liter:55 assoc:53 risk-:54 creat:53] team=6.63 rds=6.0 | N 48/0/52 [liter:50 assoc:48 risk-:49 creat:46] team=6.42 rds=6.0 | H 45/0/55 [liter:46 assoc:45 risk-:44 creat:45] team=6.31 rds=6.0
+- random: E 27/0/73 [liter:28 assoc:27 risk-:28 creat:27] team=4.92 rds=6.0 | N 26/0/74 [liter:27 assoc:26 risk-:25 creat:26] team=4.77 rds=6.0 | H 17/0/83 [liter:18 assoc:18 risk-:21 creat:13] team=3.83 rds=6.0
+
+## gambit (standard, standard; 200 seeds per opponent x level; win/draw/loss %)
+- always step lead piece: E 58/0/42 [safe:78 gambl:53 posit:46 adapt:57] botRiskRate=0.50 rds=11.0 | N 53/0/47 [safe:87 gambl:45 posit:23 adapt:59] botRiskRate=0.52 rds=10.2 | H 20/0/80 [safe:39 gambl:27 posit:8 adapt:9] botRiskRate=0.55 rds=10.8
+- always strike if able: E 53/1/46 [safe:74 gambl:47 posit:44 adapt:47] botRiskRate=0.46 rds=10.6 | N 45/2/53 [safe:68 gambl:43 posit:30 adapt:40] botRiskRate=0.46 rds=10.2 | H 27/1/73 [safe:27 gambl:31 posit:22 adapt:28] botRiskRate=0.54 rds=11.1
+- always dash lead piece: POLICY ERROR Cannot read properties of undefined (reading 'from')
+- random: E 8/1/92 [safe:10 gambl:9 posit:6 adapt:7] botRiskRate=0.46 rds=12.5 | N 6/0/94 [safe:4 gambl:6 posit:6 adapt:7] botRiskRate=0.46 rds=12.0 | H 4/0/96 [safe:2 gambl:6 posit:5 adapt:3] botRiskRate=0.49 rds=12.4
+
+## classic rps (12 rounds; 200 seeds; win/draw/loss %)
+- always rock: E 19/14/67 [repea:25 count:1 mind-:2 rando:48] pts=11.6 | M 12/11/77 [repea:5 count:0 mind-:0 rando:44] pts=9.2 | H 12/15/73 [repea:4 count:0 mind-:0 rando:44] pts=8.0
+- random: E 43/16/42 [repea:48 count:40 mind-:40 rando:44] pts=16.1 | M 41/12/48 [repea:41 count:36 mind-:40 rando:46] pts=15.8 | H 48/11/41 [repea:44 count:53 mind-:43 rando:52] pts=16.2
+- cycle: E 32/24/44 [repea:28 count:59 mind-:3 rando:38] pts=14.4 | M 48/7/45 [repea:99 count:53 mind-:0 rando:41] pts=15.6 | H 43/12/45 [repea:100 count:33 mind-:0 rando:39] pts=14.7
+- beat bot last: E 80/7/13 [repea:100 count:73 mind-:50 rando:98] pts=23.3 | M 59/12/29 [repea:73 count:82 mind-:59 rando:24] pts=17.5 | H 63/14/23 [repea:78 count:69 mind-:61 rando:45] pts=17.6
+
+## classic split-steal (10 rounds; 200 seeds; win/draw/loss %)
+- always split: E 0/75/25 [coope:0 oppor:0 retal:0 strat:0] pts=43.7 | M 0/75/25 [coope:0 oppor:0 retal:0 strat:0] pts=40.0 | H 0/50/50 [coope:0 oppor:0 retal:0 strat:0] pts=37.5
+- always steal: E 100/0/0 [coope:100 oppor:100 retal:100 strat:100] pts=43.2 | M 100/0/0 [coope:100 oppor:100 retal:100 strat:100] pts=41.5 | H 100/0/0 [coope:100 oppor:100 retal:100 strat:100] pts=24.1
+- tft: E 0/88/12 [coope:0 oppor:0 retal:0 strat:0] pts=46.1 | M 0/100/0 [coope:0 oppor:0 retal:0 strat:0] pts=47.0 | H 0/50/50 [coope:0 oppor:0 retal:0 strat:0] pts=39.5
+
+## classic stag-hunt (8 rounds; 200 seeds; win/draw/loss %)
+- always stag: E 0/50/50 [cauti:0 optim:0 oppor:0 condi:0] pts=28.8 | M 0/50/50 [cauti:0 optim:0 oppor:0 condi:0] pts=35.0 | H 0/11/90 [cauti:0 optim:0 oppor:0 condi:0] pts=32.8
+- always hare: E 50/50/0 [cauti:0 optim:100 oppor:0 condi:100] pts=24.0 | M 50/50/0 [cauti:0 optim:100 oppor:0 condi:100] pts=24.0 | H 50/50/0 [cauti:0 optim:100 oppor:0 condi:100] pts=24.0
+- tft: E 0/75/25 [cauti:0 optim:0 oppor:0 condi:0] pts=28.3 | M 0/50/50 [cauti:0 optim:0 oppor:0 condi:0] pts=29.8 | H 0/22/78 [cauti:0 optim:0 oppor:0 condi:0] pts=22.8
+
+## classic ultimatum (6 rounds; 200 seeds; win/draw/loss %)
+- offer 5 acceptAll: E 0/25/75 [maxim:0 fair:0 hardl:0 negot:0] pts=26.2 | M 0/25/75 [maxim:0 fair:0 hardl:0 negot:0] pts=25.5 | H 0/25/75 [maxim:0 fair:0 hardl:0 negot:0] pts=22.5
+- offer 3 acceptAll: E 50/1/49 [maxim:0 fair:100 hardl:0 negot:100] pts=25.2 | M 0/25/75 [maxim:0 fair:0 hardl:0 negot:0] pts=17.5 | H 0/0/100 [maxim:0 fair:0 hardl:0 negot:0] pts=15.0
+- offer 1 acceptAll: E 24/26/50 [maxim:95 fair:0 hardl:0 negot:0] pts=18.0 | M 25/25/50 [maxim:100 fair:0 hardl:0 negot:0] pts=17.3 | H 25/0/75 [maxim:100 fair:0 hardl:0 negot:0] pts=14.8
+- offer 4 reject<4: E 75/25/0 [maxim:100 fair:100 hardl:0 negot:100] pts=27.0 | M 50/25/25 [maxim:100 fair:100 hardl:0 negot:0] pts=21.8 | H 50/50/0 [maxim:100 fair:100 hardl:0 negot:0] pts=16.3
+
+## classic two-thirds (5 rounds; 200 seeds; win/draw/loss %)
+- always 33: E 8/0/92 [crowd:11 shall:0 deep:0 chaos:23] pts=18.4 | M 0/0/100 [crowd:0 shall:0 deep:0 chaos:0] pts=1.9 | H 0/0/100 [crowd:0 shall:0 deep:0 chaos:0] pts=1.4
+- always 22: E 31/0/69 [crowd:44 shall:69 deep:7 chaos:7] pts=50.0 | M 31/0/69 [crowd:13 shall:75 deep:0 chaos:37] pts=42.8 | H 13/0/87 [crowd:0 shall:0 deep:0 chaos:52] pts=26.0
+- always 15: E 6/0/94 [crowd:1 shall:2 deep:23 chaos:0] pts=26.5 | M 28/0/72 [crowd:43 shall:50 deep:1 chaos:19] pts=47.9 | H 3/0/97 [crowd:0 shall:2 deep:0 chaos:9] pts=36.4
+- always 0: E 0/0/100 [crowd:0 shall:0 deep:0 chaos:0] pts=0.0 | M 0/0/100 [crowd:0 shall:0 deep:0 chaos:0] pts=2.5 | H 0/0/100 [crowd:0 shall:0 deep:0 chaos:0] pts=11.5
+- always 50: E 0/0/100 [crowd:0 shall:0 deep:0 chaos:0] pts=0.2 | M 0/0/100 [crowd:0 shall:0 deep:0 chaos:0] pts=0.0 | H 0/0/100 [crowd:0 shall:0 deep:0 chaos:0] pts=0.0

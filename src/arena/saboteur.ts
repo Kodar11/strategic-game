@@ -44,7 +44,7 @@ export interface Mission {
   leader: number;
   target: number;
   bench: number;
-  /** Cards by seat (null for the benched bot). JAM is −2. */
+  /** Cards by seat (null for the benched bot). JAM is −1. */
   cards: (number | null)[];
   /** The only thing revealed: the sum of the cards. */
   total: number;

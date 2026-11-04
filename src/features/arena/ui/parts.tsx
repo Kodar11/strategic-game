@@ -199,44 +199,6 @@ export function AnimatedBar({ ratio, color, height = 10, track = colors.surfaceH
   );
 }
 
-/** "You 14 · Round 3/10 · Rival 9". */
-export function ScoreStrip({ you, rival, rivalName, round, total, roundWord = 'Round', unit, target }: { you: number; rival: number; rivalName: string; round: number; total: number; roundWord?: string; unit: string; target?: string }) {
-  const shown = Math.min(round, total);
-  return (
-    <View style={styles.strip} accessible accessibilityLabel={`${roundWord} ${shown} of ${total}. You ${you} ${unit}, ${rivalName} ${rival}.${target ? ` ${target}` : ''}`}>
-      <View style={{ flex: 1, gap: 2 }}>
-        <AppText variant="caption" color={colors.primaryText}>
-          You
-        </AppText>
-        <AppText variant="title" tabular>
-          {you}
-        </AppText>
-      </View>
-      <View style={{ alignItems: 'center', gap: 2 }}>
-        <AppText variant="overline" color={colors.textMuted}>
-          {roundWord}
-        </AppText>
-        <AppText variant="bodyStrong" tabular>
-          {shown}/{total}
-        </AppText>
-        {target ? (
-          <AppText variant="caption" color={colors.insight} align="center">
-            {target}
-          </AppText>
-        ) : null}
-      </View>
-      <View style={{ flex: 1, gap: 2, alignItems: 'flex-end' }}>
-        <AppText variant="caption" color={colors.rivalText} numberOfLines={1}>
-          {rivalName}
-        </AppText>
-        <AppText variant="title" tabular>
-          {rival}
-        </AppText>
-      </View>
-    </View>
-  );
-}
-
 /** A one-time hint for a first-time player. Never blocks the controls. */
 export function CoachTip({ text, onDismiss }: { text: string; onDismiss: () => void }) {
   const reduced = useMotionReduced();
@@ -269,33 +231,12 @@ export function Reveal({ revealKey, tone = 'plain', overline, children }: { reve
   );
 }
 
-/** A big decision button with a payoff hint. */
-export function ActionTile({ label, hint, icon: Icon, tint, bg, onPress, disabled, selected }: { label: string; hint?: string; icon: LucideIcon; tint: string; bg: string; onPress: () => void; disabled?: boolean; selected?: boolean }) {
+export function Row({ children, style, ...rest }: { children: ReactNode; style?: object; accessible?: boolean; accessibilityLabel?: string }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={hint ? `${label}. ${hint}` : label}
-      accessibilityState={{ disabled: !!disabled, selected: !!selected }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [styles.tile, { borderColor: selected ? tint : colors.border }, (pressed || selected) && { backgroundColor: bg }, disabled && { opacity: 0.45 }]}>
-      <View style={[styles.tileIcon, { backgroundColor: bg }]}>
-        <Icon size={24} color={tint} strokeWidth={2.1} />
-      </View>
-      <AppText variant="bodyStrong" align="center">
-        {label}
-      </AppText>
-      {hint ? (
-        <AppText variant="caption" color={colors.textMuted} align="center">
-          {hint}
-        </AppText>
-      ) : null}
-    </Pressable>
+    <View {...rest} style={[{ flexDirection: 'row', alignItems: 'center', gap: space.sm }, style]}>
+      {children}
+    </View>
   );
-}
-
-export function Row({ children, style }: { children: ReactNode; style?: object }) {
-  return <View style={[{ flexDirection: 'row', alignItems: 'center', gap: space.sm }, style]}>{children}</View>;
 }
 
 /** A label/value pair for stat rows. */
@@ -316,11 +257,8 @@ export const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 
 
 const styles = StyleSheet.create({
-  strip: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgRaised },
   coach: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm, padding: space.md, borderRadius: radius.md, backgroundColor: colors.insightSoft, borderWidth: 1, borderColor: 'rgba(253,186,116,0.3)' },
   reveal: { gap: space.xs, padding: space.lg, borderRadius: radius.lg, borderWidth: 1 },
-  tile: { flex: 1, minHeight: 112, alignItems: 'center', justifyContent: 'center', gap: space.xs, padding: space.md, borderRadius: radius.xl, borderWidth: 1.5, backgroundColor: colors.surface },
-  tileIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
 });
 
 /** What every board receives from the play screen. */

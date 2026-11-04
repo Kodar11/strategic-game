@@ -106,10 +106,11 @@ const futureBotSends = (n: number, total: number) => {
  * The bot's signal when it is the sender in round `h.length` (it knows `strong`, as the sender does).
  *
  * - Investor (reputation): Strong → stake; Weak → warn. Easy slips into a pitch on a Weak venture one time in five;
- *   Hard bluffs a pitch on a Weak venture in its last sending round, when reputation can no longer pay it back.
+ *   Normal and Hard pitch a Weak venture in their last sending round, when reputation can no longer pay them back.
  * - Banker (consistent, honest): Weak → warn; Strong → stake or pitch on a coin flip. Its pitches are honest.
- * - Deal Maker (reciprocal): honest (Strong → stake, Weak → warn) — but on Normal and Hard, if you bluffed it last
- *   time you sent (a pitch or stake on a Weak venture that it invested in), it bluffs you back once with a pitch.
+ * - Deal Maker (reciprocal): honest (Strong → stake, Weak → warn) — but on Normal, if you bluffed it last time you sent
+ *   (a pitch or stake on a Weak venture that it invested in), it bluffs you back with a pitch. On Hard it holds the
+ *   grudge: any bluff it has caught you in earns a pitch on a Weak venture.
  * - Opportunist (bluffs): Strong → stake (Hard: a pitch 40 % of the time, so pitches stay ambiguous). Weak → pitch with
  *   probability Easy 0.35, Normal 0.6; Hard 0.85 if you invested after at least half its pitches (two or more), 0.35 if
  *   you've learned to doubt them, 0.6 before it knows.
@@ -123,15 +124,16 @@ export function signalBotSend(setup: Setup<SignalVariant>, total: number, h: rea
     case 'investor':
       if (strong) return 'stake';
       if (level === 'easy') return u < 0.2 ? 'pitch' : 'warn';
-      if (level === 'hard' && futureBotSends(n, total) === 0) return 'pitch';
+      if (futureBotSends(n, total) === 0) return 'pitch';
       return 'warn';
     case 'banker':
       return strong ? (u < 0.5 ? 'stake' : 'pitch') : 'warn';
     case 'dealmaker': {
       if (strong) return 'stake';
       if (level === 'easy') return 'warn';
-      const mineLast = [...h].reverse().find((r) => r.sender === 'player');
-      const bluffed = mineLast && !mineLast.strong && mineLast.signal !== 'warn' && mineLast.invested;
+      const mine = h.filter((r) => r.sender === 'player');
+      const caught = (r: SignalRound) => !r.strong && r.signal !== 'warn' && r.invested;
+      const bluffed = level === 'hard' ? mine.some(caught) : mine.length > 0 && caught(mine[mine.length - 1]);
       return bluffed ? 'pitch' : 'warn';
     }
     case 'opportunist': {

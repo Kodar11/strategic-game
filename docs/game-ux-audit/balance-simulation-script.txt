@@ -1,0 +1,313 @@
+// Audit-only balance probe: plays each engine with simple fixed policies. Nothing in the app imports this.
+const R = 'file:///C:/Users/ADMIN/Documents/Computer%20Science/React%20Native/strategic-game/src/';
+const { ARENA_ENGINES } = await import(R + 'arena/registry.ts');
+const { ENGINES } = await import(R + 'games/registry.ts');
+const mole = await import(R + 'arena/mole.ts');
+const sab = await import(R + 'arena/saboteur.ts');
+const bluff = await import(R + 'arena/bluff.ts');
+const dice = await import(R + 'arena/liars-dice.ts');
+const pp = await import(R + 'arena/power-play.ts');
+const ls = await import(R + 'arena/last-stand.ts');
+const def = await import(R + 'arena/defusal.ts');
+const code = await import(R + 'arena/codebreaker.ts');
+const auc = await import(R + 'arena/auction.ts');
+const mkt = await import(R + 'arena/market.ts');
+const sig = await import(R + 'arena/signal.ts');
+const ult = await import(R + 'arena/ultimatum-game.ts');
+const gam = await import(R + 'arena/gambit.ts');
+const insp = await import(R + 'arena/inspector.ts');
+
+const N = 200;
+const LEVELS = ['easy', 'normal', 'hard'];
+let rngState = 12345;
+const rnd = () => { rngState = (rngState * 1664525 + 1013904223) >>> 0; return rngState / 4294967296; };
+const pickR = (a: any[]) => a[Math.floor(rnd() * a.length)];
+
+function play(engine: any, setup: any, policy: (s: any) => any) {
+  let s = engine.create(setup);
+  let guard = 0;
+  while (!engine.isOver(s) && guard++ < 300) {
+    const a = policy(s);
+    const why = engine.validate(s, a);
+    if (why) throw new Error(`${engine.id}: ${why} :: ${JSON.stringify(a)}`);
+    s = engine.apply(s, a);
+  }
+  return s;
+}
+function table(id: string, variant: string, policies: Record<string, (s: any) => any>, extra?: (s: any) => number, extraLabel?: string, length = 'standard') {
+  const e = ARENA_ENGINES[id];
+  console.log(`\n## ${id} (${length}, ${variant}; ${N} seeds per opponent x level; win/draw/loss %)`);
+  for (const [name, pol] of Object.entries(policies)) {
+    const parts: string[] = [];
+    try {
+      for (const level of LEVELS) {
+        const per: string[] = [];
+        let w = 0, d = 0, l = 0, ex = 0, rounds = 0, c = 0;
+        for (const persona of e.opponents) {
+          let pw = 0;
+          for (let i = 0; i < N; i++) {
+            const seed = (i * 2654435761 + 97) >>> 0;
+            const s = play(e, { persona, level, length, variant, seed }, pol);
+            const o = e.result(s).outcome;
+            if (o === 'win') { w++; pw++; } else if (o === 'draw') d++; else l++;
+            if (extra) ex += extra(s);
+            rounds += e.played(s); c++;
+          }
+          per.push(`${persona.slice(0, 5)}:${Math.round((pw / N) * 100)}`);
+        }
+        parts.push(`${level[0].toUpperCase()} ${Math.round((w / c) * 100)}/${Math.round((d / c) * 100)}/${Math.round((l / c) * 100)} [${per.join(' ')}]${extra ? ` ${extraLabel}=${(ex / c).toFixed(2)}` : ''} rds=${(rounds / c).toFixed(1)}`);
+      }
+      console.log(`- ${name}: ` + parts.join(' | '));
+    } catch (err: any) {
+      console.log(`- ${name}: POLICY ERROR ${err.message}`);
+    }
+  }
+}
+const randomMoves = (id: string) => (s: any) => pickR(ARENA_ENGINES[id].moves(s));
+const best = (a: number[]) => a.indexOf(Math.max(...a));
+
+// cooperation
+const coopN = (m: any) => (s: any) => ({ move: typeof m === 'function' ? m(s) : m, round: s.rounds.length });
+table('cooperation', 'classic', {
+  alwaysC: coopN('C'), alwaysD: coopN('D'),
+  tft: coopN((s: any) => (s.rounds.length ? s.rounds[s.rounds.length - 1].b : 'C')),
+  cThenDLast: coopN((s: any) => (s.rounds.length === s.total - 1 ? 'D' : 'C')),
+}, (s) => s.rounds.reduce((t: number, r: any) => t + r.ps, 0), 'you');
+
+// ultimatum game
+const ultP = (frac: number, minAccept: number) => (s: any) => {
+  const p = ult.ultPrompt(s);
+  if (p.terms.proposer === 'player') return Math.round(p.terms.pool * frac);
+  return p.botOffer >= p.terms.pool * minAccept ? 'accept' : 'reject';
+};
+table('ultimatum-game', 'standard', { 'offer40 acceptAll': ultP(0.4, 0), 'offer50 acceptAll': ultP(0.5, 0), 'offer20 acceptAll': ultP(0.2, 0), 'offer40 reject<40%': ultP(0.4, 0.4), 'offer0 acceptAll': ultP(0, 0) });
+
+// auction
+const aucP = (f: (lot: any, est: number) => number) => (s: any) => { const p = auc.auctionPrompt(s); return Math.max(0, Math.min(p.cash, Math.round(f(p.lot, p.estimate)))); };
+table('auction', 'standard', {
+  pass: () => 0,
+  'UI default (mean-0.6u)': aucP((l, e) => auc.posteriorMean(l, e) - l.u * 0.6),
+  'raw estimate': aucP((_, e) => e),
+  'mean-1.0u': aucP((l, e) => auc.posteriorMean(l, e) - l.u),
+}, (s) => s.profit[0], 'profit');
+
+// market
+const mktC = (f: (s: any, p: any) => number) => (s: any) => { const p = mkt.marketPrompt(s); return Math.max(4, Math.min(20, f(s, p))); };
+table('market', 'standard', {
+  'fixed 10': () => 10, 'fixed 11 (UI default cost+5)': () => 11, 'fixed 12': () => 12, 'fixed 15': () => 15, 'fixed 7': () => 7,
+  'match lowest rival': mktC((s, p) => (p.lastPrices ? Math.min(...p.lastPrices.slice(1)) : 11)),
+}, (s) => s.profit[0], 'profit');
+
+// signal
+const sigP = (send: (strong: boolean) => string, recv: (p: any) => string) => (s: any) => {
+  const p = sig.signalPrompt(s);
+  return p.role === 'send' ? send(p.strong) : recv(p);
+};
+table('signal', 'standard', {
+  'honest send, always pass': sigP((st) => (st ? 'stake' : 'warn'), () => 'pass'),
+  'honest send, always invest': sigP((st) => (st ? 'stake' : 'warn'), () => 'invest'),
+  'always pitch, invest unless warned': sigP(() => 'pitch', (p) => (p.signal === 'warn' ? 'pass' : 'invest')),
+  'always pitch, pass': sigP(() => 'pitch', () => 'pass'),
+  'pitch, invest if prior>=.5': sigP(() => 'pitch', (p) => (p.prior >= 0.5 ? 'invest' : 'pass')),
+}, (s) => s.rounds.reduce((t: number, r: any) => t + r.ps, 0), 'you');
+
+// mole
+const molePol = (accuse: (s: any) => number, ask: (s: any, p: any) => number) => (s: any) => {
+  const p = mole.molePrompt(s);
+  return p.phase === 'accuse' ? { kind: 'accuse', suspect: accuse(s) } : { kind: 'interrogate', suspect: ask(s, p) };
+};
+const moleBayes = (s: any) => best(mole.playerPosterior(s));
+const accCount = (s: any) => { const c = [0, 0, 0, 0]; for (const r of s.rounds) for (const t of r.accusations) c[t]++; return c; };
+const camCount = (s: any) => { const c = [0, 0, 0, 0]; for (const r of s.rounds) for (const t of r.clue) c[t]++; return c; };
+const moleRight = (s: any) => (s.accused === s.mole ? 1 : 0);
+table('mole', 'standard', {
+  'exact Bayes (camera+nervous)': molePol(moleBayes, (s) => moleBayes(s)),
+  'most camera sightings': molePol((s) => best(camCount(s)), (s, p) => p.clue[0]),
+  'most accused': molePol((s) => best(accCount(s)), (s, p) => p.clue[0]),
+  'least accused': molePol((s) => { const c = accCount(s); return c.indexOf(Math.min(...c)); }, (s, p) => p.clue[0]),
+  'random': molePol(() => Math.floor(rnd() * 4), () => Math.floor(rnd() * 4)),
+}, moleRight, 'right');
+
+// commons
+const fixed = (n: number) => () => n;
+table('commons', 'standard', { 'take 0': fixed(0), 'take 3': fixed(3), 'take 4': fixed(4), 'take 5': fixed(5), 'take 7': fixed(7), 'take 10': fixed(10) },
+  (s) => (s.lake <= 0 ? 1 : 0), 'collapse');
+
+// coalition
+table('coalition', 'standard', {
+  'sample moves random': randomMoves('coalition'),
+  'fair split, accept all': (s: any) => ARENA_ENGINES.coalition.moves(s)[0],
+  'half split, accept all': (s: any) => { const m = ARENA_ENGINES.coalition.moves(s); return m[1] ?? m[0]; },
+}, (s) => s.rounds.filter((r: any) => !r.passed).length, 'failedBills');
+
+// inspector
+const inspP = (op: string, ins: string) => (s: any) => (insp.playerOperates(s.rounds.length) ? op : ins);
+table('inspector', 'standard', {
+  'comply+trust': inspP('comply', 'trust'), 'comply+inspect': inspP('comply', 'inspect'), 'cut+inspect': inspP('cut', 'inspect'), 'cut+trust': inspP('cut', 'trust'),
+  'equilibrium mix': (s: any) => (insp.playerOperates(s.rounds.length) ? (rnd() < 0.29 ? 'cut' : 'comply') : (rnd() < 0.33 ? 'inspect' : 'trust')),
+});
+
+// travelers
+table('travelers', 'standard', {
+  'always 20': fixed(20), 'always 19': fixed(19), 'always 15': fixed(15), 'always 2': fixed(2),
+  'mirror last': (s: any) => (s.rounds.length ? s.rounds[s.rounds.length - 1].claims[1] : 20),
+  'undercut last by 1': (s: any) => (s.rounds.length ? Math.max(2, s.rounds[s.rounds.length - 1].claims[1] - 1) : 20),
+}, (s) => s.rounds.reduce((t: number, r: any) => t + r.pay[0], 0), 'you');
+
+// saboteur
+const sabPol = (accuse: (s: any) => number, card: number) => (s: any) => {
+  const p = sab.saboteurPrompt(s);
+  if (p.phase === 'accuse') return { kind: 'accuse', suspect: accuse(s) };
+  const failed = [1, 2, 3].map((b) => s.history.filter((m: any) => sab.teamBots(m).includes(b) && !m.success).length);
+  const c = Math.min(card, Math.min(3, p.energy));
+  return p.leader === 0 ? { kind: 'mission', bench: 1 + best(failed), card: c } : { kind: 'mission', card: c };
+};
+const sabFail = (s: any) => 1 + best([1, 2, 3].map((b) => s.history.filter((m: any) => sab.teamBots(m).includes(b) && !m.success).length - 0.2 * s.history.filter((m: any) => sab.teamBots(m).includes(b) && m.success).length));
+const sabSusp = (s: any) => 1 + best(sab.suspicion(s.history).slice(1));
+const sabRight = (s: any) => (s.accused === s.saboteur ? 1 : 0);
+table('saboteur', 'standard', {
+  'card 2, accuse most failed': sabPol(sabFail, 2), 'card 3, accuse most failed': sabPol(sabFail, 3),
+  'card 2, suspicion()': sabPol(sabSusp, 2), 'card 2, random accuse': sabPol(() => 1 + Math.floor(rnd() * 3), 2),
+}, sabRight, 'rightAccuse');
+
+// bluff
+const bluffP = (press: (p: any) => boolean, claim: (p: any) => number, judge: (p: any) => string) => (s: any) => {
+  const p = bluff.bluffPrompt(s);
+  if (p.role === 'bust') return 'continue';
+  if (p.role === 'judge') return judge(p);
+  if (p.canPress && press(p)) return 'press';
+  return { claim: Math.max(0, Math.min(p.maxClaim, Math.round(claim(p)))) };
+};
+const tot = (s: any) => bluff.bluffTotals(s)[0];
+table('bluff', 'standard', {
+  'honest, no press, believe': bluffP(() => false, (p) => p.value, () => 'believe'),
+  'honest, no press, always call': bluffP(() => false, (p) => p.value, () => 'call'),
+  'value+2, no press, always call': bluffP(() => false, (p) => p.value + 2, () => 'call'),
+  'value+1, press to 3, always call': bluffP((p) => p.hand.length < 3, (p) => p.value + 1, () => 'call'),
+  'claim 4 on 2 tokens, always call': bluffP(() => false, () => 4, () => 'call'),
+  'claim max, no press, always call': bluffP(() => false, (p) => p.maxClaim, () => 'call'),
+  'honest, call if claim far above odds': bluffP(() => false, (p) => p.value, (p) => (p.claim > p.count * 1.35 + 1 ? 'call' : 'believe')),
+}, tot, 'pts');
+
+// defusal: a careful human that uses own + shared clues
+const defCareful = (s: any) => {
+  const p = def.defusalPrompt(s);
+  if (p.phase === 'share') {
+    if (!p.options.length) return { kind: 'share', clue: null };
+    let bestK = p.options[0], bestN = Infinity;
+    for (const k of p.options) { const n = def.consistent(s, [s.hands.player[k]]).length; if (n < bestN) { bestN = n; bestK = k; } }
+    return { kind: 'share', clue: bestK };
+  }
+  const sh = def.sharedClues(s);
+  const clues = [...s.hands.player, ...[...sh.bot, ...(p.shared !== null ? [p.shared] : [])].map((k: number) => s.hands.bot[k])];
+  const safe = def.safety(s, def.consistent(s, clues));
+  let w = -1, b = -1;
+  safe.forEach((v: any, i: number) => { if (v !== null && v > b) { b = v; w = i; } });
+  return { kind: 'cut', wire: w };
+};
+table('defusal', 'standard', { 'perfect-logic human': defCareful }, (s: any) => (s.turns.some((t: any) => t.live && t.cutter === 'bot') ? 1 : 0), 'teammateCutLive');
+table('defusal', 'standard', { 'perfect-logic human': defCareful }, (s: any) => (s.turns.some((t: any) => t.live && t.cutter === 'player') ? 1 : 0), 'youCutLive');
+table('defusal', 'standard', { random: randomMoves('defusal') });
+
+// power play
+const ppP = (act: (s: any, p: any) => string, resp: (s: any, p: any) => string, blk: () => string) => (s: any) => {
+  const p = pp.powerPrompt(s);
+  if (p.phase === 'act') return { kind: 'act', move: act(s, p) };
+  if (p.phase === 'respond') return { kind: 'respond', answer: p.move === 'income' ? 'allow' : resp(s, p) };
+  return { kind: 'block-answer', answer: blk() };
+};
+table('power-play', 'standard', {
+  'always Treasury, allow': ppP(() => 'treasury', () => 'allow', () => 'accept'),
+  'always Treasury, challenge all': ppP(() => 'treasury', () => 'challenge', () => 'challenge'),
+  'Income only, allow': ppP(() => 'income', () => 'allow', () => 'accept'),
+  'honest roles, allow': ppP((s) => (s.player.hand.some((c: any) => c.role === 'treasurer') ? 'treasury' : s.player.hand.some((c: any) => c.role === 'thief') ? 'steal' : 'income'), () => 'allow', () => 'accept'),
+  'always Steal, allow': ppP(() => 'steal', () => 'allow', () => 'accept'),
+}, (s) => s.turns.filter((t: any) => t.actor === 'player').length, 'myTurns');
+
+// last stand
+const hottest = (s: any, skip?: number) => { let d = -1, v = -1; s.fire.forEach((f: number, i: number) => { if (f < ls.BURNED && i !== skip && f > v) { v = f; d = i; } }); return d; };
+const lsSmart = (s: any) => {
+  const plan = ls.teammatePlan(s);
+  const water = s.water - (plan.kind === 'douse' ? 1 : 0);
+  if (water <= 0) return { kind: 'refill' };
+  const d = hottest(s, plan.kind === 'douse' ? plan.d : undefined);
+  return d >= 0 && s.fire[d] >= 1 ? { kind: 'douse', d } : { kind: 'refill' };
+};
+table('last-stand', 'standard', { 'refill every round (no effort)': () => ({ kind: 'refill' }), 'sensible (douse other hottest)': lsSmart });
+
+// liars dice
+const dP = (bid: (s: any, prev: any, own: number[]) => any, call: (s: any, prev: any, own: number[]) => boolean) => (s: any) => {
+  const bids = dice.liveBids(s); const prev = bids[bids.length - 1]; const own = dice.roll(s).player;
+  if (prev && call(s, prev, own)) return { kind: 'liar' };
+  const b = bid(s, prev, own);
+  if (b.q > s.count.player + s.count.bot) return { kind: 'liar' };
+  return { kind: 'bid', ...b };
+};
+const lowest = (f: number, prev: any) => (!prev ? 1 : f > prev.f ? prev.q : prev.q + 1);
+const ownBest = (s: any, prev: any, own: number[]) => { const c = (f: number) => own.filter((d) => d === f).length; let bf = own[0] ?? 1; for (const f of own) if (c(f) > c(bf)) bf = f; return { q: lowest(bf, prev), f: bf }; };
+const dProb = (s: any, prev: any, own: number[]) => dice.pAtLeast(s.count.bot, prev.q - own.filter((d) => d === prev.f).length) < 0.5;
+table('liars-dice', 'standard', {
+  'open then always call': dP(ownBest, () => true),
+  'never call (raise)': dP(ownBest, () => false),
+  'prob-aware call <50%': dP(ownBest, dProb),
+}, (s) => s.rounds.length, 'rounds');
+
+// codebreaker
+const cbGuess = (p: any, stopAfter: number) => {
+  if (p.guesses.length >= Math.min(stopAfter, p.clue.n)) return { kind: 'stop' };
+  const open = p.board.words.map((w: string, i: number) => ({ i, l: code.link(w, p.clue.theme) })).filter((x: any) => !p.guesses.includes(x.i)).sort((a: any, b: any) => b.l - a.l);
+  return { kind: 'guess', word: open[0].i };
+};
+const cbClue = (p: any) => {
+  let bt = code.THEMES[0], bv = -99, bn = 1;
+  for (const t of code.THEMES) {
+    const ts = p.board.words.map((w: string, i: number) => ({ k: p.board.key[i], l: code.link(w, t) }));
+    const hit = ts.filter((x: any) => x.k === 'target' && x.l >= 2).length;
+    const bad = ts.filter((x: any) => x.k === 'trap' && x.l >= 1).length;
+    const neu = ts.filter((x: any) => x.k === 'neutral' && x.l >= 2).length;
+    const v = hit - 3 * bad - neu;
+    if (v > bv) { bv = v; bt = t; bn = Math.max(1, Math.min(3, hit)); }
+  }
+  return { kind: 'clue', theme: bt, n: bn };
+};
+const cbP = (stopAfter: number) => (s: any) => { const p = code.codePrompt(s); return p.phase === 'clue' ? cbClue(p) : cbGuess(p, stopAfter); };
+table('codebreaker', 'standard', { 'link-aware, take n guesses': cbP(3), 'link-aware, stop after 1': cbP(1), random: randomMoves('codebreaker') }, (s) => code.codeScore(s), 'team');
+
+// gambit
+const toA = (m: any) => ({ from: m.from, to: m.to });
+const gStep = (s: any) => { const ms = gam.legalMoves(s, 'player'); const f = ms.filter((m: any) => m.kind === 'step' && m.to[0] > m.from[0]).sort((a: any, b: any) => b.from[0] - a.from[0]); return toA(f[0] ?? ms.find((x: any) => x.kind === 'step') ?? ms[0]); };
+const gStrike = (s: any) => { const m = gam.legalMoves(s, 'player').find((x: any) => x.kind === 'strike'); return m ? toA(m) : gStep(s); };
+const gDash = (s: any) => { const m = gam.legalMoves(s, 'player').filter((x: any) => x.kind === 'dash').sort((a: any, b: any) => b.from[0] - a.from[0])[0]; return m ? toA(m) : gStep(s); };
+table('gambit', 'standard', { 'always step lead piece': gStep, 'always strike if able': gStrike, 'always dash lead piece': gDash, random: (s: any) => toA(pickR(gam.legalMoves(s, 'player'))) },
+  (s) => s.turns.filter((t: any) => t.side === 'bot' && t.move.kind !== 'step').length / Math.max(1, s.turns.filter((t: any) => t.side === 'bot').length), 'botRiskRate');
+
+// classic
+function classic(id: string, policies: Record<string, (h: any[], p: any) => any>) {
+  const e = ENGINES[id];
+  console.log(`\n## classic ${id} (${e.rounds} rounds; ${N} seeds; win/draw/loss %)`);
+  for (const [name, pol] of Object.entries(policies)) {
+    const parts: string[] = [];
+    for (const difficulty of ['easy', 'medium', 'hard']) {
+      let w = 0, d = 0, l = 0, pts = 0, c = 0; const per: string[] = [];
+      for (const bot of e.bots) {
+        let pw = 0;
+        for (let i = 0; i < N; i++) {
+          const spec = { bot, difficulty, seed: (i * 2654435761 + 7) >>> 0 };
+          const h: any[] = [];
+          while (h.length < e.rounds) { const p = e.prompt(spec, h); h.push(e.resolve(spec, h, e.parseMove(pol(h, p), p))); }
+          const o = e.outcome(h); if (o === 'win') { w++; pw++; } else if (o === 'draw') d++; else l++;
+          pts += e.totals(h).player; c++;
+        }
+        per.push(`${bot.slice(0, 5)}:${Math.round((pw / N) * 100)}`);
+      }
+      parts.push(`${difficulty[0].toUpperCase()} ${Math.round((w / c) * 100)}/${Math.round((d / c) * 100)}/${Math.round((l / c) * 100)} [${per.join(' ')}] pts=${(pts / c).toFixed(1)}`);
+    }
+    console.log(`- ${name}: ` + parts.join(' | '));
+  }
+}
+const beat: any = { rock: 'paper', paper: 'scissors', scissors: 'rock' };
+classic('rps', { 'always rock': () => 'rock', random: () => pickR(['rock', 'paper', 'scissors']), cycle: (h) => ['rock', 'paper', 'scissors'][h.length % 3], 'beat bot last': (h) => (h.length ? beat[h[h.length - 1].b] : 'rock') });
+classic('split-steal', { 'always split': () => 'split', 'always steal': () => 'steal', tft: (h) => (h.length ? h[h.length - 1].b : 'split') });
+classic('stag-hunt', { 'always stag': () => 'stag', 'always hare': () => 'hare', tft: (h) => (h.length ? h[h.length - 1].b : 'stag') });
+classic('ultimatum', { 'offer 5 acceptAll': (_, p) => (p.role === 'propose' ? 5 : 'accept'), 'offer 3 acceptAll': (_, p) => (p.role === 'propose' ? 3 : 'accept'), 'offer 1 acceptAll': (_, p) => (p.role === 'propose' ? 1 : 'accept'), 'offer 4 reject<4': (_, p) => (p.role === 'propose' ? 4 : p.offer >= 4 ? 'accept' : 'reject') });
+classic('two-thirds', { 'always 33': () => 33, 'always 22': () => 22, 'always 15': () => 15, 'always 0': () => 0, 'always 50': () => 50 });

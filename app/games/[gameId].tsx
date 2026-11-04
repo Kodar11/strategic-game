@@ -49,6 +49,7 @@ export default function GameScreen() {
   const [chooseOpen, setChooseOpen] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
 
@@ -155,6 +156,20 @@ export default function GameScreen() {
             )}
           </Card>
 
+          <Button label={bot === null ? `Play · ${MYSTERY_NAME.toLowerCase()}` : `Play vs ${personality(gameId, bot)?.name ?? bot}`} icon={Play} onPress={play} />
+          <AppText variant="caption" color={colors.textMuted} align="center">
+            {DIFFICULTY_LABEL[difficulty]} · {ENGINES[gameId].rounds} rounds
+          </AppText>
+
+          <Pressable onPress={() => setCustomOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: customOpen }} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44 }}>
+            <AppText variant="small" weight="semibold" color={colors.primaryText} style={{ flex: 1 }}>
+              Customize opponent and difficulty
+            </AppText>
+            <ChevronDown size={18} color={colors.textMuted} style={{ transform: [{ rotate: customOpen ? '180deg' : '0deg' }] }} />
+          </Pressable>
+
+          {customOpen ? (
+          <>
           {(
             <View style={{ gap: space.sm }}>
               <SectionLabel>{gameId === 'two-thirds' ? 'Who’s in the crowd' : gameId === 'stag-hunt' ? 'Your partner' : 'Your opponent'}</SectionLabel>
@@ -196,7 +211,9 @@ export default function GameScreen() {
             </AppText>
           </View>
 
-          <Button label={bot === null ? `Play vs a ${MYSTERY_NAME.toLowerCase()}` : `Play vs ${personality(gameId, bot)?.name ?? bot}`} icon={Play} onPress={play} />
+          </>
+          ) : null}
+
           <Button label={inviting ? 'Creating link…' : 'Challenge a friend to this'} variant="secondary" icon={UserPlus} iconPosition="left" disabled={inviting} onPress={() => void invite()} />
           {note ? (
             <AppText variant="small" color={colors.textMuted} selectable accessibilityLiveRegion="polite">

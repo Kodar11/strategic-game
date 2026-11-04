@@ -19,7 +19,7 @@ describe('share and invite text', () => {
   });
 
   it('invites without claiming anything the friend hasn’t done', () => {
-    assert.equal(inviteText('stag-hunt', 'conditional', 'medium', null), 'I challenge you to Stag Hunt on Tactiqo: same opponent — The Conditional Partner (Medium) — and the same luck for both of us. Can you beat it?');
+    assert.equal(inviteText('stag-hunt', 'conditional', 'medium', null), 'I challenge you to Stag Hunt on Tactiqo: same opponent — The Conditional Partner (Normal) — and the same luck for both of us. Can you beat it?');
     assert.match(inviteText('rps', 'counter', 'hard', 27), /I scored 27\./);
   });
 });

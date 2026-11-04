@@ -7,7 +7,7 @@ import { useArenaRecords } from './records';
 export interface OpponentRead {
   mystery: boolean;
   guess: string | null;
-  /** A guess can be made or changed now. */
+  /** A read can be made now. */
   open: boolean;
   /** Rounds needed before the first guess. */
   after: number;
@@ -47,7 +47,8 @@ export function useOpponentRead(game: ArenaGameId, persona: string, mystery: boo
     revealed: !mystery || settled,
     verdict,
     guessAs: (id) => {
-      if (!mystery || settled) return;
+      // One read per match: it locks when made (src/games/read-rules.ts).
+      if (!mystery || settled || guess !== null) return;
       setGuess(id);
     },
     skip: () => setSkipped(true),

@@ -1,5 +1,6 @@
 import { View } from 'react-native';
 
+import { MatchLog } from '@/src/components/game/MatchLog';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { CircleCheck, CircleX, Crosshair, Hand, HandFist, Lightbulb, type LucideIcon, Scissors, Target } from '@/src/components/ui/icons';
@@ -26,7 +27,7 @@ export function RpsRounds({ rounds }: { rounds: RpsRound[] }) {
           <View
             key={i}
             accessible
-            accessibilityLabel={`Round ${i + 1}: you ${LABEL[r.p]}, bot ${LABEL[r.b]}, ${RESULT[r.r]}.`}
+            accessibilityLabel={`Round ${i + 1}: you ${LABEL[r.p]}, opponent ${LABEL[r.b]}, ${RESULT[r.r]}.`}
             style={{ width: 34, alignItems: 'center', gap: 2, paddingVertical: 4, borderRadius: radius.sm, borderWidth: 1, borderColor: tint }}>
             <AppText variant="caption" color={colors.textMuted} style={{ fontSize: 10, lineHeight: 12 }}>
               {i + 1}
@@ -95,10 +96,7 @@ export function RpsReveal({ view, onPractise }: { view: MatchView; onPractise?: 
         )
       ) : null}
 
-      <View style={{ gap: space.xs }}>
-        <AppText variant="caption" color={colors.textMuted}>
-          What its throws show
-        </AppText>
+      <MatchLog title="What its throws show" summary="Counted from this match">
         {reveal.evidence.map((e, i) => (
           <View key={i} style={{ flexDirection: 'row', gap: space.sm }}>
             <AppText variant="small" color={colors.textMuted}>
@@ -109,16 +107,14 @@ export function RpsReveal({ view, onPractise }: { view: MatchView; onPractise?: 
             </AppText>
           </View>
         ))}
-      </View>
-
-      <View style={{ flexDirection: 'row', gap: space.sm }}>
-        <Target size={18} color={colors.insight} />
-        <AppText variant="small" weight="semibold" color={colors.text} style={{ flex: 1 }}>
-          {reveal.takeaway}
-        </AppText>
-      </View>
-
-      {onPractise ? <Button label={`Practise vs ${reveal.name}`} variant="secondary" compact icon={Target} iconPosition="left" onPress={() => onPractise(reveal.bot)} /> : null}
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <Target size={18} color={colors.insight} />
+          <AppText variant="small" weight="semibold" color={colors.text} style={{ flex: 1 }}>
+            {reveal.takeaway}
+          </AppText>
+        </View>
+        {onPractise ? <Button label={`Practise vs ${reveal.name}`} variant="secondary" compact icon={Target} iconPosition="left" onPress={() => onPractise(reveal.bot)} /> : null}
+      </MatchLog>
     </Panel>
   );
 }

@@ -128,3 +128,8 @@ export { default as ScrollText } from 'lucide-react-native/icons/scroll-text';
 export { default as Pause } from 'lucide-react-native/icons/pause';
 export { default as SkipBack } from 'lucide-react-native/icons/skip-back';
 export { default as SkipForward } from 'lucide-react-native/icons/skip-forward';
+export { default as User } from 'lucide-react-native/icons/user';
+export { default as Camera } from 'lucide-react-native/icons/camera';
+export { default as MousePointerClick } from 'lucide-react-native/icons/mouse-pointer-click';
+export { default as StickyNote } from 'lucide-react-native/icons/sticky-note';
+export { default as CircleSlash } from 'lucide-react-native/icons/circle-slash';

@@ -104,7 +104,9 @@ export function trueClues(n: number, live: Live): Clue[] {
   for (let from = 0; from < n; from++) for (let to = from + 2; to < n; to++) for (let k = 0; k <= 2; k++) out.push({ kind: 'count', from, to, k });
   for (const p of ['odd', 'even', 'mixed'] as const) out.push({ kind: 'parity', p });
   out.push({ kind: 'adjacent', yes: true }, { kind: 'adjacent', yes: false });
-  return out.filter((c) => holds(c, live));
+  // A clue every arrangement satisfies ("both live wires are among 1–6" on six wires) says nothing: never deal it.
+  const all = allLive(n);
+  return out.filter((c) => holds(c, live) && !all.every((l) => holds(c, l)));
 }
 
 export interface Cut {

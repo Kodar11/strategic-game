@@ -31,7 +31,8 @@ export interface GameInfo {
   tone: 'blue' | 'orange' | 'amber' | 'cyan' | 'success';
 }
 
-export const DIFFICULTY_LABEL: Record<Difficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+/** Shared wording with the Arena: `medium` stays the stored id (server rows, SQL), and reads Normal everywhere. */
+export const DIFFICULTY_LABEL: Record<Difficulty, string> = { easy: 'Easy', medium: 'Normal', hard: 'Hard' };
 
 export const DIFFICULTY_HINT: Record<Difficulty, string> = {
   easy: 'Simple habits you can spot quickly',

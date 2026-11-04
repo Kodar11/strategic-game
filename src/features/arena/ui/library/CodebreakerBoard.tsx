@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FlipInXUp } from 'react-native-reanimated';
 
+import { CompactReveal, MatchLog } from '@/src/components/game/MatchLog';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Hand, KeyRound, Send } from '@/src/components/ui/icons';
-import { type Board, type CodeAction, type CodeState, type Key, THEMES, TRAP_PENALTY, type Theme, codePar, codePrompt, codeScore } from '@/src/arena/codebreaker';
+import { type Board, type CodeAction, type CodeRound, type CodeState, type Key, THEMES, TRAP_PENALTY, type Theme, codePar, codePrompt, codeScore, link } from '@/src/arena/codebreaker';
 import { haptic, useMotionReduced } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
-import { type BoardProps, Reveal, Row } from '../parts';
+import { type BoardProps, Row } from '../parts';
 import { Chip, Overline, Panel, Stepper } from './kit';
 
 const KEY_LOOK: Record<Key, { bg: string; border: string; label: string }> = {
@@ -63,7 +64,7 @@ function ClueMaker({ board, onGive }: { board: Board; onGive: (t: Theme, n: numb
   const [theme, setTheme] = useState<Theme | null>(null);
   const [n, setN] = useState(1);
   return (
-    <View style={{ gap: space.md }}>
+    <View style={{ gap: space.sm }}>
       <Grid board={board} showKey revealed={[]} />
       <Overline>Pick a theme</Overline>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}>
@@ -79,6 +80,26 @@ function ClueMaker({ board, onGive }: { board: Board; onGive: (t: Theme, n: numb
   );
 }
 
+const STRENGTH = ['no link', 'a stretch', 'a clear link', 'an obvious link'];
+
+/** Why a round went as it did: how strongly each word on the key is tied to the theme, in the game's association table. */
+function LinkNotes({ r }: { r: CodeRound }) {
+  const lines = r.board.words
+    .map((w, i) => ({ w, i, l: link(w, r.clue.theme) }))
+    .filter((x) => r.guesses.includes(x.i) || r.board.key[x.i] === 'target' || (r.board.key[x.i] === 'trap' && x.l > 0))
+    .sort((a, b) => b.l - a.l);
+  return (
+    <View style={{ gap: 2 }}>
+      {lines.map((x) => (
+        <AppText key={x.i} variant="caption" color={r.board.key[x.i] === 'trap' ? colors.danger : r.board.key[x.i] === 'target' ? colors.primaryText : colors.textMuted}>
+          {x.w} ({KEY_LOOK[r.board.key[x.i]].label}): {STRENGTH[x.l]} to {r.clue.theme}
+          {r.guesses.includes(x.i) ? ' · guessed' : ''}
+        </AppText>
+      ))}
+    </View>
+  );
+}
+
 export function CodebreakerBoard({ state, act, over, rivalName }: BoardProps<CodeState, CodeAction>) {
   const p = codePrompt(state);
   const last = state.rounds[state.rounds.length - 1];
@@ -87,28 +108,27 @@ export function CodebreakerBoard({ state, act, over, rivalName }: BoardProps<Cod
     haptic.commit();
     act(a);
   };
+  const line = (r: CodeRound) => `${r.guesses.length ? `${r.giver === 'bot' ? 'You' : 'It'} picked ${r.guesses.map((g) => r.board.words[g]).join(', ')}` : 'No guesses'}: ${r.points >= 0 ? `+${r.points}` : r.points}.`;
   return (
-    <View style={{ gap: space.lg }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }} accessible accessibilityLabel={`Team score ${codeScore(state)}; ${codePar(state)} needed.`}>
+    <View style={{ gap: space.sm }}>
+      <Row style={{ justifyContent: 'space-between' }} accessible accessibilityLabel={`Team score ${codeScore(state)}; ${codePar(state)} needed.`}>
         <AppText variant="bodyStrong" tabular>
           Team {codeScore(state)} / {codePar(state)}
         </AppText>
         <AppText variant="caption" color={colors.textMuted}>
           Round {Math.min(state.rounds.length + 1, state.total)} of {state.total}
         </AppText>
-      </View>
+      </Row>
 
       {last ? (
-        <Reveal revealKey={state.rounds.length} tone={last.points > 0 ? 'good' : last.points < 0 ? 'bad' : 'plain'} overline={`Round ${state.rounds.length} · ${last.giver === 'bot' ? `${mate}’s clue` : 'your clue'}: ${last.clue.theme.toUpperCase()} ${last.clue.n}`}>
+        <CompactReveal revealKey={state.rounds.length} tone={last.points > 0 ? 'good' : last.points < 0 ? 'bad' : 'plain'} overline={`${last.giver === 'bot' ? `${mate}’s clue` : 'Your clue'}: ${last.clue.theme.toUpperCase()} ${last.clue.n}`} summary={line(last)}>
           <Grid board={last.board} showKey revealed={last.guesses} />
-          <AppText variant="small" color={colors.textBody} accessibilityLiveRegion="polite">
-            {last.guesses.length ? `${last.giver === 'bot' ? 'You' : 'It'} picked ${last.guesses.map((g) => last.board.words[g]).join(', ')}` : 'No guesses'} — {last.points >= 0 ? `+${last.points}` : last.points}.
-          </AppText>
-        </Reveal>
+          <LinkNotes r={last} />
+        </CompactReveal>
       ) : null}
 
       {p && !over ? (
-        <Panel accent={p.phase === 'clue' ? 'rgba(37,99,235,0.45)' : 'rgba(253,186,116,0.4)'}>
+        <Panel accent={p.phase === 'clue' ? 'rgba(37,99,235,0.45)' : 'rgba(253,186,116,0.4)'} style={{ padding: space.md, gap: space.sm }}>
           <Row>
             <KeyRound size={16} color={p.phase === 'clue' ? colors.primaryText : colors.insight} />
             <Overline color={p.phase === 'clue' ? colors.primaryText : colors.insight}>{p.phase === 'clue' ? 'You give the clue · only you see the key' : `${mate[0].toUpperCase()}${mate.slice(1)} gives the clue`}</Overline>
@@ -134,6 +154,19 @@ export function CodebreakerBoard({ state, act, over, rivalName }: BoardProps<Cod
           )}
         </Panel>
       ) : null}
+
+      {state.rounds.length ? (
+        <MatchLog title="Earlier boards" summary={`${state.rounds.length} round${state.rounds.length === 1 ? '' : 's'}: ${state.rounds.map((r) => (r.points >= 0 ? `+${r.points}` : r.points)).join(', ')}`}>
+          {state.rounds.map((r, i) => (
+            <View key={i} style={{ gap: space.xs, paddingVertical: space.xs, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border }}>
+              <AppText variant="caption" weight="semibold" color={colors.textBody}>
+                {i + 1}. {r.clue.theme.toUpperCase()} {r.clue.n} · {line(r)}
+              </AppText>
+              <Grid board={r.board} showKey revealed={r.guesses} />
+            </View>
+          ))}
+        </MatchLog>
+      ) : null}
     </View>
   );
 }
@@ -141,6 +174,6 @@ export function CodebreakerBoard({ state, act, over, rivalName }: BoardProps<Cod
 const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs },
   cell: { flexBasis: '31%', flexGrow: 1 },
-  word: { minHeight: 56, justifyContent: 'center', padding: space.xs, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgRaised },
-  clue: { flexDirection: 'row', justifyContent: 'center', alignItems: 'baseline', gap: space.md, paddingVertical: space.sm, borderRadius: radius.lg, backgroundColor: colors.bgRaised },
+  word: { minHeight: 48, justifyContent: 'center', padding: space.xs, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgRaised },
+  clue: { flexDirection: 'row', justifyContent: 'center', alignItems: 'baseline', gap: space.md, paddingVertical: space.xs, borderRadius: radius.md, backgroundColor: colors.bgRaised },
 });

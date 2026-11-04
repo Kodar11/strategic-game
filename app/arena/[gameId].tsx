@@ -46,6 +46,7 @@ export default function ArenaGameScreen() {
   const [length, setLength] = useState<MatchLength>('standard');
   const [variant, setVariant] = useState<string | null>(null);
   const [rulesOpen, setRulesOpen] = useState<boolean | null>(null);
+  const [customOpen, setCustomOpen] = useState(false);
 
   useEffect(() => {
     void useArenaRecords.getState().load();
@@ -76,6 +77,8 @@ export default function ArenaGameScreen() {
   const showRules = rulesOpen ?? (loaded && !coached && !unlocked);
   const close = () => (router.canGoBack() ? router.back() : router.replace('/games'));
 
+  const playLabel = persona === MYSTERY ? `Play · mystery ${who}` : `Play ${team ? 'with' : 'vs'} ${opponentName(gameId, persona)}`;
+  const setupSummary = [LEVEL_LABEL[level], `${LENGTH_LABEL[length]} · ${g.rounds(length)} ${g.roundWord}`, g.variants.find((v) => v.id === mode)?.name].join(' · ');
   const play = () => {
     useArenaRecords.getState().savePrefs(gameId, { persona, level, length, variant: mode });
     router.push({ pathname: '/arena/play', params: { game: gameId, persona, level, length, variant: mode } });
@@ -146,6 +149,20 @@ export default function ArenaGameScreen() {
               : null}
           </Card>
 
+          <Button label={playLabel} icon={Play} onPress={play} />
+          <AppText variant="caption" color={colors.textMuted} align="center">
+            {setupSummary}
+          </AppText>
+
+          <Pressable onPress={() => setCustomOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: customOpen }} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44 }}>
+            <AppText variant="small" weight="semibold" color={colors.primaryText} style={{ flex: 1 }}>
+              Customize opponent, difficulty, length and mode
+            </AppText>
+            <ChevronDown size={18} color={colors.textMuted} style={{ transform: [{ rotate: customOpen ? '180deg' : '0deg' }] }} />
+          </Pressable>
+
+          {customOpen ? (
+          <>
           <View style={{ gap: space.sm }}>
             <SectionLabel>{`Your ${who}`}</SectionLabel>
             <ChoiceCard
@@ -222,7 +239,8 @@ export default function ArenaGameScreen() {
             })}
           </View>
 
-          <Button label={persona === MYSTERY ? `Play · mystery ${who}` : `Play ${team ? 'with' : 'vs'} ${opponentName(gameId, persona)}`} icon={Play} onPress={play} />
+          </>
+          ) : null}
 
           {record && played(record) ? (
             <Card style={{ gap: space.xs }}>

@@ -1,0 +1,223 @@
+// Balance probe for Phase 2. Kept as .txt so it is not compiled with the app. To run: copy to a .mts file and
+//   ROOT=<folder containing arena/ and games/> node --experimental-strip-types balance.mts
+// Plays fixed and adaptive player strategies through the real engines. Each adaptive strategy uses only what the
+// player may see. N seeds per opponent x level.
+import { pathToFileURL } from 'node:url';
+const R = pathToFileURL(process.env.ROOT + '/').href;
+const load = (p: string): Promise<any> => import(R + p);
+const { ARENA_ENGINES } = await load('arena/registry.ts');
+const mole = await load('arena/mole.ts');
+const bluff = await load('arena/bluff.ts');
+const dice = await load('arena/liars-dice.ts');
+const pp = await load('arena/power-play.ts');
+const ls = await load('arena/last-stand.ts');
+const coal = await load('arena/coalition.ts');
+const mkt = await load('arena/market.ts');
+const sig = await load('arena/signal.ts');
+
+const N = Number(process.env.N ?? 300);
+const LEVELS = ['easy', 'normal', 'hard'];
+let rngState = 12345;
+const rnd = () => { rngState = (rngState * 1664525 + 1013904223) >>> 0; return rngState / 4294967296; };
+const best = (a: number[]) => a.indexOf(Math.max(...a));
+
+function play(engine: any, setup: any, policy: (s: any) => any) {
+  let s = engine.create(setup);
+  let guard = 0;
+  while (!engine.isOver(s) && guard++ < 400) s = engine.apply(s, policy(s));
+  return s;
+}
+function table(id: string, policies: Record<string, (s: any) => any>, extra?: (s: any) => number, label = 'x', variant = 'standard') {
+  const e = ARENA_ENGINES[id];
+  console.log(`\n## ${id}`);
+  for (const [name, pol] of Object.entries(policies)) {
+    const parts: string[] = [];
+    try {
+      for (const level of LEVELS) {
+        const per: string[] = [];
+        let w = 0, d = 0, c = 0, ex = 0;
+        for (const persona of e.opponents) {
+          let pw = 0;
+          for (let i = 0; i < N; i++) {
+            const s = play(e, { persona, level, length: 'standard', variant, seed: (i * 2654435761 + 97) >>> 0 }, pol);
+            const o = e.result(s).outcome;
+            if (o === 'win') { w++; pw++; } else if (o === 'draw') d++;
+            if (extra) ex += extra(s);
+            c++;
+          }
+          per.push(`${persona.slice(0, 4)}:${Math.round((pw / N) * 100)}`);
+        }
+        parts.push(`${level[0].toUpperCase()} ${Math.round((w / c) * 100)}w/${Math.round((d / c) * 100)}d [${per.join(' ')}]${extra ? ` ${label}=${(ex / c).toFixed(1)}` : ''}`);
+      }
+      console.log(`- ${name}: ${parts.join(' | ')}`);
+    } catch (err: any) {
+      console.log(`- ${name}: ERROR ${err.message}`);
+    }
+  }
+}
+
+// Market
+const bestAgainstLast = (s: any) => {
+  const p = mkt.marketPrompt(s);
+  const prices = p.lastPrices ?? s.seats.map(() => p.cond.cost + 6);
+  let bp = 4, bv = -Infinity;
+  for (let x = 4; x <= 20; x++) { const v = mkt.marketOutcome(p.cond, [x, ...prices.slice(1)]).profits[0]; if (v > bv) { bv = v; bp = x; } }
+  return bp;
+};
+table('market', {
+  'fixed 9': () => 9, 'fixed 10': () => 10, 'fixed 11': () => 11, 'fixed 12': () => 12,
+  'best reply to last prices (adaptive)': bestAgainstLast,
+  'best reply then hold one above (adaptive)': (s: any) => Math.min(20, bestAgainstLast(s) + (s.rounds.length % 2 ? 1 : 0)),
+  'undercut lowest by 1 (floor cost+3)': (s: any) => { const p = mkt.marketPrompt(s); return p.lastPrices ? Math.max(p.cond.cost + 3, Math.min(...p.lastPrices.slice(1)) - 1) : p.cond.cost + 5; },
+}, (s) => s.profit[0], 'profit');
+
+// Liar's Dice
+const dP = (bidF: (s: any, prev: any, own: number[]) => any, call: (s: any, prev: any, own: number[], bids: any[]) => boolean) => (s: any) => {
+  const bids = dice.liveBids(s); const prev = bids[bids.length - 1]; const own = dice.roll(s).player;
+  if (prev && call(s, prev, own, bids)) return { kind: 'liar' };
+  const b = bidF(s, prev, own);
+  if (b.q > s.count.player + s.count.bot) return prev ? { kind: 'liar' } : { kind: 'bid', q: 1, f: 6 };
+  return { kind: 'bid', ...b };
+};
+const lowest = (f: number, prev: any) => (!prev ? 1 : f > prev.f ? prev.q : prev.q + 1);
+const ownBest = (_s: any, prev: any, own: number[]) => { const c = (f: number) => own.filter((d) => d === f).length; let bf = own[0] ?? 1; for (const f of own) if (c(f) > c(bf)) bf = f; return { q: lowest(bf, prev), f: bf }; };
+const pBid = (s: any, prev: any, own: number[], p = 1 / 6) => dice.pAtLeast(s.count.bot, prev.q - own.filter((d) => d === prev.f).length, p);
+table('liars-dice', {
+  'open then always call': dP(ownBest, () => true),
+  'never call (raise own best)': dP(ownBest, () => false),
+  'call below 50% (fair dice)': dP(ownBest, (s, prev, own) => pBid(s, prev, own) < 0.5),
+  'call below 30% (fair dice)': dP(ownBest, (s, prev, own) => pBid(s, prev, own) < 0.3),
+  'adaptive: assumes bot holds what it bids': dP(ownBest, (s, prev, own) => pBid(s, prev, own, 1 / 3) < 0.35),
+});
+
+// Power Play
+const holds = (s: any, r: string) => s.player.hand.some((c: any) => c.role === r);
+const ppP = (act: (s: any) => string, resp: (s: any, p: any) => string, blk: (s: any) => string = () => 'accept') => (s: any) => {
+  const p = pp.powerPrompt(s);
+  if (p.phase === 'act') return { kind: 'act', move: act(s) };
+  if (p.phase === 'respond') return { kind: 'respond', answer: p.move === 'income' ? 'allow' : resp(s, p) };
+  return { kind: 'block-answer', answer: blk(s) };
+};
+const honestAct = (s: any) => (holds(s, 'treasurer') ? 'treasury' : holds(s, 'thief') && s.bot.coins >= 2 ? 'steal' : holds(s, 'oracle') ? 'foresight' : 'income');
+const seenCopies = (s: any, role: string) => [...s.player.hand, ...s.player.lost, ...s.bot.lost].filter((c: any) => c.role === role).length;
+const countChallenge = (s: any, p: any) => {
+  const role = pp.CLAIM_OF[p.move];
+  if (seenCopies(s, role) >= pp.COPIES) return 'challenge';
+  if (p.move === 'treasury' && s.bot.coins + 3 >= pp.WIN_COINS) return 'challenge';
+  return p.move === 'steal' && holds(s, 'guard') ? 'block' : 'allow';
+};
+const bluffLate = (s: any) => { const r = honestAct(s); return r !== 'income' ? r : 'treasury'; };
+table('power-play', {
+  'always Treasury, allow': ppP(() => 'treasury', () => 'allow'),
+  'always Treasury, challenge decisive claims': ppP(() => 'treasury', countChallenge),
+  'Income only, allow': ppP(() => 'income', () => 'allow'),
+  'honest roles, allow': ppP(honestAct, () => 'allow'),
+  'always Steal, allow': ppP(() => 'steal', () => 'allow'),
+  'adaptive: real roles, else bluff; counts cards': ppP(bluffLate, countChallenge),
+}, (s) => s.turns.length, 'turns');
+
+// Bluff
+const bluffP = (press: (p: any, s: any) => boolean, claim: (p: any, s: any) => number, judge: (p: any, s: any) => string) => (s: any) => {
+  const p = bluff.bluffPrompt(s);
+  if (p.role === 'bust') return 'continue';
+  if (p.role === 'judge') return judge(p, s);
+  if (p.canPress && press(p, s)) return 'press';
+  return { claim: Math.max(0, Math.min(p.maxClaim, Math.round(claim(p, s)))) };
+};
+const theirBluffRate = (s: any) => { const t = s.rounds.filter((r: any) => r.claimant === 'bot' && !r.bust); return (t.filter((r: any) => r.claim > bluff.tokenValue(r.tokens)).length + 1) / (t.length + 3); };
+const adaptiveJudge = (p: any, s: any) => { const pb = 1 - bluff.pAtLeast(p.count, p.claim); const e = 0.6 * pb + 0.4 * theirBluffRate(s); return e > 2 / (7 + p.claim) ? 'call' : 'believe'; };
+table('bluff', {
+  'honest, believe': bluffP(() => false, (p) => p.value, () => 'believe'),
+  'honest, always call': bluffP(() => false, (p) => p.value, () => 'call'),
+  'value+1, press to 3, always call': bluffP((p) => p.hand.length < 3, (p) => p.value + 1, () => 'call'),
+  'honest, call long odds': bluffP(() => false, (p) => p.value, (p) => (p.claim > p.count * 1.35 + 1 ? 'call' : 'believe')),
+  'adaptive: odds + its record; bluff small': bluffP((p) => p.hand.length < 3, (p, s) => { const mine = s.rounds.filter((r: any) => r.claimant === 'player' && r.call).length; return p.value + (mine >= 2 ? 0 : 1); }, adaptiveJudge),
+}, (s) => bluff.bluffTotals(s)[0], 'pts');
+
+// Hidden Signal
+const sigP = (send: (strong: boolean, s: any) => string, recv: (p: any, s: any) => string) => (s: any) => {
+  const p = sig.signalPrompt(s);
+  return p.role === 'send' ? send(p.strong, s) : recv(p, s);
+};
+const botRecord = (s: any, sigName: string) => { const r = s.rounds.filter((x: any) => x.sender === 'bot' && x.signal === sigName); return { n: r.length, weak: r.filter((x: any) => !x.strong).length }; };
+const adaptiveRecv = (p: any, s: any) => {
+  if (p.signal === 'warn') return 'pass';
+  const rec = botRecord(s, p.signal);
+  const trust = (rec.n - rec.weak + 1) / (rec.n + 2);
+  const q = (p.test === null || p.test === undefined) ? trust * 0.6 + p.prior * 0.4 : p.test ? Math.max(trust, 0.7) : Math.min(trust, 0.3);
+  if ((p.test === null || p.test === undefined) && q > 0.35 && q < 0.7) return 'investigate';
+  return q >= 0.5 ? 'invest' : 'pass';
+};
+table('signal', {
+  'honest send, always pass': sigP((st) => (st ? 'stake' : 'warn'), () => 'pass'),
+  'always pitch, invest unless warned': sigP(() => 'pitch', (p) => (p.signal === 'warn' ? 'pass' : 'invest')),
+  'honest send, invest unless warned': sigP((st) => (st ? 'stake' : 'warn'), (p) => (p.signal === 'warn' ? 'pass' : 'invest')),
+  'always pitch, adaptive receive': sigP(() => 'pitch', adaptiveRecv),
+  'honest send, adaptive receive': sigP((st) => (st ? 'stake' : 'warn'), adaptiveRecv),
+  'pitch after trust, adaptive receive': sigP((st, s) => (st ? 'stake' : s.rounds.filter((r: any) => r.sender === 'player' && !r.strong && r.invested).length >= 2 ? 'warn' : 'pitch'), adaptiveRecv),
+}, (s) => s.rounds.reduce((t: number, r: any) => t + r.ps, 0), 'tokens');
+
+// Mole
+const molePol = (accuse: (s: any) => number, ask: (s: any, p: any) => number) => (s: any) => {
+  const p = mole.molePrompt(s);
+  return p.phase === 'accuse' ? { kind: 'accuse', suspect: accuse(s) } : { kind: 'interrogate', suspect: ask(s, p) };
+};
+const accCount = (s: any) => { const c = [0, 0, 0, 0]; for (const r of s.rounds) for (const t of r.accusations) c[t]++; return c; };
+const bayes = (s: any) => best(mole.playerPosterior(s));
+const combined = (s: any) => { const a = accCount(s); const p = mole.playerPosterior(s); return best(p.map((x: number, i: number) => x * (1 + a[i]))); };
+table('mole', {
+  'exact Bayes (camera + nervous)': molePol(bayes, (s) => bayes(s)),
+  'most accused': molePol((s) => best(accCount(s)), (_s, p) => p.clue[0]),
+  'Bayes x accusations (adaptive)': molePol(combined, (s) => combined(s)),
+  'random': molePol(() => Math.floor(rnd() * 4), () => Math.floor(rnd() * 4)),
+});
+
+// Coalition
+const lowestAccepted = (s: any, seat: number) => {
+  let low: number | null = null;
+  for (const r of s.rounds) r.proposal.members.forEach((m: number, i: number) => { void i; if (m === seat && r.responses[seat] === true && (low === null || r.proposal.shares[seat] < low)) low = r.proposal.shares[seat]; });
+  return low;
+};
+const coalAdaptive = (margin: number, rejectBelow: number) => (s: any) => {
+  const p = coal.coalitionPrompt(s);
+  if (p.phase === 'watch') return { kind: 'watch' };
+  if (p.phase === 'respond') {
+    const fair = coal.proportional(s, p.proposal.members, 0);
+    return { kind: 'respond', accept: p.proposal.shares[0] >= Math.round(fair * rejectBelow) };
+  }
+  let bestBill: any = null, bestKeep = -1;
+  for (const members of p.options) {
+    const shares = [0, 0, 0, 0]; let given = 0;
+    for (const m of members) if (m !== 0) { const low = lowestAccepted(s, m); const prop = coal.proportional(s, members, m); const offer = low !== null ? Math.min(Math.round(prop), low + margin) : Math.round(prop); shares[m] = offer; given += offer; }
+    const keep = coal.PRIZE - given;
+    if (keep > bestKeep && keep >= 0) { bestKeep = keep; shares[0] = keep; bestBill = { kind: 'propose', members, shares }; }
+  }
+  return bestBill;
+};
+table('coalition', {
+  'fair split, accept all': (s: any) => ARENA_ENGINES.coalition.moves(s)[0],
+  'half split, accept all': (s: any) => { const m = ARENA_ENGINES.coalition.moves(s); return m[1] ?? m[0]; },
+  'adaptive: cheapest proven partner, accept all': coalAdaptive(0, 0),
+  'adaptive: cheapest proven partner, reject <70% fair': coalAdaptive(0, 0.7),
+  'adaptive: +1 over proven, reject <70% fair': coalAdaptive(1, 0.7),
+}, (s) => s.rounds.filter((r: any) => !r.passed).length, 'failedBills');
+
+// Last Stand
+const hottest = (s: any, skip?: number) => { let d = -1, v = -1; s.fire.forEach((f: number, i: number) => { if (f < ls.BURNED && i !== skip && f > v) { v = f; d = i; } }); return d; };
+const lsSmart = (s: any) => {
+  const plan = ls.teammatePlan(s);
+  const water = s.water - (plan.kind === 'douse' ? 1 : 0);
+  if (water <= 0) return { kind: 'refill' };
+  const d = hottest(s, plan.kind === 'douse' ? plan.d : undefined);
+  return d >= 0 && s.fire[d] >= 1 ? { kind: 'douse', d } : { kind: 'refill' };
+};
+const lsThreat = (s: any) => {
+  const plan = ls.teammatePlan(s);
+  const water = s.water - (plan.kind === 'douse' ? 1 : 0);
+  const skip = plan.kind === 'douse' ? plan.d : -1;
+  const scored = s.fire.map((f: number, d: number) => ({ d, f, t: f + ls.neighbours(d).filter((x: number) => s.fire[x] >= 2 && s.fire[x] < ls.BURNED).length })).filter((x: any) => x.f < ls.BURNED && x.d !== skip).sort((a: any, b: any) => b.t - a.t);
+  if (water <= 1 && (scored[0]?.f ?? 0) < 3) return { kind: 'refill' };
+  if (water <= 0) return { kind: 'refill' };
+  return scored[0] && scored[0].t >= 1 ? { kind: 'douse', d: scored[0].d } : { kind: 'refill' };
+};
+table('last-stand', { 'refill every round (no effort)': () => ({ kind: 'refill' }), 'douse other hottest': lsSmart, 'adaptive: covers by threat, manages water': lsThreat }, (s) => s.rounds.length, 'rounds');

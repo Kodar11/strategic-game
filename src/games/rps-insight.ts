@@ -25,7 +25,7 @@ export function pickOpponent(choice: string | null | undefined, u: number): { bo
 }
 
 /** What the player may see as the opponent's name: hidden in a mystery match until it ends. */
-export const MYSTERY_NAME = 'Mystery bot';
+export const MYSTERY_NAME = 'Mystery opponent';
 export const opponentName = (bot: string, mode: OpponentMode, done: boolean) => (mode === 'mystery' && !done ? MYSTERY_NAME : isRpsBot(bot) ? NAME[bot] : bot);
 
 /**

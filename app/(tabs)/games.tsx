@@ -12,12 +12,13 @@ import { Badge } from '@/src/components/ui/Card';
 import { ArrowRight, Clock, Crown, ListOrdered, Pencil, Play, RefreshCw, Settings, Trophy } from '@/src/components/ui/icons';
 import type { Competition, GamesOverview } from '@/src/data/games';
 import { useGames } from '@/src/data/games-session';
-import { DIFFICULTY_LABEL, GAMES, GAME_ORDER, personality } from '@/src/games/catalog';
+import { DIFFICULTY_LABEL, GAMES, personality } from '@/src/games/catalog';
+import { LIBRARY_COUNT, LIBRARY_GROUPS } from '@/src/games/library';
 import { ordinal, timeLeft, weekLabel } from '@/src/games/competition';
 import type { GameId } from '@/src/games/core';
 import { ENGINES } from '@/src/games/registry';
 import { GAME_TINT, GameArt } from '@/src/features/games/ui/GameArt';
-import { ARENA, ARENA_ORDER } from '@/src/arena/catalog';
+import { ARENA } from '@/src/arena/catalog';
 import type { ArenaGameId } from '@/src/arena/core';
 import { played, useArenaRecords } from '@/src/features/arena/records';
 import { ARENA_TINT, ArenaArt } from '@/src/features/arena/ui/parts';
@@ -37,6 +38,7 @@ export default function GamesScreen() {
   const enter = useEnter();
   const overview = useGames((s) => s.overview);
   const loadOverview = useGames((s) => s.loadOverview);
+  const [group, setGroup] = useState('all');
 
   useFocusEffect(
     useCallback(() => {
@@ -59,7 +61,7 @@ export default function GamesScreen() {
               <IconButton icon={Settings} label="Settings" onPress={() => router.navigate('/settings')} />
             </View>
             <AppText variant="small" color={colors.textMuted}>
-              Ten strategic games against bots with personalities.
+              {LIBRARY_COUNT} strategic games against bots with personalities.
             </AppText>
           </View>
 
@@ -77,30 +79,42 @@ export default function GamesScreen() {
 
           <View style={{ gap: 2, marginTop: space.sm }}>
             <AppText variant="heading" accessibilityRole="header">
-              All games
+              All {LIBRARY_COUNT} games
             </AppText>
             <AppText variant="small" color={colors.textMuted}>
-              Practice any game, any time. Practice never affects rankings.
+              Each has four hidden personalities to figure out. Practice never affects rankings.
             </AppText>
           </View>
-          {GAME_ORDER.map((id, i) => (
-            <Animated.View key={id} entering={enter(120 + i * 40)}>
-              <GameCard id={id} featured={overview.status === 'ready' && overview.data.competition?.game === id && overview.data.competition.phase === 'active'} />
-            </Animated.View>
-          ))}
-
-          <View style={{ gap: 2, marginTop: space.sm }}>
-            <AppText variant="heading" accessibilityRole="header">
-              Strategy Arena
-            </AppText>
-            <AppText variant="small" color={colors.textMuted}>
-              {ARENA_ORDER.length} deeper games, each with four hidden personalities to figure out. Played on your device.
-            </AppText>
-          </View>
-          {ARENA_ORDER.map((id, i) => (
-            <Animated.View key={id} entering={enter(320 + i * 40)}>
-              <ArenaCard id={id} />
-            </Animated.View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.xs }} accessibilityRole="tablist">
+            {[{ id: 'all', title: 'All' }, ...LIBRARY_GROUPS].map((g) => {
+              const on = group === g.id;
+              return (
+                <Pressable key={g.id} onPress={() => setGroup(g.id)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={({ pressed }) => [styles.filter, on && { borderColor: colors.primary, backgroundColor: colors.primarySoft }, pressed && { opacity: 0.8 }]}>
+                  <AppText variant="small" weight={on ? 'semibold' : 'regular'} color={on ? colors.text : colors.textBody}>
+                    {g.title}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          {LIBRARY_GROUPS.filter((g) => group === 'all' || g.id === group).map((g) => (
+            <View key={g.id} style={{ gap: space.xs }}>
+              <View style={{ gap: 1, marginTop: space.xs }}>
+                <AppText variant="bodyStrong" accessibilityRole="header">
+                  {g.title}
+                </AppText>
+                <AppText variant="caption" color={colors.textMuted}>
+                  {g.blurb}
+                </AppText>
+              </View>
+              {g.games.map((e) =>
+                e.kind === 'classic' ? (
+                  <GameCard key={e.id} id={e.id} featured={overview.status === 'ready' && overview.data.competition?.game === e.id && overview.data.competition.phase === 'active'} />
+                ) : (
+                  <ArenaCard key={e.id} id={e.id} />
+                ),
+              )}
+            </View>
           ))}
         </View>
       </ScrollView>
@@ -308,22 +322,19 @@ function ArenaCard({ id }: { id: ArenaGameId }) {
       accessibilityRole="button"
       accessibilityLabel={`${g.title}. ${g.tagline} ${g.question}${tally ? ` Your record: ${record!.w} won of ${n}.` : ''}`}
       style={({ pressed }) => [styles.card, pressed && { backgroundColor: colors.surfaceHigh }]}>
-      <ArenaArt game={id} size={64} />
-      <View style={{ flex: 1, gap: 4 }}>
+      <ArenaArt game={id} size={48} />
+      <View style={{ flex: 1, gap: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs, flexWrap: 'wrap' }}>
-          <AppText variant="bodyStrong">{g.title}</AppText>
+          <AppText variant="small" weight="semibold">
+            {g.title}
+          </AppText>
           {tally ? <Badge label={tally} /> : null}
         </View>
-        <AppText variant="small" color={colors.textBody}>
-          {g.tagline}
-        </AppText>
-        <AppText variant="caption" color={ARENA_TINT[id].fg}>
+        <AppText variant="caption" color={ARENA_TINT[id].fg} numberOfLines={2}>
           {g.question}
         </AppText>
       </View>
-      <View style={styles.play}>
-        <Play size={16} color={colors.text} fill={colors.text} />
-      </View>
+      <ArrowRight size={16} color={colors.textMuted} />
     </Pressable>
   );
 }
@@ -336,22 +347,19 @@ function GameCard({ id, featured }: { id: GameId; featured: boolean }) {
       accessibilityRole="button"
       accessibilityLabel={`${g.title}${featured ? ', this week’s featured game' : ''}. ${g.action} ${g.concept}`}
       style={({ pressed }) => [styles.card, pressed && { backgroundColor: colors.surfaceHigh }, featured && { borderColor: 'rgba(253,186,116,0.45)' }]}>
-      <GameArt game={id} size={64} />
-      <View style={{ flex: 1, gap: 4 }}>
+      <GameArt game={id} size={48} />
+      <View style={{ flex: 1, gap: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs, flexWrap: 'wrap' }}>
-          <AppText variant="bodyStrong">{g.title}</AppText>
+          <AppText variant="small" weight="semibold">
+            {g.title}
+          </AppText>
           {featured ? <Badge label="This week" tone="amber" /> : null}
         </View>
-        <AppText variant="small" color={colors.textBody}>
-          {g.action}
-        </AppText>
-        <AppText variant="caption" color={GAME_TINT[id].fg}>
+        <AppText variant="caption" color={GAME_TINT[id].fg} numberOfLines={2}>
           {g.concept}
         </AppText>
       </View>
-      <View style={styles.play}>
-        <Play size={16} color={colors.text} fill={colors.text} />
-      </View>
+      <ArrowRight size={16} color={colors.textMuted} />
     </Pressable>
   );
 }
@@ -364,6 +372,6 @@ const styles = StyleSheet.create({
   boards: { flexDirection: 'row', gap: space.sm },
   board: { flex: 1, alignItems: 'center', gap: 4, minHeight: 64, justifyContent: 'center', padding: space.sm, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, minHeight: 56 },
-  card: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
-  play: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  card: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.sm, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  filter: { minHeight: 44, justifyContent: 'center', paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
 });

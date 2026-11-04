@@ -1,0 +1,57 @@
+
+## market
+- fixed 9: E 90w/10d [inve:100 bank:97 deal:82 oppo:82] profit=1199.3 | N 13w/88d [inve:17 bank:17 deal:0 oppo:15] profit=1004.7 | H 17w/83d [inve:19 bank:21 deal:9 oppo:18] profit=1031.0
+- fixed 10: E 82w/15d [inve:87 bank:87 deal:87 oppo:67] profit=1363.7 | N 48w/53d [inve:41 bank:41 deal:65 oppo:42] profit=1124.1 | H 50w/51d [inve:38 bank:52 deal:70 oppo:38] profit=1145.9
+- fixed 11: E 28w/10d [inve:45 bank:22 deal:46 oppo:0] profit=1406.1 | N 0w/15d [inve:0 bank:0 deal:0 oppo:0] profit=1149.7 | H 0w/0d [inve:0 bank:0 deal:0 oppo:0] profit=1133.9
+- fixed 12: E 17w/0d [inve:34 bank:0 deal:33 oppo:0] profit=1402.3 | N 0w/0d [inve:0 bank:0 deal:0 oppo:0] profit=1097.3 | H 0w/0d [inve:0 bank:0 deal:0 oppo:0] profit=1072.7
+- best reply to last prices (adaptive): E 52w/17d [inve:58 bank:65 deal:70 oppo:17] profit=1401.8 | N 2w/97d [inve:3 bank:0 deal:5 oppo:0] profit=1150.1 | H 0w/92d [inve:0 bank:1 deal:1 oppo:0] profit=1160.5
+- best reply then hold one above (adaptive): E 20w/6d [inve:34 bank:8 deal:39 oppo:0] profit=1398.0 | N 0w/0d [inve:0 bank:0 deal:0 oppo:0] profit=1133.0 | H 0w/0d [inve:0 bank:0 deal:0 oppo:0] profit=1139.8
+- undercut lowest by 1 (floor cost+3): E 97w/3d [inve:100 bank:99 deal:96 oppo:94] profit=1342.7 | N 62w/39d [inve:66 bank:62 deal:56 oppo:62] profit=1067.3 | H 73w/27d [inve:67 bank:68 deal:86 oppo:71] profit=1081.9
+
+## liars-dice
+- open then always call: E 17w/0d [calc:0 aggr:63 cons:3 psyc:1] | N 1w/0d [calc:0 aggr:0 cons:0 psyc:3] | H 0w/0d [calc:0 aggr:0 cons:0 psyc:1]
+- never call (raise own best): E 52w/0d [calc:23 aggr:3 cons:97 psyc:83] | N 37w/0d [calc:49 aggr:1 cons:86 psyc:12] | H 24w/0d [calc:11 aggr:1 cons:80 psyc:2]
+- call below 50% (fair dice): E 43w/0d [calc:9 aggr:70 cons:59 psyc:33] | N 23w/0d [calc:13 aggr:7 cons:50 psyc:23] | H 13w/0d [calc:7 aggr:7 cons:23 psyc:15]
+- call below 30% (fair dice): E 66w/0d [calc:29 aggr:71 cons:87 psyc:78] | N 46w/0d [calc:50 aggr:23 cons:80 psyc:31] | H 33w/0d [calc:27 aggr:22 cons:61 psyc:23]
+- adaptive: assumes bot holds what it bids: E 71w/0d [calc:35 aggr:74 cons:93 psyc:83] | N 51w/0d [calc:55 aggr:25 cons:84 psyc:40] | H 40w/0d [calc:38 aggr:25 cons:73 psyc:25]
+
+## power-play
+- always Treasury, allow: E 40w/0d [hone:63 bluf:63 chal:12 mani:20] turns=8.0 | N 19w/0d [hone:25 bluf:23 chal:8 mani:20] turns=7.8 | H 21w/0d [hone:25 bluf:23 chal:14 mani:20] turns=7.6
+- always Treasury, challenge decisive claims: E 48w/0d [hone:77 bluf:77 chal:12 mani:24] turns=7.7 | N 25w/0d [hone:29 bluf:29 chal:17 mani:24] turns=7.6 | H 26w/0d [hone:29 bluf:29 chal:21 mani:24] turns=7.4
+- Income only, allow: E 9w/3d [hone:14 bluf:8 chal:13 mani:3] turns=9.8 | N 8w/5d [hone:14 bluf:3 chal:13 mani:3] turns=9.8 | H 8w/5d [hone:14 bluf:3 chal:13 mani:3] turns=9.8
+- honest roles, allow: E 43w/2d [hone:41 bluf:27 chal:81 mani:23] turns=9.2 | N 34w/3d [hone:41 bluf:27 chal:47 mani:23] turns=9.2 | H 45w/3d [hone:41 bluf:27 chal:87 mani:23] turns=8.9
+- always Steal, allow: E 12w/6d [hone:34 bluf:0 chal:12 mani:2] turns=9.2 | N 9w/6d [hone:17 bluf:0 chal:16 mani:2] turns=9.1 | H 8w/6d [hone:17 bluf:0 chal:12 mani:2] turns=8.9
+- adaptive: real roles, else bluff; counts cards: E 49w/7d [hone:48 bluf:41 chal:78 mani:31] turns=9.0 | N 38w/8d [hone:41 bluf:33 chal:49 mani:31] turns=8.8 | H 47w/7d [hone:41 bluf:33 chal:82 mani:31] turns=8.5
+
+## bluff
+- honest, believe: E 31w/6d [caut:53 risk:9 obse:42 perf:21] pts=10.6 | N 27w/5d [caut:24 risk:12 obse:53 perf:21] pts=10.6 | H 18w/4d [caut:13 risk:11 obse:31 perf:19] pts=10.6
+- honest, always call: E 53w/2d [caut:7 risk:100 obse:11 perf:95] pts=10.0 | N 56w/3d [caut:37 risk:96 obse:13 perf:79] pts=9.3 | H 51w/2d [caut:5 risk:96 obse:25 perf:77] pts=9.1
+- value+1, press to 3, always call: E 49w/2d [caut:20 risk:100 obse:4 perf:72] pts=9.0 | N 45w/2d [caut:37 risk:91 obse:1 perf:51] pts=6.8 | H 41w/2d [caut:11 risk:91 obse:3 perf:59] pts=6.6
+- honest, call long odds: E 64w/4d [caut:40 risk:96 obse:35 perf:83] pts=12.0 | N 63w/4d [caut:35 risk:93 obse:44 perf:81] pts=12.1 | H 62w/4d [caut:46 risk:95 obse:26 perf:81] pts=12.3
+- adaptive: odds + its record; bluff small: E 53w/2d [caut:29 risk:100 obse:5 perf:77] pts=10.5 | N 47w/3d [caut:36 risk:91 obse:1 perf:61] pts=8.5 | H 47w/3d [caut:25 risk:91 obse:4 perf:67] pts=8.7
+
+## signal
+- honest send, always pass: E 0w/11d [inve:0 bank:0 deal:0 oppo:0] tokens=3.8 | N 1w/11d [inve:0 bank:2 deal:0 oppo:0] tokens=3.8 | H 0w/11d [inve:0 bank:0 deal:0 oppo:0] tokens=3.8
+- always pitch, invest unless warned: E 83w/6d [inve:77 bank:94 deal:87 oppo:73] tokens=15.6 | N 71w/8d [inve:83 bank:82 deal:73 oppo:44] tokens=13.0 | H 72w/2d [inve:85 bank:87 deal:68 oppo:47] tokens=12.2
+- honest send, invest unless warned: E 29w/20d [inve:29 bank:35 deal:35 oppo:17] tokens=13.4 | N 31w/19d [inve:35 bank:44 deal:35 oppo:11] tokens=13.2 | H 28w/21d [inve:35 bank:35 deal:35 oppo:9] tokens=13.1
+- always pitch, adaptive receive: E 84w/2d [inve:82 bank:87 deal:83 oppo:82] tokens=12.8 | N 73w/3d [inve:73 bank:72 deal:81 oppo:65] tokens=10.8 | H 69w/6d [inve:73 bank:74 deal:70 oppo:58] tokens=10.3
+- honest send, adaptive receive: E 25w/1d [inve:25 bank:27 deal:27 oppo:21] tokens=10.6 | N 24w/2d [inve:27 bank:27 deal:27 oppo:15] tokens=10.6 | H 24w/1d [inve:27 bank:27 deal:27 oppo:15] tokens=10.5
+- pitch after trust, adaptive receive: E 69w/1d [inve:82 bank:27 deal:83 oppo:82] tokens=13.1 | N 43w/3d [inve:45 bank:45 deal:53 oppo:31] tokens=11.1 | H 36w/3d [inve:43 bank:32 deal:45 oppo:25] tokens=10.8
+
+## mole
+- exact Bayes (camera + nervous): E 63w/0d [inve:63 soci:63 dece:63 oppo:63] | N 63w/0d [inve:63 soci:63 dece:63 oppo:63] | H 63w/0d [inve:63 soci:63 dece:63 oppo:63]
+- most accused: E 43w/0d [inve:42 soci:40 dece:45 oppo:43] | N 43w/0d [inve:42 soci:40 dece:45 oppo:43] | H 43w/0d [inve:41 soci:41 dece:45 oppo:43]
+- Bayes x accusations (adaptive): E 66w/0d [inve:65 soci:67 dece:66 oppo:65] | N 66w/0d [inve:65 soci:67 dece:66 oppo:65] | H 66w/0d [inve:66 soci:66 dece:66 oppo:65]
+- random: E 21w/0d [inve:18 soci:21 dece:24 oppo:23] | N 24w/0d [inve:21 soci:24 dece:26 oppo:25] | H 24w/0d [inve:27 soci:25 dece:23 oppo:22]
+
+## coalition
+- fair split, accept all: E 17w/4d [loya:24 brok:11 swit:17 fair:16] failedBills=0.5 | N 17w/3d [loya:23 brok:10 swit:14 fair:20] failedBills=1.5 | H 21w/1d [loya:23 brok:21 swit:18 fair:23] failedBills=1.7
+- half split, accept all: E 3w/5d [loya:1 brok:4 swit:9 fair:0] failedBills=3.9 | N 1w/10d [loya:0 brok:2 swit:3 fair:0] failedBills=5.0 | H 1w/8d [loya:0 brok:2 swit:3 fair:0] failedBills=4.9
+- adaptive: cheapest proven partner, accept all: E 25w/2d [loya:21 brok:21 swit:31 fair:25] failedBills=0.6 | N 16w/4d [loya:14 brok:13 swit:16 fair:20] failedBills=1.6 | H 18w/1d [loya:19 brok:15 swit:17 fair:22] failedBills=1.8
+- adaptive: cheapest proven partner, reject <70% fair: E 22w/3d [loya:19 brok:19 swit:26 fair:23] failedBills=0.8 | N 25w/3d [loya:23 brok:25 swit:25 fair:25] failedBills=1.7 | H 20w/1d [loya:19 brok:19 swit:17 fair:23] failedBills=1.8
+- adaptive: +1 over proven, reject <70% fair: E 17w/3d [loya:18 brok:17 swit:13 fair:18] failedBills=0.7 | N 21w/5d [loya:23 brok:21 swit:21 fair:19] failedBills=1.7 | H 21w/1d [loya:22 brok:20 swit:19 fair:23] failedBills=1.6
+
+## last-stand
+- refill every round (no effort): E 100w/0d [plan:100 resp:100 guar:100 coor:100] rounds=8.0 | N 11w/0d [plan:11 resp:11 guar:10 coor:11] rounds=4.1 | H 3w/0d [plan:3 resp:3 guar:3 coor:3] rounds=3.2
+- douse other hottest: E 100w/0d [plan:100 resp:100 guar:100 coor:100] rounds=8.0 | N 86w/0d [plan:94 resp:94 guar:60 coor:94] rounds=7.8 | H 47w/0d [plan:51 resp:51 guar:30 coor:55] rounds=6.8
+- adaptive: covers by threat, manages water: E 100w/0d [plan:100 resp:100 guar:100 coor:100] rounds=8.0 | N 33w/0d [plan:28 resp:44 guar:31 coor:28] rounds=6.2 | H 11w/0d [plan:11 resp:17 guar:7 coor:10] rounds=5.0

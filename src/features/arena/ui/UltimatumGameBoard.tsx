@@ -1,170 +1,132 @@
-import { memo, useState } from 'react';
+import { useState } from 'react';
 import { View } from 'react-native';
 
+import { ChoiceTile } from '@/src/components/game/MatchChrome';
+import { CompactReveal, MatchLog } from '@/src/components/game/MatchLog';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Check, Send, X } from '@/src/components/ui/icons';
 import { Slider } from '@/src/components/ui/Slider';
 import { type UltAction, type UltRound, type UltState, type UltTerms, ultPrompt } from '@/src/arena/ultimatum-game';
-import { haptic } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
-import { ActionTile, type BoardProps, Reveal, Row, Stat } from './parts';
+import { type BoardProps, Row } from './parts';
 
-/** The pool as tokens: the first `mine` are yours (blue), the rest theirs (amber). */
-const TokenPool = memo(function TokenPool({ pool, mine, label }: { pool: number; mine: number; label: string }) {
-  return (
-    <View style={{ gap: space.xs }} accessible accessibilityLabel={label}>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'center', maxWidth: 10 * 27, alignSelf: 'center' }}>
-        {Array.from({ length: pool }, (_, i) => (
-          <View key={i} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: i < mine ? colors.primary : colors.insight, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.22)' }} />
-        ))}
-      </View>
-    </View>
-  );
-});
-
-function Terms({ t, name }: { t: UltTerms; name: string }) {
+/**
+ * The pool as one bar: your share in blue, theirs in amber. The ticks mark each side's walk-away value, so you can see
+ * whether a split clears what each of you gets by saying no. This is what sets the Arena game apart from the classic.
+ */
+function PoolBar({ t, mine }: { t: UltTerms; mine: number }) {
+  const pct = (x: number) => `${(x / t.pool) * 100}%` as const;
   const walk = t.walkPlayer > 0 || t.walkBot > 0;
+  const theirs = t.pool - mine;
+  const youClear = mine >= t.walkPlayer;
+  const theyClear = theirs >= t.walkBot;
   return (
-    <Row style={{ flexWrap: 'wrap', padding: space.md, borderRadius: radius.lg, backgroundColor: colors.bgRaised, borderWidth: 1, borderColor: colors.border }}>
-      <Stat label="Pool" value={`${t.pool} tokens`} color={colors.insight} />
-      <Stat label="Proposer" value={t.proposer === 'player' ? 'You' : name} />
-      {walk ? <Stat label="Walk-away · you / them" value={`${t.walkPlayer} / ${t.walkBot}`} /> : <Stat label="If rejected" value="0 each" />}
-    </Row>
+    <View style={{ gap: 4 }} accessible accessibilityLabel={`You ${mine}, they ${theirs}, of ${t.pool}.${walk ? ` Walk-away: you ${t.walkPlayer}, they ${t.walkBot}.` : ' Rejection leaves both with nothing.'}`}>
+      <Row style={{ justifyContent: 'space-between' }}>
+        <AppText variant="small" weight="semibold" color={colors.primaryText} tabular>
+          You {mine}
+        </AppText>
+        <AppText variant="caption" color={colors.textMuted} tabular>
+          pool {t.pool}
+        </AppText>
+        <AppText variant="small" weight="semibold" color={colors.insight} tabular>
+          They {theirs}
+        </AppText>
+      </Row>
+      <View style={{ height: 26, justifyContent: 'center' }}>
+        <View style={{ flexDirection: 'row', height: 16, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.surfaceHigh }}>
+          <View style={{ width: pct(mine), backgroundColor: colors.primary }} />
+          <View style={{ flex: 1, backgroundColor: colors.insight, opacity: 0.85 }} />
+        </View>
+        {t.walkPlayer > 0 ? <View style={{ position: 'absolute', left: pct(t.walkPlayer), width: 3, marginLeft: -1, height: 26, backgroundColor: colors.text }} /> : null}
+        {t.walkBot > 0 ? <View style={{ position: 'absolute', right: pct(t.walkBot), width: 3, marginRight: -1, height: 26, backgroundColor: colors.text }} /> : null}
+      </View>
+      {walk ? (
+        <Row style={{ justifyContent: 'space-between' }}>
+          <AppText variant="caption" color={youClear ? colors.success : colors.danger} tabular>
+            {youClear ? 'clears' : 'below'} your walk-away {t.walkPlayer}
+          </AppText>
+          <AppText variant="caption" color={theyClear ? colors.success : colors.danger} tabular>
+            {theyClear ? 'clears' : 'below'} theirs {t.walkBot}
+          </AppText>
+        </Row>
+      ) : (
+        <AppText variant="caption" color={colors.textMuted}>
+          If rejected, each of you gets nothing.
+        </AppText>
+      )}
+    </View>
   );
 }
 
-function Propose({ t, act, name }: { t: UltTerms; act: (a: UltAction) => void; name: string }) {
+function Propose({ t, act }: { t: UltTerms; act: (a: UltAction) => void }) {
   const [offer, setOffer] = useState(Math.round(t.pool * 0.4));
-  const keep = t.pool - offer;
   return (
-    <View style={{ gap: space.md }}>
+    <View style={{ gap: space.sm }}>
       <AppText variant="overline" color={colors.primaryText}>
         You propose · how many do they get?
       </AppText>
-      <TokenPool pool={t.pool} mine={keep} label={`You keep ${keep}, they get ${offer}.`} />
-      <Row style={{ justifyContent: 'space-between' }}>
-        <AppText variant="bodyStrong" color={colors.primaryText} tabular>
-          You keep {keep}
-        </AppText>
-        <AppText variant="bodyStrong" color={colors.insight} tabular>
-          {name.replace(/^The /, '')} gets {offer}
-        </AppText>
-      </Row>
-      <Slider value={offer} min={0} max={t.pool} step={1} onChange={setOffer} label={`Tokens offered to ${name}`} hideLabel showValue={false} tone="orange" />
-      <AppText variant="caption" color={colors.textMuted}>
-        If {name} rejects, you get {t.walkPlayer} and it gets {t.walkBot}.
-      </AppText>
-      <Button
-        label={`Offer ${offer} of ${t.pool}`}
-        icon={Send}
-        onPress={() => {
-          haptic.commit();
-          act(offer);
-        }}
-      />
+      <PoolBar t={t} mine={t.pool - offer} />
+      <Slider value={offer} min={0} max={t.pool} step={1} onChange={setOffer} label="Tokens offered" hideLabel showValue={false} tone="orange" />
+      <Button label={`Offer ${offer} of ${t.pool}`} icon={Send} onPress={() => act(offer)} />
     </View>
   );
 }
 
-function Respond({ t, offer, act, name }: { t: UltTerms; offer: number; act: (a: UltAction) => void; name: string }) {
+function Respond({ t, offer, act }: { t: UltTerms; offer: number; act: (a: UltAction) => void }) {
   return (
-    <View style={{ gap: space.md }}>
+    <View style={{ gap: space.sm }}>
       <AppText variant="overline" color={colors.insight}>
-        {name} proposes
+        They propose · {offer} for you
       </AppText>
-      <TokenPool pool={t.pool} mine={offer} label={`${name} offers you ${offer} and keeps ${t.pool - offer}.`} />
-      <AppText variant="heading" align="center" tabular>
-        {offer} for you · {t.pool - offer} for {name.replace(/^The /, '')}
-      </AppText>
-      <View style={{ flexDirection: 'row', gap: space.md }}>
-        <ActionTile
-          label="Accept"
-          hint={`You get ${offer}, it gets ${t.pool - offer}`}
-          icon={Check}
-          tint={colors.success}
-          bg={colors.successSoft}
-          onPress={() => {
-            haptic.commit();
-            act('accept');
-          }}
-        />
-        <ActionTile
-          label="Reject"
-          hint={`You get ${t.walkPlayer}, it gets ${t.walkBot}`}
-          icon={X}
-          tint={colors.rivalText}
-          bg={colors.rivalSoft}
-          onPress={() => {
-            haptic.commit();
-            act('reject');
-          }}
-        />
+      <PoolBar t={t} mine={offer} />
+      <View style={{ flexDirection: 'row', gap: space.sm }}>
+        <ChoiceTile compact label="Accept" hint={`You ${offer}, they ${t.pool - offer}`} icon={<Check size={18} color={colors.success} />} tint={colors.success} bg={colors.successSoft} onPress={() => act('accept')} />
+        <ChoiceTile compact label="Reject" hint={`You ${t.walkPlayer}, they ${t.walkBot}`} icon={<X size={18} color={colors.rivalText} />} tint={colors.rivalText} bg={colors.rivalSoft} onPress={() => act('reject')} />
       </View>
     </View>
   );
 }
 
-function verdict(r: UltRound, name: string): string {
-  if (r.proposer === 'player') return r.accepted ? `${name} accepted ${r.offer} of ${r.pool}. You keep ${r.ps}.` : `${name} rejected your offer of ${r.offer}. Walk-aways: you ${r.ps}, it ${r.bs}.`;
-  return r.accepted ? `You accepted ${r.offer} of ${r.pool}. ${name} keeps ${r.bs}.` : `You rejected ${r.offer}. Walk-aways: you ${r.ps}, it ${r.bs}.`;
+function verdict(r: UltRound): string {
+  if (r.proposer === 'player') return r.accepted ? `Deal: they took ${r.offer} of ${r.pool}. You +${r.ps}, them +${r.bs}.` : `No deal: they turned down ${r.offer} of ${r.pool}. You +${r.ps}, them +${r.bs}.`;
+  return r.accepted ? `Deal: you took ${r.offer} of ${r.pool}. You +${r.ps}, them +${r.bs}.` : `No deal: you turned down ${r.offer} of ${r.pool}. You +${r.ps}, them +${r.bs}.`;
 }
 
-export function UltimatumGameBoard({ state, act, over, rivalName }: BoardProps<UltState, UltAction>) {
+export function UltimatumGameBoard({ state, act, over }: BoardProps<UltState, UltAction>) {
   const h = state.rounds;
   const last = h[h.length - 1];
   const p = ultPrompt(state);
   return (
-    <View style={{ gap: space.lg }}>
-      {last ? (
-        <Reveal revealKey={h.length} tone={last.accepted ? 'good' : 'bad'} overline={`Round ${h.length} · ${last.accepted ? 'Deal' : 'No deal'}`}>
-          <AppText variant="bodyStrong" accessibilityLiveRegion="polite">
-            {verdict(last, rivalName)}
-          </AppText>
-          <Row>
-            <AppText variant="small" color={colors.primaryText} tabular>
-              You +{last.ps}
-            </AppText>
-            <AppText variant="small" color={colors.insight} tabular>
-              {rivalName} +{last.bs}
-            </AppText>
-          </Row>
-        </Reveal>
-      ) : null}
+    <View style={{ gap: space.sm }}>
+      {last ? <CompactReveal revealKey={h.length} tone={last.accepted ? 'good' : 'bad'} summary={verdict(last)} /> : null}
 
       {!over && p ? (
-        <View style={{ gap: space.md }}>
-          <Terms t={p.terms} name={rivalName} />
-          {p.terms.proposer === 'player' ? (
-            <Propose key={h.length} t={p.terms} act={act} name={rivalName} />
-          ) : (
-            <Respond t={p.terms} offer={p.botOffer!} act={act} name={rivalName} />
-          )}
+        <View style={{ gap: space.sm, padding: space.md, borderRadius: radius.lg, borderWidth: 1, borderColor: 'rgba(253,186,116,0.3)', backgroundColor: colors.surface }}>
+          {p.terms.proposer === 'player' ? <Propose key={h.length} t={p.terms} act={act} /> : <Respond t={p.terms} offer={p.botOffer!} act={act} />}
         </View>
       ) : null}
 
       {h.length ? (
-        <View style={{ gap: space.xs }}>
-          <AppText variant="caption" color={colors.textMuted}>
-            Negotiations so far
-          </AppText>
+        <MatchLog title="Negotiations so far" summary={`${h.filter((r) => r.accepted).length} deals, ${h.filter((r) => !r.accepted).length} rejected`}>
           {h.map((r, i) => (
-            <Row key={i} style={{ paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-              <AppText variant="caption" color={colors.textMuted} tabular style={{ width: 26 }}>
+            <Row key={i} style={{ paddingVertical: 3 }}>
+              <AppText variant="caption" color={colors.textMuted} tabular style={{ width: 24 }}>
                 R{i + 1}
               </AppText>
-              <AppText variant="small" color={colors.textBody} style={{ flex: 1 }} numberOfLines={1}>
+              <AppText variant="caption" color={colors.textBody} style={{ flex: 1 }} numberOfLines={1}>
                 {r.proposer === 'player' ? 'You offered' : 'They offered'} {r.offer}/{r.pool}
               </AppText>
-              <AppText variant="small" weight="semibold" color={r.accepted ? colors.success : colors.rivalText}>
+              <AppText variant="caption" weight="semibold" color={r.accepted ? colors.success : colors.rivalText}>
                 {r.accepted ? 'accepted' : 'rejected'}
               </AppText>
-              <AppText variant="small" tabular color={colors.textMuted} style={{ width: 52, textAlign: 'right' }}>
+              <AppText variant="caption" tabular color={colors.textMuted} style={{ width: 44, textAlign: 'right' }}>
                 {r.ps}–{r.bs}
               </AppText>
             </Row>
           ))}
-        </View>
+        </MatchLog>
       ) : null}
     </View>
   );

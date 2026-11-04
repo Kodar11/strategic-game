@@ -82,15 +82,15 @@ export function pAtLeast(n: number, k: number, p = 1 / FACES): number {
 
 /**
  * P(a bid is true) from the bot's view: its own matching dice plus the chance your hidden dice make up the rest.
- * Hard also reads your bids: a face you have bid makes it assume one more of that face in your cup is likelier
- * (p = 1/4 instead of 1/6 for that face). Easy forgets its own cup and treats every die as unknown.
+ * Normal and Hard also read your bids: a face you have bid this round is likelier to be in your cup (p = 1/4 on Normal,
+ * 1/3 on Hard, instead of 1/6). Easy forgets its own cup and treats every die as unknown.
  */
 function pTrue(s: DiceState, own: number[], b: { q: number; f: number }, bids: Bid[]): number {
   // Easy forgets to count its own cup: it treats every die on the table as unknown.
   if (s.setup.level === 'easy') return pAtLeast(s.count.player + s.count.bot, b.q);
   const mine = own.filter((d) => d === b.f).length;
   const yours = bids.some((x) => x.by === 'player' && x.f === b.f);
-  const p = s.setup.level === 'hard' && yours ? 1 / 4 : 1 / FACES;
+  const p = yours ? (s.setup.level === 'hard' ? 1 / 3 : 1 / 4) : 1 / FACES;
   return pAtLeast(s.count.player, b.q - mine, p);
 }
 
@@ -126,7 +126,9 @@ export function botMove(s: DiceState, own: number[], bids: Bid[], u: number, v: 
   }
   if (prev) {
     const pPrev = pTrue(s, own, prev, bids);
-    const callBelow = persona === 'calculator' ? 0.5 : persona === 'aggressive' ? 0.2 : persona === 'conservative' ? 0.6 : 0.4;
+    // Normal and Hard notice a player who never calls: raising is safer against them, so a call must be surer.
+    const timid = level !== 'easy' && s.rounds.length >= 2 && !s.rounds.some((r) => r.caller === 'player');
+    const callBelow = (persona === 'calculator' ? 0.5 : persona === 'aggressive' ? 0.2 : persona === 'conservative' ? 0.6 : 0.4) * (timid ? 0.6 : 1);
     if (level === 'easy' && persona === 'calculator' ? pPrev < 0.3 : pPrev < callBelow) return { kind: 'liar' };
     if (!legal.length) return { kind: 'liar' };
   }
@@ -216,13 +218,13 @@ function diceDebrief(s: DiceState): Debrief {
   const goodCall = h.find(({ r }) => r.caller === 'player' && r.loser === 'bot');
   const caughtYou = h.find(({ r }) => r.caller === 'bot' && r.loser === 'player');
   const last = (r: DiceRound) => r.bids[r.bids.length - 1];
-  if (goodCall) moments.push({ at: goodCall.i, text: `Round ${goodCall.i + 1}: you called its ${last(goodCall.r).q} ${faceName(last(goodCall.r).f)} — there were ${goodCall.r.count}. It lost a die.` });
+  if (goodCall) moments.push({ at: goodCall.i, text: `Round ${goodCall.i + 1}: you called its ${bidText(last(goodCall.r))} — there were ${goodCall.r.count}. It lost a die.` });
   if (badCall) {
     const b = last(badCall.r);
     const mine = badCall.r.dice.player.filter((d) => d === b.f).length;
-    moments.push({ at: badCall.i, text: `Round ${badCall.i + 1}: you called ${b.q} ${faceName(b.f)} with ${mine} in your own cup — there were ${badCall.r.count}. A ${Math.round(pAtLeast(badCall.r.dice.bot.length, b.q - mine) * 100)}% bid from your view: plausible isn’t certain.` });
+    moments.push({ at: badCall.i, text: `Round ${badCall.i + 1}: you called ${bidText(b)} with ${mine} in your own cup — there were ${badCall.r.count}. A ${Math.round(pAtLeast(badCall.r.dice.bot.length, b.q - mine) * 100)}% bid from your view: plausible isn’t certain.` });
   }
-  if (caughtYou && moments.length < 3) moments.push({ at: caughtYou.i, text: `Round ${caughtYou.i + 1}: it called your ${last(caughtYou.r).q} ${faceName(last(caughtYou.r).f)} — only ${caughtYou.r.count} on the table.` });
+  if (caughtYou && moments.length < 3) moments.push({ at: caughtYou.i, text: `Round ${caughtYou.i + 1}: it called your ${bidText(last(caughtYou.r))} — only ${caughtYou.r.count} on the table.` });
   if (!moments.length) moments.push({ at: 0, text: `${s.rounds.length} rounds, ${s.count.player} dice left for you, ${s.count.bot} for it.` });
   const d = DICE(s.setup.length);
   const insight = `Your own cup is information: each hidden die shows a given face 1/6 of the time, so ${d} hidden dice hold about ${(d / FACES).toFixed(1)} of any face. A bid is a claim about probability, not a fact — call when it needs more from the hidden dice than they are likely to give, and remember the bidder’s own cup is why it bid.`;
@@ -240,7 +242,7 @@ function diceDebrief(s: DiceState): Debrief {
     headline: s.count.bot === 0 ? 'Last die standing' : 'Out of dice',
     moments: moments.sort((a, b) => a.at - b.at).slice(0, 3).map((m) => m.text),
     insight,
-    opponentRead: `${DICE_NAME[s.setup.persona]} ${style[s.setup.persona]}: ${theirBids.length} bids (${bluffs} on a face it didn’t hold) and ${calls} calls.${ex ? ` For example it bid ${ex.b.q} ${faceName(ex.b.f)} holding none.` : ''}`,
+    opponentRead: `${DICE_NAME[s.setup.persona]} ${style[s.setup.persona]}: ${theirBids.length} bids (${bluffs} on a face it didn’t hold) and ${calls} calls.${ex ? ` For example it bid ${bidText(ex.b)} holding none.` : ''}`,
   };
 }
 

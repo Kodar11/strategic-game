@@ -1,0 +1,12 @@
+old default (mean-0.6u) easy win 32% profit 20.2
+old default (mean-0.6u) normal win 37% profit 8.3
+old default (mean-0.6u) hard win 35% profit 7.5
+new default (public low) easy win 7% profit 11.8
+new default (public low) normal win 2% profit 1.6
+new default (public low) hard win 2% profit 1.3
+raw estimate easy win 9% profit 3.1
+raw estimate normal win 9% profit -5.6
+raw estimate hard win 8% profit -6.5
+mean-1.0u easy win 56% profit 28.9
+mean-1.0u normal win 39% profit 11.2
+mean-1.0u hard win 33% profit 9.6

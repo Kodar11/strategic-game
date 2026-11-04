@@ -90,10 +90,12 @@ export function Die({ face, size = 34, highlight, hidden }: { face: number; size
   const fill = hidden ? colors.surfaceHigh : highlight ? colors.insight : colors.text;
   const pip = hidden ? colors.textFaint : colors.bg;
   return (
-    <Svg width={size} height={size} viewBox="0 0 40 40" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <Rect x={2} y={2} width={36} height={36} rx={8} fill={fill} stroke={hidden ? colors.borderStrong : 'none'} strokeWidth={1.5} />
-      {hidden ? <Circle cx={20} cy={20} r={4} fill={pip} /> : (PIPS[face] ?? []).map(([x, y], i) => <Circle key={i} cx={x * 9 + 2} cy={y * 9 + 2} r={3.6} fill={pip} />)}
-    </Svg>
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ width: size, height: size }}>
+      <Svg width={size} height={size} viewBox="0 0 40 40">
+        <Rect x={2} y={2} width={36} height={36} rx={8} fill={fill} stroke={hidden ? colors.borderStrong : 'none'} strokeWidth={1.5} />
+        {hidden ? <Circle cx={20} cy={20} r={4} fill={pip} /> : (PIPS[face] ?? []).map(([x, y], i) => <Circle key={i} cx={x * 9 + 2} cy={y * 9 + 2} r={3.6} fill={pip} />)}
+      </Svg>
+    </View>
   );
 }
 

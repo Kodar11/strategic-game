@@ -1,0 +1,18 @@
+// Audit probe: how often does a dealt Defusal clue rule out nothing? And how many cuts does the player get?
+const R = 'file:///C:/Users/ADMIN/Documents/Computer%20Science/React%20Native/strategic-game/src/';
+const def: any = await import(R + 'arena/defusal.ts');
+const { defusal, consistent, clueText } = def;
+for (const length of ['short', 'standard', 'long']) for (const level of ['easy', 'normal', 'hard']) {
+  let hands = 0, clues = 0, useless = 0, withUseless = 0; const samples = new Set<string>();
+  for (let i = 0; i < 500; i++) {
+    const s = defusal.create({ persona: 'methodical', level, length, variant: 'standard', seed: (i * 2654435761 + 5) >>> 0 });
+    const all = consistent(s, []).length;
+    let any = false;
+    for (const c of s.hands.player) {
+      clues++;
+      if (consistent(s, [c]).length === all) { useless++; any = true; samples.add(clueText(c)); }
+    }
+    hands++; if (any) withUseless++;
+  }
+  console.log({ length, level, hands, wires: defusal.create({ persona: 'methodical', level, length, variant: 'standard', seed: 1 }).wires, uselessClueRate: (useless / clues).toFixed(3), handsWithUseless: (withUseless / hands).toFixed(3), samples: [...samples].slice(0, 3) });
+}

@@ -60,7 +60,8 @@ Challenge modes unlock after one finished match of that game.
 
 A scratch simulation of fixed player strategies over 300 seeds per persona × level was used to tune bots. Examples:
 bidding your raw estimate against Normal rooms loses ~90 % of auctions (winner's curse); a careful shading bidder earns
-the most against Easy rooms and the least against Hard; always-defect never wins Cooperation; Hard Banker takes the
+the most against Easy rooms and the least against Hard; always-defect out-scores every Cooperation opponent while earning
+less than steady cooperation can (the results screen shows that trade-off); Hard Banker takes the
 final-round defection; greedy ultimatum offers beat Easy bots and mostly fail against Hard. The durable versions of
 these checks are in the test file.
 
@@ -120,10 +121,11 @@ is masked, since the other seats would otherwise give the rival away by eliminat
 
 - **When:** after `READ_RULES[game].after(total)` rounds — enough decisions to tell the personalities apart (two to four
   rounds, more in long matches; a short match may only allow a guess at the end). Documented per game in `READ_RULES`.
-- **How:** optional, from a compact panel under the board ("Think you've figured them out?"); changeable until the
-  match ends; the last guess counts. A match that ends without one offers a guess once before the reveal (skippable).
-- **Scoring:** right / wrong / unscored, kept locally (`reads` in `src/features/arena/records.ts`). No points, no effect
-  on the bot, the score or the outcome — the engines never receive the guess.
+- **How:** optional, from the shared read panel under the board (`src/components/game/ReadCard.tsx`). One read per match,
+  locked when made, as in the classic games (`src/games/read-rules.ts`). A match that ends without one offers it once
+  before the reveal (skippable).
+- **Scoring:** right / wrong / unscored, kept locally (`reads` in `src/features/arena/records.ts`). A right read shows
+  Insight Points at the reveal. No effect on the bot, the score or the outcome — the engines never receive the guess.
 - **Reveal:** the true personality, the guess, the verdict, and the engine's `debrief.opponentRead`, which cites this
   match's recorded decisions.
 - **Trust model:** like every Arena game, this is client-side; a player who inspects their own app can see the hidden

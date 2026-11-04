@@ -5,13 +5,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
-import { Button, IconButton } from '@/src/components/ui/Button';
-import { ArrowLeft, ListOrdered } from '@/src/components/ui/icons';
+import { Button } from '@/src/components/ui/Button';
+import { ListOrdered } from '@/src/components/ui/icons';
+import { LeaveGuard } from '@/src/components/game/LeaveGuard';
+import { MatchHeader, ScoreLine } from '@/src/components/game/MatchChrome';
+import { MatchLog } from '@/src/components/game/MatchLog';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { toDataError } from '@/src/data/errors';
 import type { ChallengeView, ServerMatch } from '@/src/data/games';
 import { gamesRepo, useGames } from '@/src/data/games-session';
-import { GAMES, personality } from '@/src/games/catalog';
+import { DIFFICULTY_LABEL, GAMES, personality } from '@/src/games/catalog';
 import { type GameId, isDifficulty, isGameId } from '@/src/games/core';
 import { ENGINES, engineFor } from '@/src/games/registry';
 import { MYSTERY_NAME } from '@/src/games/rps-insight';
@@ -19,7 +22,7 @@ import type { RpsRound } from '@/src/games/rps';
 import { type MatchView, usePracticeMatch, useServerMatch } from '@/src/features/games/useMatch';
 import { Board } from '@/src/features/games/ui/Board';
 import { ordinal } from '@/src/games/competition';
-import { OpponentBadges, Panel, ScoreBar } from '@/src/features/games/ui/parts';
+import { Panel } from '@/src/features/games/ui/parts';
 import { ResultPanel } from '@/src/features/games/ui/ResultPanel';
 import { RpsReveal, RpsRounds } from '@/src/features/games/ui/RpsReveal';
 import { ClassicReveal } from '@/src/features/games/ui/ClassicReveal';
@@ -213,21 +216,16 @@ function MatchLayout({ view, result }: { view: MatchView; result: React.ReactNod
   const readView = view.read && repeat.holding ? { ...view, read: { ...view.read, skip: () => (repeat.release(), view.read!.skip()) } } : view;
   const g = GAMES[view.game];
   const hidden = view.opponent === 'mystery' && !view.done;
-  const botName = view.game === 'two-thirds' ? 'Bot rounds' : hidden ? MYSTERY_NAME : (personality(view.game, view.bot)?.name ?? view.bot);
+  const botName = view.game === 'two-thirds' ? 'Rounds to the crowd' : hidden ? 'Opponent' : (personality(view.game, view.bot)?.name ?? view.bot);
   const close = () => (router.canGoBack() ? router.back() : router.replace('/games'));
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Backdrop />
-      <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: insets.top + space.md, paddingBottom: insets.bottom + space.huge }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: insets.top + space.xs, paddingBottom: insets.bottom + space.huge }} keyboardShouldPersistTaps="handled">
         <View style={styles.column}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-            <IconButton icon={ArrowLeft} label={view.mode === 'practice' || view.done ? 'Back' : 'Leave — you can resume this match later'} onPress={close} />
-            <AppText variant="heading" accessibilityRole="header" style={{ flex: 1 }} numberOfLines={1}>
-              {g.title}
-            </AppText>
-          </View>
-          <OpponentBadges game={view.game} bot={view.bot} difficulty={view.difficulty} mode={view.mode} hidden={hidden} />
-          <ScoreBar you={view.totals.player} bot={view.totals.bot} botName={botName} round={view.rounds.length + (view.done ? 0 : 1)} total={view.totalRounds} />
+          {view.mode === 'practice' ? <LeaveGuard started={view.rounds.length > 0} over={view.done} /> : null}
+          <MatchHeader title={g.title} meta={`${hidden ? MYSTERY_NAME : (personality(view.game, view.bot)?.name ?? view.bot)} · ${DIFFICULTY_LABEL[view.difficulty]} · ${view.mode === 'competition' ? 'Game of the Week' : view.mode === 'challenge' ? 'Friend challenge' : 'Practice'}`} progress={`Round ${Math.min(view.rounds.length + (view.done ? 0 : 1), view.totalRounds)}/${view.totalRounds}`} backLabel={view.mode === 'practice' || view.done ? 'Back' : 'Leave — you can resume this match later'} onBack={close} />
+          {view.done ? null : <ScoreLine you={view.totals.player} rival={view.totals.bot} rivalName={botName} />}
           {view.mode !== 'practice' && !view.done ? (
             <AppText variant="caption" color={colors.textMuted}>
               Played on the server: each move is sent and the bot answers there. {view.mode === 'competition' ? 'You can leave and resume until the week ends.' : 'You can leave and resume from the link.'}
@@ -238,10 +236,15 @@ function MatchLayout({ view, result }: { view: MatchView; result: React.ReactNod
               {view.error}
             </AppText>
           ) : null}
-          <Board view={board} />
+          {view.done && !repeat.holding ? null : <Board view={board} />}
           {repeatable ? <RepeatPanel repeat={repeat} hidden={!!view.read?.awaiting} /> : null}
           <ReadOpponentPanel view={readView} />
           {view.done ? repeat.holding ? <RepeatDone repeat={repeat} /> : result : null}
+          {view.done && !repeat.holding ? (
+            <MatchLog title="Final board" summary={`All ${view.rounds.length} rounds`}>
+              <Board view={board} />
+            </MatchLog>
+          ) : null}
         </View>
       </ScrollView>
     </View>
@@ -249,5 +252,5 @@ function MatchLayout({ view, result }: { view: MatchView; result: React.ReactNod
 }
 
 const styles = StyleSheet.create({
-  column: { maxWidth: MAX_CONTENT_WIDTH, width: '100%', alignSelf: 'center', gap: space.lg },
+  column: { maxWidth: MAX_CONTENT_WIDTH, width: '100%', alignSelf: 'center', gap: space.sm },
 });
