@@ -22,6 +22,8 @@ interface StoriesState extends StoriesSave {
   saveMeridian: (run: MeridianRun) => void;
   reflectMeridian: () => void;
   restart: (id: StoryId) => void;
+  /** Forget every story's progress (account deletion), after any write already queued. */
+  reset: () => Promise<void>;
 }
 
 let writes = Promise.resolve();
@@ -48,6 +50,11 @@ export const useStories = create<StoriesState>()((set, get) => {
       } catch {
         set({ loaded: true });
       }
+    },
+    reset: async () => {
+      set({ ...EMPTY_SAVE, loaded: true });
+      writes = writes.then(() => AsyncStorage.removeItem(KEY)).catch(() => undefined);
+      await writes;
     },
     saveCrossing: (pos, choices) => update({ crossing: { pos, choices, reflecting: false }, touched: { ...get().touched, crossing: Date.now() } }),
     reflectCrossing: () => {

@@ -18,6 +18,7 @@ import { MYSTERY, READ_RULES } from '@/src/arena/reads';
 import { TEAM_GAMES } from '@/src/features/arena/ui/library';
 import { MiniMatrix } from '@/src/features/games/ui/common';
 import { played, useArenaRecords } from '@/src/features/arena/records';
+import { RelatedGameLink } from '@/src/features/games/ui/RelatedGameLink';
 import { ARENA_TINT, ArenaArt, PERSONA_ICON } from '@/src/features/arena/ui/parts';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
@@ -110,6 +111,7 @@ export default function ArenaGameScreen() {
             </AppText>
           ) : null}
           <AppText color={colors.textBody}>{g.intro ?? g.tagline}</AppText>
+          <RelatedGameLink entry={{ kind: 'arena', id: gameId }} />
 
           <View style={[styles.question, { borderColor: tint.fg }]}>
             <AppText variant="overline" color={tint.fg}>

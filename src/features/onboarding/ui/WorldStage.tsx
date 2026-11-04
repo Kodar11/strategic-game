@@ -7,7 +7,7 @@ import { LessonArt } from '@/src/components/art/LessonArt';
 import { useEnter } from '@/src/components/lesson/motion';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
-import { Compass, Play } from '@/src/components/ui/icons';
+import { BookOpen, Compass, Play } from '@/src/components/ui/icons';
 import type { LessonMeta } from '@/src/content/lessons';
 import { allLessons } from '@/src/content/lessons';
 import { ArenaArt } from '@/src/features/arena/ui/parts';
@@ -27,8 +27,11 @@ const SHOWCASE_GAMES: ({ kind: 'classic'; id: GameId } | { kind: 'arena'; id: Ar
   { kind: 'classic', id: 'two-thirds' },
 ];
 
+/** The Stories tab's two stories, by the titles its cards show. */
+const STORY_TITLES = ['The Distance Between Us', 'The Rules of the Game'] as const;
+
 /**
- * Stages 4 and 5: the three pillars, each with real catalog content and its own look (an illustration, a row of game
+ * Stages 4 and 5: the three pillars — named after the Learn, Games and Stories tabs, so the tour matches the tab bar — each with real catalog content and its own look (an illustration, a row of game
  * tiles, a stack of situations), then one recommended next step into the real app. Nothing here is a tutorial.
  */
 export function WorldStage({ next, onStart, onExplore }: { next: LessonMeta | undefined; onStart: () => void; onExplore: () => void }) {
@@ -47,32 +50,42 @@ export function WorldStage({ next, onStart, onExplore }: { next: LessonMeta | un
         <AppText color={colors.textMuted}>Here’s where the rest of them live.</AppText>
       </Animated.View>
 
-      <Animated.View entering={enter(60)} style={styles.pillar} accessible accessibilityLabel={`Learn. Understand the ideas. ${lessons.length} interactive lessons with stories, simulations and predictions.`}>
+      <Animated.View entering={enter(60)} style={styles.pillar} accessible accessibilityLabel={`Learn tab. Understand the ideas. ${lessons.length} interactive lessons, plus ${allScenarios().length} decision scenarios to explore, such as ${scenarios.map((s) => s.title).join(', ')}.`}>
         <LessonArt lesson={lessons[0]?.id ?? 'cooperation-trap'} height={88} style={{ borderRadius: radius.lg }} />
-        <PillarText overline="Learn" tone={colors.primaryText} title="Understand the ideas." body={`${lessons.length} interactive lessons: stories, simulations and predictions.`} />
+        <View style={{ gap: space.xs }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          {scenarios.slice(0, 2).map((s) => (
+            <View key={s.id} style={styles.scenario}>
+              <Compass size={14} color={colors.accent} />
+              <AppText variant="small" color={colors.textBody} numberOfLines={1} style={{ flexShrink: 1 }}>
+                {s.title}
+              </AppText>
+            </View>
+          ))}
+        </View>
+        <PillarText overline="Learn" tone={colors.primaryText} title="Understand the ideas." body={`${lessons.length} interactive lessons, plus ${allScenarios().length} decision scenarios about trust, negotiation and uncertainty.`} />
       </Animated.View>
 
-      <Animated.View entering={enter(120)} style={styles.pillar} accessible accessibilityLabel={`Play. Put your decisions to the test. ${gameCount} games against opponents with different personalities.`}>
+      <Animated.View entering={enter(120)} style={styles.pillar} accessible accessibilityLabel={`Games tab. Put your decisions to the test. ${gameCount} games against opponents with different personalities.`}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           {games.map((g) => (g.kind === 'classic' ? <GameArt key={g.id} game={g.id} size={56} /> : <ArenaArt key={g.id} game={g.id} size={56} />))}
         </ScrollView>
-        <PillarText overline="Play" tone={colors.rivalText} title="Put your decisions to the test." body={`${gameCount} games, each against opponents with their own personalities.`} />
+        <PillarText overline="Games" tone={colors.rivalText} title="Put your decisions to the test." body={`${gameCount} games, each against opponents with their own personalities.`} />
       </Animated.View>
 
-      <Animated.View entering={enter(180)} style={styles.pillar} accessible accessibilityLabel={`Explore. See what happens when incentives collide. ${allScenarios().length} decision scenarios, such as ${scenarios.map((s) => s.title).join(', ')}.`}>
+      <Animated.View entering={enter(180)} style={styles.pillar} accessible accessibilityLabel={`Stories tab. Step inside a situation. ${STORY_TITLES.length} interactive stories: ${STORY_TITLES.join(' and ')}.`}>
         <View style={{ gap: space.xs }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          {scenarios.map((s, i) => (
-            <View key={s.id} style={{ paddingLeft: i * space.md }}>
+          {STORY_TITLES.map((t, i) => (
+            <View key={t} style={{ paddingLeft: i * space.md }}>
               <View style={styles.scenario}>
-                <Compass size={14} color={colors.accent} />
+                <BookOpen size={14} color={colors.accent} />
                 <AppText variant="small" color={colors.textBody} numberOfLines={1} style={{ flexShrink: 1 }}>
-                  {s.title}
+                  {t}
                 </AppText>
               </View>
             </View>
           ))}
         </View>
-        <PillarText overline="Explore" tone={colors.accent} title="See what happens when incentives collide." body={`${allScenarios().length} decision scenarios about trust, negotiation and uncertainty.`} />
+        <PillarText overline="Stories" tone={colors.accent} title="Step inside a situation." body={`${STORY_TITLES.length} interactive stories: you decide first and meet the idea afterwards.`} />
       </Animated.View>
 
       <Animated.View entering={enter(240)} style={{ gap: space.sm, marginTop: space.sm }}>

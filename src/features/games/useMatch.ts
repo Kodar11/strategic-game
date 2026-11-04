@@ -33,6 +33,8 @@ export interface MatchView {
   error: string | null;
   play: (move: unknown) => void;
   server: ServerMatch | null;
+  /** The match seed, on the device for practice matches only (server matches never reveal theirs). */
+  seed: number | null;
   /** 'mystery': the opponent stays hidden until the match ends (any practice match without a chosen opponent). */
   opponent: OpponentMode;
   /**
@@ -110,6 +112,7 @@ export function usePracticeMatch(game: GameId, choice: string | null, difficulty
     error: null,
     play,
     server: null,
+    seed: current.seed,
     opponent: mode,
     read: mode === 'mystery' ? { current: read, open: readIsOpen(read, readState, minRounds), awaiting, lock, skip } : null,
   };
@@ -172,6 +175,7 @@ export function useServerMatch(initial: ServerMatch): MatchView {
     error,
     play,
     server: match,
+    seed: null,
     opponent: 'chosen',
     read: null,
   };

@@ -22,6 +22,7 @@ import { type HistoryItem, ago, opponentHistory } from '@/src/features/games/his
 import { useSeenRules } from '@/src/features/games/seen';
 import { challengeLink, inviteFailure, shareResultMessage, shareText } from '@/src/features/games/share';
 import { GameArt } from '@/src/features/games/ui/GameArt';
+import { RelatedGameLink } from '@/src/features/games/ui/RelatedGameLink';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
 const OUTCOME = { win: 'Won', loss: 'Lost', draw: 'Drew' } as const;
@@ -126,6 +127,7 @@ export default function GameScreen() {
             </View>
           </View>
           <AppText color={colors.textBody}>{g.action}</AppText>
+          <RelatedGameLink entry={{ kind: 'classic', id: gameId }} />
 
           <Card style={{ gap: space.sm }}>
             <Pressable

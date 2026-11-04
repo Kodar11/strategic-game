@@ -90,6 +90,34 @@ describe('Bluff: calling everything has a cost', () => {
     }
     for (const gap of honest) assert.equal(gap, 0);
   });
+  it('always calling no longer crushes the Risk Taker (it was ~96%): its big claims are often true', () => {
+    for (const level of ['normal', 'hard'] as const) {
+      let wins = 0;
+      for (let i = 0; i < 120; i++) {
+        let s = bluff.create(setup('risk-taker', level, (i * 2654435761 + 97) >>> 0));
+        while (!bluff.isOver(s)) s = bluff.apply(s, claimHonest(s as never) as never);
+        if (bluff.result(s).outcome === 'win') wins += 1;
+      }
+      assert.ok(wins / 120 < 0.7, `${level}: always-call won ${Math.round((wins / 120) * 100)}%`);
+    }
+  });
+  it('the Risk Taker still bluffs sometimes, so believing everything doesn’t beat it either', () => {
+    let bluffs = 0;
+    let claims = 0;
+    for (let i = 0; i < 60; i++) {
+      let s = bluff.create(setup('risk-taker', 'normal', i + 1));
+      while (!bluff.isOver(s)) {
+        const p = bluffPrompt(s)!;
+        s = bluff.apply(s, (p.role === 'bust' ? 'continue' : p.role === 'judge' ? 'believe' : { claim: (p as { value: number }).value }) as never);
+      }
+      for (const r of s.rounds)
+        if (r.claimant === 'bot' && !r.bust) {
+          claims += 1;
+          if (r.claim! > r.tokens.reduce<number>((a, x) => a + (x === 'crack' ? 0 : x), 0)) bluffs += 1;
+        }
+    }
+    assert.ok(bluffs / claims > 0.25 && bluffs / claims < 0.55, `bluff rate ${bluffs}/${claims}`);
+  });
   it('always calling is no longer stronger on Hard than on Normal by any margin that matters', () => {
     assert.ok(winRate(bluff, 'hard', claimHonest) <= winRate(bluff, 'normal', claimHonest) + 0.03);
   });
@@ -146,6 +174,33 @@ describe('The Last Stand', () => {
     const plan = teammatePlan({ ...s, fire: [3, 0, 0, 0, 0, 0], water: 2 });
     assert.deepEqual(plan, { kind: 'douse', d: 0 });
     assert.deepEqual(teammatePlan({ ...s, fire: [1, 0, 0, 0, 0, 0], water: 2 }), { kind: 'refill' });
+  });
+  it('Easy needs you: doing nothing (refilling every round) usually fails, covering the other fire holds', () => {
+    const hold = (policy: (s: never) => unknown) => {
+      let held = 0;
+      let n = 0;
+      for (const persona of lastStand.opponents)
+        for (let i = 0; i < 60; i++) {
+          let s = lastStand.create(setup(persona, 'easy', seedOf(i)));
+          while (!lastStand.isOver(s)) s = lastStand.apply(s, policy(s as never) as never);
+          n += 1;
+          if (lastStand.result(s).outcome === 'win') held += 1;
+        }
+      return held / n;
+    };
+    const passive = hold(() => ({ kind: 'refill' }));
+    const engaged = hold((s: never) => {
+      const st = s as { fire: number[]; water: number };
+      const plan = teammatePlan(st as never);
+      const water = st.water - (plan.kind === 'douse' ? 1 : 0);
+      let d = -1;
+      st.fire.forEach((f, i) => {
+        if (f < 4 && f >= 1 && !(plan.kind === 'douse' && plan.d === i) && (d < 0 || f > st.fire[d])) d = i;
+      });
+      return water > 0 && d >= 0 ? { kind: 'douse', d } : { kind: 'refill' };
+    });
+    assert.ok(passive < 0.5, `passive held ${Math.round(passive * 100)}% (was 100%)`);
+    assert.ok(engaged > 0.9, `engaged held ${Math.round(engaged * 100)}%`);
   });
 });
 

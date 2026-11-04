@@ -158,6 +158,12 @@ if (Platform.OS !== 'web' || typeof window !== 'undefined') {
   });
 }
 
+/** Back to the default story sound levels and forget the saved ones (account deletion). */
+export async function resetStoryAudioPrefs(): Promise<void> {
+  useStoryAudio.setState({ ...PREF_DEFAULTS });
+  await AsyncStorage.removeItem(KEY).catch(() => undefined);
+}
+
 /** Keeps a story's sound alive while the calling screen is mounted, and loads the saved levels. */
 export function useStoryAudioSession() {
   useEffect(() => {

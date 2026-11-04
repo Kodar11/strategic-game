@@ -12,6 +12,8 @@ import { useDaily } from './daily-session';
 import { DataError, toDataError } from './errors';
 import { Outbox, type OutboxStatus } from './outbox';
 import { accountRepository } from './account';
+import { arenaUploads } from './arena-session';
+import { clearAccountDeviceData } from './device-data';
 import { useGames } from './games-session';
 import { categoryRepository, contentRepository, progressRepository } from './repositories';
 import { ensureUser, supabase, supabaseRpc } from './supabase';
@@ -96,26 +98,32 @@ const account = accountRepository(supabaseRpc);
 
 /**
  * Delete the signed-in account on the server, then start over on this device as a new anonymous player.
- * Progress sync pauses while the request runs, so nothing is written for an account being deleted. If the request
- * fails nothing local changes, sync resumes, and the DataError is rethrown: the account still exists.
+ * Progress sync and Arena uploads pause while the request runs, so nothing is written for an account being deleted
+ * (an upload already in flight either lands before the deletion and goes with the account, or fails for lack of
+ * one). If the request fails nothing local changes, both resume, and the DataError is rethrown: the account still
+ * exists. Only once the server confirms does the device forget the account's data (src/data/device-data.ts).
  */
 export async function deleteAccount(): Promise<void> {
   const { data, error } = await supabase().auth.getSession();
   if (error || !data.session) throw new DataError('auth', error?.message ?? 'no session to delete');
 
+  const owner = data.session.user.id;
   unsubscribe?.();
   unsubscribe = null;
   outbox.stop();
+  arenaUploads.stop();
   try {
     await account.deleteMyAccount();
   } catch (e) {
     startSync();
     void outbox.drain();
+    await arenaUploads.restore(owner);
     throw e;
   }
 
   // The account is gone: forget everything this device held for it. Device preferences (motion, haptics) stay.
   await outbox.clear();
+  await clearAccountDeviceData();
   await supabase().auth.signOut({ scope: 'local' });
   useProgress.setState({ ...EMPTY_PROGRESS, hydrated: false });
   useProgress.getState().setSetting('onboarded', false);
@@ -142,6 +150,8 @@ export function startAppData(): Promise<void> {
       const categoriesLoaded = loadCategories(catalog);
       // Changes saved before the last shutdown go first, so the progress loaded next includes them.
       await outbox.restore(userId);
+      // Arena summaries waiting from earlier sessions are sent in the background; they never block start-up.
+      await arenaUploads.restore(userId);
       if (!(await outbox.drain())) throw new DataError('network', 'pending progress changes could not be sent');
       const saved = await progress.load();
       await categoriesLoaded;

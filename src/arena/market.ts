@@ -12,11 +12,16 @@ import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONAS, PERSONA_NAME, 
  * - β is price sensitivity: higher β means customers switch more for the same price gap.
  *
  * Each round the conditions are public before pricing: customers M (80–140, from the seed), unit cost (6, or 4–9 in
- * the Volatile line) and sensitivity (β = 0.35, or 0.6 in the Price War line). Prices are whole numbers 4–20, set in
+ * the Volatile line) and the shoppers' mood — sensitivity β drawn per round from MOODS (Standard 0.25 / 0.35 / 0.5,
+ * Price War 0.5 / 0.6 / 0.8, Volatile a steady 0.35 while its cost moves). Prices are whole numbers 4–20, set in
  * secret and revealed together. Bots see only past prices and outcomes, never the player's current price.
  *
  * With β = 0.35 and cost 6, the one-round best reply to rivals at ~10 is ~10 (a price-war floor), while all three
  * pricing ~15 would earn each firm far more — and undercutting a rival at 15 pays more still. That is the tension.
+ *
+ * Why the mood moves (rules v2, 2026-11-04): with fixed conditions the right price was the same every round, so one
+ * fixed price (10) won about 92 % of seasons at every level. Now the equilibrium moves between rounds (about 12 with
+ * loyal shoppers, 10 normally, 9 with bargain hunters at cost 6), and reading each round beats any fixed price.
  */
 
 export type MarketVariant = 'standard' | 'price-war' | 'volatile';
@@ -54,11 +59,28 @@ export function marketSeats(setup: Setup): (Persona | null)[] {
   return [null, setup.persona, others[drawInt(setup.seed, 999, 0, 0, others.length - 1)]];
 }
 
+/**
+ * Shopper sensitivity (β) by line, one value drawn per round from the seed and shown before pricing. Loyal shoppers
+ * (low β) let a firm hold a margin; bargain hunters (high β) reward a cut. Because the right price moves from round to
+ * round, no single fixed price is right all season.
+ */
+export const MOODS: Record<MarketVariant, readonly number[]> = { standard: [0.25, 0.35, 0.5], 'price-war': [0.5, 0.6, 0.8], volatile: [0.35] };
+
+/** The mood in words, relative to its line: the lowest sensitivity reads as loyal, the highest as bargain hunting. */
+export function moodName(variant: MarketVariant, beta: number): string {
+  const moods = MOODS[variant];
+  if (moods.length === 1) return 'steady shoppers';
+  if (beta <= moods[0]) return 'loyal shoppers';
+  if (beta >= moods[moods.length - 1]) return 'bargain hunters';
+  return 'ordinary shoppers';
+}
+
 export function conditions(setup: Setup<MarketVariant>, n: number): Conditions {
+  const moods = MOODS[setup.variant];
   return {
     customers: drawInt(setup.seed, n, 0, 80, 140),
     cost: setup.variant === 'volatile' ? drawInt(setup.seed, n, 1, 4, 9) : 6,
-    beta: setup.variant === 'price-war' ? 0.6 : 0.35,
+    beta: moods[drawInt(setup.seed, n, 2, 0, moods.length - 1)],
   };
 }
 
@@ -95,17 +117,20 @@ const clampPrice = (p: number) => Math.min(PRICE_MAX, Math.max(PRICE_MIN, Math.r
  * Easy — fixed habits, with a seeded 30 % chance of being a step off: Investor cost + 7, Banker cost + 5, Deal Maker
  *   starts at cost + 7 then matches the lowest rival + 1, Opportunist undercuts the lowest rival by 1 but never goes
  *   below cost + 4 (cost + 5 to start).
- * Normal — best reply to rivals' last prices (round 1 assumes cost + 6), then: Investor never goes below cost + 3 and
- *   prices 1 above its best reply when rivals priced higher; Banker never below cost + 4; Deal Maker holds its price
- *   while both rivals stay at or above it and otherwise matches the lowest (at least cost + 3); Opportunist plays the
- *   pure best reply.
+ * Normal and Hard anchor their margins to e, the round's public one-round equilibrium price (equilibriumPrice), so a
+ *   floor means the same with loyal shoppers as with bargain hunters.
+ * Normal — best reply to rivals' last prices (round 1 assumes e + 2), then: Investor never goes below e − 1 and
+ *   prices 1 above its best reply when rivals priced higher; Banker never below e; Deal Maker opens at e + 3, holds its
+ *   price while both rivals stay at or above it and otherwise matches the lowest (at least e − 1); Opportunist plays
+ *   the pure best reply (at least cost + 1).
  * Hard — best reply to a prediction, with the match horizon in mind. Each rival's price is predicted from its last
  *   move and trend (within ±2) — except a firm whose last two prices were each within 1 of its best reply to the round
  *   before, which is predicted to do that again (a predictable best-replier gets anticipated). Then: Investor
- *   sustains high prices while both rivals have held at cost + 6 or more for two rounds; Banker adds a step when
- *   rivals are erratic; Deal Maker matches an undercut (never far below its best reply) and, while nobody undercuts it,
- *   edges its price up a step at a time toward cost + 8 — an open invitation, not an agreement; Opportunist undercuts
- *   whenever it pays. In the final round every Hard bot plays its best reply — no future left to protect.
+ *   sustains high prices while both rivals have held at their round's e + 2 or more for two rounds (floor e − 1);
+ *   Banker (floor e) adds a step when rivals are erratic; Deal Maker matches an undercut (never below e − 1 or far
+ *   below its best reply) and, while nobody undercuts it, edges its price up a step at a time toward e + 4 — an open
+ *   invitation, not an agreement; Opportunist undercuts whenever it pays. In the final round every Hard bot plays its
+ *   best reply (at least e − 2) — no future left to protect.
  */
 export function marketBotPrice(state: MarketState, seat: number, cond: Conditions): number {
   const persona = state.seats[seat]!;
@@ -118,6 +143,9 @@ export function marketBotPrice(state: MarketState, seat: number, cond: Condition
   const rivalsLast = last ? last.prices.filter((_, i) => i !== seat) : [];
   const minRival = rivalsLast.length ? Math.min(...rivalsLast) : null;
   const own = last ? last.prices[seat] : null;
+  // The round's public one-round equilibrium: the anchor for Normal and Hard margins, so a "floor" means the same in a
+  // loyal-shopper round as in a bargain-hunter round.
+  const e = equilibriumPrice(cond);
 
   if (level === 'easy') {
     let p: number;
@@ -131,34 +159,34 @@ export function marketBotPrice(state: MarketState, seat: number, cond: Condition
     return clampPrice(p);
   }
 
-  const assumed = last ? last.prices : state.seats.map(() => c + 6);
+  const assumed = last ? last.prices : state.seats.map(() => e + 2);
   if (level === 'normal') {
     const br = bestReply(cond, seat, assumed);
-    if (persona === 'investor') return clampPrice(Math.max(c + 3, minRival !== null && minRival > br ? br + 1 : br));
-    if (persona === 'banker') return clampPrice(Math.max(c + 4, br));
+    if (persona === 'investor') return clampPrice(Math.max(e - 1, minRival !== null && minRival > br ? br + 1 : br));
+    if (persona === 'banker') return clampPrice(Math.max(e, br));
     if (persona === 'dealmaker') {
-      if (own === null) return clampPrice(c + 7);
-      return clampPrice(rivalsLast.every((p) => p >= own) ? own : Math.max(c + 3, minRival!));
+      if (own === null) return clampPrice(e + 3);
+      return clampPrice(rivalsLast.every((p) => p >= own) ? own : Math.max(e - 1, minRival!));
     }
     return clampPrice(Math.max(c + 1, br));
   }
 
   // Hard: predict each rival's price from its last move and trend.
-  const predicted = last ? last.prices.map((p, i) => (i === seat ? p : predictFirm(h, i, cond))) : state.seats.map(() => c + 6);
+  const predicted = last ? last.prices.map((p, i) => (i === seat ? p : predictFirm(h, i, cond))) : state.seats.map(() => e + 2);
   const br = bestReply(cond, seat, predicted);
-  if (n === state.total - 1) return clampPrice(Math.max(persona === 'opportunist' ? c + 1 : c + 2, br));
+  if (n === state.total - 1) return clampPrice(Math.max(persona === 'opportunist' ? c + 1 : e - 2, br));
   if (persona === 'investor') {
-    const held = n >= 2 && [last, prev].every((r) => r.prices.every((p, i) => i === seat || p >= r.cond.cost + 6));
-    return clampPrice(held ? Math.max(br, Math.min(own!, minRival!)) : Math.max(c + 3, br));
+    const held = n >= 2 && [last, prev].every((r) => r.prices.every((p, i) => i === seat || p >= equilibriumPrice(r.cond) + 2));
+    return clampPrice(held ? Math.max(br, Math.min(own!, minRival!)) : Math.max(e - 1, br));
   }
   if (persona === 'banker') {
     const erratic = prev ? last.prices.some((p, i) => i !== seat && Math.abs(p - prev.prices[i]) >= 3) : false;
-    return clampPrice(Math.max(c + 4, br + (erratic ? 1 : 0)));
+    return clampPrice(Math.max(e, br + (erratic ? 1 : 0)));
   }
   if (persona === 'dealmaker') {
-    if (own === null) return clampPrice(c + 7);
-    if (minRival! < own) return clampPrice(Math.max(c + 3, br - 1, minRival!));
-    return clampPrice(Math.min(c + 8, Math.max(br, own + 1)));
+    if (own === null) return clampPrice(e + 3);
+    if (minRival! < own) return clampPrice(Math.max(e - 1, br - 1, minRival!));
+    return clampPrice(Math.min(e + 4, Math.max(br, own + 1)));
   }
   return clampPrice(Math.max(c + 1, br));
 }

@@ -33,6 +33,8 @@ export interface Database {
       record_practice_game: { Args: { request: Json }; Returns: Json };
       get_my_games: { Args: Record<string, never>; Returns: Json };
       delete_my_account: { Args: Record<string, never>; Returns: Json };
+      record_arena_matches: { Args: { request: Json }; Returns: Json };
+      get_my_arena_matches: { Args: Record<string, never>; Returns: Json };
       finalize_due_competitions: { Args: Record<string, never>; Returns: number };
     };
     Enums: { content_status: 'draft' | 'published' };

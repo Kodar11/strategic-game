@@ -23,7 +23,8 @@ export const colors = {
   text: '#F1F5F9',
   textBody: palette.light,
   textMuted: palette.slate,
-  textFaint: '#64748B',
+  /** Dimmest text. #8494AA: 6.1:1 on bg, 5.7:1 on bgRaised, 4.7:1 on surface (WCAG AA); 4.0:1 on surfaceHigh — keep it off surfaceHigh for small text. Was #64748B (3.1–3.9:1). */
+  textFaint: '#8494AA',
   slateDot: '#64748B',
   primary: palette.blue,
   primaryPressed: '#1D4ED8',

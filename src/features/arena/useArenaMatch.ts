@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ArenaEngine, MatchResult, Setup } from '@/src/arena/core';
+import { arenaUploads, matchId } from '@/src/data/arena-session';
 import { useArenaRecords } from './records';
 
 /** A second tap this soon after a round resolved is treated as an accidental double tap, not the next move. */
@@ -26,8 +27,10 @@ export function useArenaMatch<S extends { setup: Setup<V, any> }, A, V extends s
     recorded.current = true;
     const s = state.setup;
     setNewBest(useArenaRecords.getState().record(engine.id, { persona: s.persona, level: s.level, variant: s.variant, outcome: result.outcome, player: result.player, rival: result.rival }));
+    // The summary for the player's account: the result screen's facts only — no seed, rounds or hidden information.
+    arenaUploads.enqueue({ id: matchId(), game: engine.id, opponent: s.persona, level: s.level, variant: s.variant, length: s.length, outcome: result.outcome, playerScore: result.player, rivalScore: result.rival, rounds: engine.played(state), playedAt: Date.now() });
     useArenaRecords.getState().markCoached(engine.id);
-  }, [result, state.setup, engine.id]);
+  }, [result, state, engine]);
 
   const act = useCallback(
     (a: A) => {

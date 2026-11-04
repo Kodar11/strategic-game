@@ -9,14 +9,17 @@ import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONAS, PERSONA_NAME, 
  * 2. Hidden: the venture is Strong or Weak, drawn from that prior. Only the sender sees it.
  * 3. The sender sends one signal:
  *    - Warn — "it's weak".
- *    - Pitch — "it's strong". Free to send: cheap talk.
+ *    - Pitch — "it's strong". Free to send, but if the investor invests and the venture is Weak, the sender refunds
+ *      PITCH_REFUND of its fee: a small liability, so a bluff that lands still pays, just less.
  *    - Stake — "it's strong, and I'll back that": if the investor invests and the venture is Weak, the sender pays the
  *      investor STAKE. Costly only when the claim is false — that is what makes it credible.
  * 4. The investor may pay TEST_COST to investigate: a test that reports the true state with the round's accuracy
  *    (80 %, or 70 % in the Murky line). Then the investor invests or passes.
- * 5. Payoffs. Invest: the investor gets +GAIN if Strong, −LOSS if Weak (+STAKE back if staked); the sender earns FEE
- *    whenever the investor invests — the sender always wants investment, whatever the truth. Pass: 0 each (minus any
- *    test cost). The true state is revealed to both after every round.
+ * 5. Payoffs. Invest: the investor gets +GAIN if Strong, −LOSS if Weak (+STAKE back if staked, +PITCH_REFUND if
+ *    pitched); the sender earns FEE whenever the investor invests — the sender always wants investment, whatever the
+ *    truth. Pass: 0 each (minus any test cost). The true state is revealed to both after every round.
+ * 6. Result: reach the benchmark (signalPar, from the public priors) to win — see signalResult for why the win is not
+ *    "more tokens than the opponent".
  *
  * Information rules, for bots and the player alike: a bot investor sees the prior, the signal, its own test result and
  * revealed past rounds — never the hidden state. A bot sender knows the state, as the rules say the sender does. The
@@ -34,6 +37,8 @@ export const LOSS = 6;
 export const FEE = 2;
 export const STAKE = 4;
 export const TEST_COST = 1;
+/** A pitch the investor acts on that proves false refunds the fee: the sender answers for its word, a little. */
+export const PITCH_REFUND = 1;
 export const PRIORS = [0.3, 0.4, 0.5, 0.6, 0.7] as const;
 export const signalRounds = LENGTH_ROUNDS(4, 8, 12);
 export const testAccuracy = (v: SignalVariant) => (v === 'murky' ? 0.7 : 0.8);
@@ -77,7 +82,9 @@ export function afterTest(q: number, says: boolean, a: number): number {
   return (q * ls) / (q * ls + (1 - q) * lw);
 }
 
-const investValue = (q: number, signal: Signal) => q * GAIN - (1 - q) * (signal === 'stake' ? LOSS - STAKE : LOSS);
+/** What a Weak investment costs the investor after the signal's guarantee: a stake pays back STAKE, a pitch PITCH_REFUND. */
+export const weakLoss = (signal: Signal) => LOSS - (signal === 'stake' ? STAKE : signal === 'pitch' ? PITCH_REFUND : 0);
+const investValue = (q: number, signal: Signal) => q * GAIN - (1 - q) * weakLoss(signal);
 
 export function payoffs(r: Pick<SignalRound, 'strong' | 'signal' | 'tested' | 'invested' | 'sender'>): [number, number] {
   let recv = r.tested ? -TEST_COST : 0;
@@ -90,6 +97,10 @@ export function payoffs(r: Pick<SignalRound, 'strong' | 'signal' | 'tested' | 'i
       if (r.signal === 'stake') {
         recv += STAKE;
         send -= STAKE;
+      }
+      if (r.signal === 'pitch') {
+        recv += PITCH_REFUND;
+        send -= PITCH_REFUND;
       }
     }
   }
@@ -253,7 +264,7 @@ export function signalDebrief(s: SignalState): Debrief {
   const fooled = recv.filter(({ r }) => r.invested && !r.strong && r.signal === 'pitch');
   if (fooled.length) {
     const { r, i } = fooled[0];
-    moments.push(`Round ${i + 1}: you invested on a pitch and the venture was Weak (${r.ps}). A pitch cost the sender nothing to send, and it earned ${FEE} the moment you invested — its incentive didn’t depend on the truth.`);
+    moments.push(`Round ${i + 1}: you invested on a pitch and the venture was Weak (${r.ps}). A false pitch cost the sender only ${PITCH_REFUND}, and it still earned ${FEE - PITCH_REFUND} the moment you invested — its incentive barely depended on the truth.`);
   }
   const stakes = recv.filter(({ r }) => r.signal === 'stake');
   if (stakes.length && moments.length < 2) {
@@ -277,7 +288,7 @@ export function signalDebrief(s: SignalState): Debrief {
   }
 
   const insight = fooled.length
-    ? 'Ask what a signal costs the sender if it’s false. A free claim from someone who profits either way is weak evidence; a stake they lose when wrong is strong evidence.'
+    ? 'Ask what a signal costs the sender if it’s false. A nearly free claim from someone who profits either way is weak evidence; a stake they lose when wrong is strong evidence.'
     : stakes.length && tests.length
       ? 'You combined the signal with your own evidence. Each piece updates the prior — the strongest decisions weigh both the sender’s incentives and how reliable your test is.'
       : bluffs.length
@@ -296,6 +307,40 @@ export function signalDebrief(s: SignalState): Debrief {
   return { headline: 'All ventures revealed', moments: moments.slice(0, 3), insight, opponentRead: `${style[s.setup.persona]}${read}` };
 }
 
+/**
+ * The benchmark: what reading honest signals well is worth on this match's ventures, from the public priors only —
+ * PAR_SHARE of (prior × GAIN) for each venture you judge and (prior × FEE) for each you send.
+ */
+export const PAR_SHARE = 0.75;
+export function signalPar(setup: Setup<SignalVariant>, total: number): number {
+  let t = 0;
+  for (let n = 0; n < total; n++) t += venture(setup, n).prior * (playerReceives(n) ? GAIN : FEE);
+  return Math.floor(t * PAR_SHARE);
+}
+
+/**
+ * Win by doing well, not by making the other side do badly (rules v2): reach the benchmark to win, finish within
+ * DRAW_BAND of it for a draw. Under "most tokens wins", a bluff that cost the investor LOSS counted as much as a sale,
+ * and an honest stake that earned the investor GAIN counted against you — so free pitches won about 70 % of matches
+ * while honest play, which earns more tokens, won about 25 %. The opponent's total is still shown.
+ */
+export const DRAW_BAND = 2;
+export function signalResult(s: SignalState) {
+  const you = s.rounds.reduce((t, r) => t + r.ps, 0);
+  const them = s.rounds.reduce((t, r) => t + r.bs, 0);
+  const base = resultFrom(
+    [
+      { id: 'you', name: 'You', score: you, isPlayer: true },
+      { id: s.setup.persona, name: PERSONA_NAME[s.setup.persona], score: them, isPlayer: false },
+    ],
+    'tokens',
+  );
+  const par = signalPar(s.setup, s.total);
+  const outcome = you >= par ? 'win' : you >= par - DRAW_BAND ? 'draw' : 'loss';
+  const note = outcome === 'win' ? null : outcome === 'draw' ? `Just short of the benchmark (${par}) — close.` : `Below the benchmark of ${par} tokens.`;
+  return { ...base, outcome, par, note } as const;
+}
+
 export const hiddenSignal: ArenaEngine<SignalState, SignalAction, SignalVariant> = {
   id: 'signal',
   opponents: PERSONAS,
@@ -306,13 +351,6 @@ export const hiddenSignal: ArenaEngine<SignalState, SignalAction, SignalVariant>
   apply,
   isOver: (s) => s.rounds.length >= s.total,
   played: (s) => s.rounds.length,
-  result: (s) =>
-    resultFrom(
-      [
-        { id: 'you', name: 'You', score: s.rounds.reduce((t, r) => t + r.ps, 0), isPlayer: true },
-        { id: s.setup.persona, name: PERSONA_NAME[s.setup.persona], score: s.rounds.reduce((t, r) => t + r.bs, 0), isPlayer: false },
-      ],
-      'tokens',
-    ),
+  result: signalResult,
   debrief: signalDebrief,
 };

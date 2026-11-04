@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 
 import { BLUFF_PERSONAS, bluff, bluffPrompt, botCalls, pAtLeast as pTokens, token } from '../bluff.ts';
 import { ARENA } from '../catalog.ts';
-import { COALITION_PERSONAS, MAJORITY, PRIZE, coalition, coalitionPrompt, minimalWinning, pivotal } from '../coalition.ts';
+import { COALITION_PERSONAS, MAJORITY, PRIZE, clearLeader, coalition, coalitionAccepts, coalitionPrompt, minimalWinning, outsideOption, pivotal, proportional, revealedPrice } from '../coalition.ts';
 import { CODE_PERSONAS, botClue, botGuesses, boardFor, codebreaker, codePrompt, link, resolveGuesses } from '../codebreaker.ts';
 import { COMMONS_PERSONAS, COLLAPSE_BELOW, commons, commonsBotTake, ration, regrow } from '../commons.ts';
 import { ARENA_IDS, LEVELS, type Level, type MatchLength } from '../core.ts';
@@ -12,7 +12,7 @@ import { GAMBIT_PERSONAS, gambit, gambitBotMove, legalMoves, resolveMove } from 
 import { INSPECTOR_PERSONAS, equilibrium, inspectPayoff, inspector, inspectorChoice, operatorChoice } from '../inspector.ts';
 import { BURNED, LAST_STAND_PERSONAS, held, lastStand, spread, teammatePlan } from '../last-stand.ts';
 import { DICE_PERSONAS, isRaise, liarsDice, liveBids, pAtLeast, roll } from '../liars-dice.ts';
-import { MOLE_STYLES, camera, mole, moleAccuses, molePosterior } from '../mole.ts';
+import { MOLE_STYLES, camera, mole, moleAccuses, moleEvidence, molePosterior, molePrompt, playerPosterior } from '../mole.ts';
 import { POWER_PERSONAS, pHolds, powerPlay, powerPrompt } from '../power-play.ts';
 import { READ_RULES, awaitingRead, hiddenOpponent, readAfter, readOpen, scoreRead } from '../reads.ts';
 import { ARENA_ENGINES } from '../registry.ts';
@@ -125,6 +125,43 @@ describe('the mole', () => {
     assert.ok(Math.abs(hits / 2000 - 0.75) < 0.04, `${hits / 2000}`);
   });
 
+  it('Hard faces a composed Mole: published, weaker evidence that the camera and the questioning both obey', () => {
+    assert.deepEqual(moleEvidence({ variant: 'standard', level: 'easy' }), moleEvidence({ variant: 'standard', level: 'normal' }));
+    const hard = moleEvidence({ variant: 'standard', level: 'hard' });
+    assert.ok(hard.camera < 0.75 && hard.camera > 0.5 && hard.nervousMole < 0.75 && hard.nervousMole > hard.nervousInnocent);
+    assert.ok(moleEvidence({ variant: 'blurry', level: 'hard' }).camera > 0.5, 'the camera still carries information');
+    let hits = 0;
+    let nervous = 0;
+    for (let seed = 1; seed <= 2000; seed++) {
+      const s = mole.create(setup('investigator', 'hard', 'standard', seed));
+      if (camera(s.setup, s.mole, 0, 0).includes(s.mole)) hits++;
+      if (mole.apply(s, { kind: 'interrogate', suspect: s.mole }).rounds[0].nervous) nervous++;
+    }
+    assert.ok(Math.abs(hits / 2000 - hard.camera) < 0.04, `camera ${hits / 2000}`);
+    assert.ok(Math.abs(nervous / 2000 - hard.nervousMole) < 0.04, `nervous ${nervous / 2000}`);
+  });
+
+  it('Hard is measurably harder for exact reasoning (it was 77% at every level)', () => {
+    const solve = (level: 'normal' | 'hard') => {
+      let solved = 0;
+      for (const persona of MOLE_STYLES)
+        for (let i = 0; i < 100; i++) {
+          let s = mole.create(setup(persona, level, 'standard', (i * 2654435761 + 97) >>> 0));
+          const best = () => {
+            const p = playerPosterior(s);
+            return p.indexOf(Math.max(...p));
+          };
+          while (molePrompt(s)?.phase === 'investigate') s = mole.apply(s, { kind: 'interrogate', suspect: best() });
+          s = mole.apply(s, { kind: 'accuse', suspect: best() });
+          if (s.accused === s.mole) solved++;
+        }
+      return solved / 400;
+    };
+    const normal = solve('normal');
+    const hard = solve('hard');
+    assert.ok(hard < normal - 0.08 && hard > 0.45, `normal ${normal}, hard ${hard}`);
+  });
+
   it('the posterior is a distribution and moves toward suspects caught on camera', () => {
     const p = molePosterior('standard', [[0, 1], [0, 2]]);
     assert.ok(Math.abs(p.reduce((a, b) => a + b, 0) - 1) < 1e-9);
@@ -223,6 +260,55 @@ describe('the commons', () => {
 // ── The Coalition ───────────────────────────────────────────────────────────
 
 describe('the coalition', () => {
+  it('revealed prices come from public votes: above the most rejected, at most the least accepted', () => {
+    const s = coalition.create(setup('broker', 'hard', 'standard', 3));
+    const bill = (shares: number[], responses: (boolean | null)[]) => ({ proposal: { proposer: 0, members: [0, 1, 2, 3], shares }, responses, passed: responses.every((r) => r !== false) });
+    const hist = { ...s, rounds: [bill([6, 2, 2, 2], [null, false, true, true]), bill([4, 4, 2, 2], [null, true, true, true])] };
+    assert.equal(revealedPrice(hist, 1, 99), 3, 'rejected 2, accepted 4 → 3 is the cheapest consistent offer');
+    assert.equal(revealedPrice(hist, 2, 99), 2, 'accepted 2 twice');
+    assert.equal(revealedPrice(s, 1, 5), 5, 'untested → fallback');
+  });
+
+  it('Hard proposers never re-offer a share a partner already turned down', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      let s = coalition.create(setup('broker', 'hard', 'standard', seed));
+      while (!coalition.isOver(s)) {
+        const p = coalitionPrompt(s)!;
+        if (p.phase !== 'propose' && p.proposal.proposer === 1)
+          for (const m of p.proposal.members)
+            if (m !== 1) for (const r of s.rounds) if (r.responses[m] === false) assert.ok(p.proposal.shares[m] > r.proposal.shares[m] || p.proposal.shares[m] >= PRIZE - 1, `seed ${seed}`);
+        s = coalition.apply(s, (coalition.moves!(s) as never[])[0]);
+      }
+    }
+  });
+
+  it('Hard responders turn down a greedy bill when they have a better majority elsewhere; Normal ones may not', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const base = coalition.create(setup('switcher', 'hard', 'standard', seed));
+      for (const members of minimalWinning(base, 0)) {
+        const partner = members.find((m) => m !== 0)!;
+        if (members.length !== 2 || outsideOption(base, partner, 0) <= 1) continue;
+        const shares = [0, 0, 0, 0];
+        shares[partner] = 1;
+        shares[0] = PRIZE - 1;
+        const p = { proposer: 0, members, shares };
+        assert.equal(coalitionAccepts(base, partner, p), false, `seed ${seed}`);
+      }
+    }
+  });
+
+  it('Hard bots stop feeding a clear leader', () => {
+    const s = coalition.create(setup('fair', 'hard', 'standard', 5));
+    const lead = { ...s, points: [12, 0, 0, 0] };
+    assert.equal(clearLeader(lead), 0);
+    assert.equal(clearLeader({ ...s, points: [5, 4, 0, 0] }), null);
+    for (const seat of [1, 2, 3]) {
+      const fair = proportional(lead, [0, seat], seat);
+      const p = { proposer: 0, members: [0, seat].sort(), shares: [0, 1, 2, 3].map((i) => (i === seat ? Math.floor(fair) - 1 : i === 0 ? PRIZE - Math.floor(fair) + 1 : 0)) };
+      if (lead.weights[0] + lead.weights[seat] >= MAJORITY) assert.equal(coalitionAccepts(lead, seat, p), false);
+    }
+  });
+
   it('minimal winning coalitions hold a majority and lose it without any member', () => {
     const s = coalition.create(setup('fair', 'normal', 'standard', 1));
     for (let seat = 0; seat < 4; seat++)

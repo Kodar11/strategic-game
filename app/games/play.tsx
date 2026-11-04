@@ -26,6 +26,7 @@ import { Panel } from '@/src/features/games/ui/parts';
 import { ResultPanel } from '@/src/features/games/ui/ResultPanel';
 import { RpsReveal, RpsRounds } from '@/src/features/games/ui/RpsReveal';
 import { ClassicReveal } from '@/src/features/games/ui/ClassicReveal';
+import { WhatIfPanel } from '@/src/features/games/ui/WhatIfPanel';
 import { ReadOpponentPanel } from '@/src/features/games/ui/ReadOpponentPanel';
 import { RepeatDone, RepeatPanel } from '@/src/features/repeat/RepeatPanel';
 import { useRepeat } from '@/src/features/repeat/useRepeat';
@@ -70,8 +71,9 @@ function PracticeSession({ game, bot, difficulty, onPlayAgain }: { game: GameId;
           onPlayAgain={onPlayAgain}
           playAgainLabel={view.opponent === 'mystery' ? 'Play again · new mystery bot' : 'Play again'}
           detail={game === 'rps' ? <RpsRounds rounds={view.rounds as RpsRound[]} /> : undefined}
-          insight={game === 'rps' ? <RpsReveal view={view} onPractise={practise} /> : <ClassicReveal view={view} onPractise={practise} />}
-        />
+          insight={game === 'rps' ? <RpsReveal view={view} onPractise={practise} /> : <ClassicReveal view={view} onPractise={practise} />}>
+          <WhatIfPanel view={view} />
+        </ResultPanel>
       }
     />
   );

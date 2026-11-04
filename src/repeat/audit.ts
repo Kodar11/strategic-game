@@ -21,7 +21,7 @@ export const REPEAT_AUDIT: Record<GameId | ArenaGameId, AuditEntry> = {
   'split-steal': { title: 'Split or Steal', categories: ['A', 'C'], why: 'One simultaneous Split/Steal choice every round; the bot reads only revealed rounds, so a fixed choice or tit for tat is a clean experiment.' },
   rps: { title: 'Rock, Paper, Scissors', categories: ['A', 'B', 'C'], why: 'Twelve identical throws; the bots exploit habits, so fixed throws, a cycle and “beat its last” are exactly the patterns worth testing.' },
   'two-thirds': { title: 'Two-Thirds Guess', categories: ['A'], why: 'One number per round from 0–100; repeating a pick (say 0, the equilibrium) shows how the crowd moves. Adjusting to the target stays manual.' },
-  ultimatum: { title: 'The Ultimatum', categories: ['D'], why: 'Roles alternate every round and each response reacts to an offer revealed only in that round; only three decisions of each kind.' },
+  ultimatum: { title: 'Quick Ultimatum', categories: ['D'], why: 'Roles alternate every round and each response reacts to an offer revealed only in that round; only three decisions of each kind.' },
   'stag-hunt': { title: 'Stag Hunt', categories: ['A', 'C'], why: 'One simultaneous Stag/Hare choice every round; committing to stag (or hare) for a stretch is the trust experiment the game is about.' },
   cooperation: { title: 'The Cooperation Game', categories: ['A', 'C'], why: 'A repeated prisoner’s dilemma with one secret choice per round; Always C/D and tit for tat are the textbook strategies.' },
   'ultimatum-game': { title: 'The Ultimatum Game', categories: ['D'], why: 'Pools and walk-away values change every round, roles alternate, and responses depend on an offer revealed only that round.' },

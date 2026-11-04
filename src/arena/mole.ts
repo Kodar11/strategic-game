@@ -35,6 +35,26 @@ export const SUSPECTS = 4;
 export const NERVOUS_MOLE = 0.75;
 export const NERVOUS_INNOCENT = 0.25;
 export const clueTrue = (v: MoleVariant) => (v === 'blurry' ? 0.6 : 0.75);
+
+/**
+ * How telling the evidence is in this match. Easy and Normal use the line's camera rate and the standard tells. Hard
+ * faces a composed Mole: it keeps out of the camera's way (HARD_CAMERA_DROP off the line's rate, never below 56 %) and holds its nerve
+ * under questioning (nervous HARD_NERVOUS_MOLE of the time instead of NERVOUS_MOLE). Everyone — you, the innocents and
+ * the board's numbers — reasons with these same published rates, so Hard asks for more evidence, not hidden facts.
+ * (Until 2026-11-04 difficulty didn't touch the evidence, and exact reasoning won about 77 % at every level.)
+ */
+export const HARD_CAMERA_DROP = 0.08;
+export const HARD_NERVOUS_MOLE = 0.6;
+export interface MoleEvidence {
+  camera: number;
+  nervousMole: number;
+  nervousInnocent: number;
+}
+export function moleEvidence(setup: Pick<Setup<MoleVariant, MoleStyle>, 'variant' | 'level'>): MoleEvidence {
+  const hard = setup.level === 'hard';
+  return { camera: hard ? Math.max(0.56, clueTrue(setup.variant) - HARD_CAMERA_DROP) : clueTrue(setup.variant), nervousMole: hard ? HARD_NERVOUS_MOLE : NERVOUS_MOLE, nervousInnocent: NERVOUS_INNOCENT };
+}
+const evidenceOf = (e: MoleEvidence | MoleVariant): MoleEvidence => (typeof e === 'string' ? { camera: clueTrue(e), nervousMole: NERVOUS_MOLE, nervousInnocent: NERVOUS_INNOCENT } : e);
 export const CASE_POINTS = 10;
 
 export type MoleAction = { kind: 'interrogate'; suspect: number } | { kind: 'accuse'; suspect: number };
@@ -60,7 +80,7 @@ export interface MoleState {
 export function camera(setup: Setup<MoleVariant, MoleStyle>, mole: number, n: number, k: number): [number, number] {
   const { seed } = setup;
   const innocents = [0, 1, 2, 3].filter((i) => i !== mole);
-  if (draw(seed, n, 40 + k * 3) < clueTrue(setup.variant)) {
+  if (draw(seed, n, 40 + k * 3) < moleEvidence(setup).camera) {
     const other = innocents[drawInt(seed, n, 41 + k * 3, 0, 2)];
     return mole < other ? [mole, other] : [other, mole];
   }
@@ -70,14 +90,15 @@ export function camera(setup: Setup<MoleVariant, MoleStyle>, mole: number, n: nu
 }
 
 /** P(suspect is the Mole) from camera pairs (and optionally interrogations), uniform prior. Exact Bayes. */
-export function molePosterior(variant: MoleVariant, pairs: readonly [number, number][], interrogations: readonly { suspect: number; nervous: boolean }[] = [], exclude: number | null = null): number[] {
-  const t = clueTrue(variant);
+export function molePosterior(evidence: MoleEvidence | MoleVariant, pairs: readonly [number, number][], interrogations: readonly { suspect: number; nervous: boolean }[] = [], exclude: number | null = null): number[] {
+  const ev = evidenceOf(evidence);
+  const t = ev.camera;
   const w = [0, 1, 2, 3].map((m) => {
     if (m === exclude) return 0;
     let l = 1;
     for (const p of pairs) l *= p.includes(m) ? t : 1 - t;
     for (const q of interrogations) {
-      const pNervous = q.suspect === m ? NERVOUS_MOLE : NERVOUS_INNOCENT;
+      const pNervous = q.suspect === m ? ev.nervousMole : ev.nervousInnocent;
       l *= q.nervous ? pNervous : 1 - pNervous;
     }
     return l;
@@ -102,7 +123,7 @@ const votesAgainst = (r: MoleRound | undefined) => [0, 1, 2, 3].map((i) => (r ? 
 function innocentAccuses(s: MoleState, seat: number, n: number, pub: [number, number]): number {
   const pairs: [number, number][] = [...s.rounds.map((r) => r.clue), pub];
   pairs.push(camera(s.setup, s.mole, 0, 1 + seat));
-  return argmax(molePosterior(s.setup.variant, pairs, [], seat), seat, n + seat);
+  return argmax(molePosterior(moleEvidence(s.setup), pairs, [], seat), seat, n + seat);
 }
 
 /**
@@ -127,7 +148,7 @@ export function moleAccuses(s: MoleState, n: number, pub: [number, number]): num
   const { level, persona } = s.setup;
   const pairs: [number, number][] = [...s.rounds.map((r) => r.clue), pub];
   const counts = [0, 1, 2, 3].map((i) => pairs.filter((p) => p.includes(i)).length);
-  const post = level === 'easy' ? counts : molePosterior(s.setup.variant, pairs, [], me);
+  const post = level === 'easy' ? counts : molePosterior(moleEvidence(s.setup), pairs, [], me);
   const lead = argmax(post, me, n);
   const last = s.rounds[s.rounds.length - 1];
   const votes = votesAgainst(last);
@@ -154,7 +175,7 @@ export function moleAccuses(s: MoleState, n: number, pub: [number, number]): num
       // Re-run the target history so a switch persists.
       for (let k = 0; k <= n; k++) {
         const ps: [number, number][] = [...s.rounds.slice(0, k).map((r) => r.clue), k < s.rounds.length ? s.rounds[k].clue : pub];
-        const pk = molePosterior(s.setup.variant, ps, [], me);
+        const pk = molePosterior(moleEvidence(s.setup), ps, [], me);
         if (pk[target] < 0.12) target = level === 'hard' ? argmax(pk, me, k) : innocents.find((i) => i !== target && pk[i] >= 0.12) ?? target;
       }
     }
@@ -194,7 +215,8 @@ function apply(s: MoleState, a: MoleAction): MoleState {
   const clue = camera(s.setup, s.mole, n, 0);
   // Accusations come from the state and the public clue only — your interrogation is private.
   const accusations = [0, 1, 2, 3].map((i) => (i === s.mole ? moleAccuses(s, n, clue) : innocentAccuses(s, i, n, clue)));
-  const nervous = draw(s.setup.seed, n, 20) < (a.suspect === s.mole ? NERVOUS_MOLE : NERVOUS_INNOCENT);
+  const ev = moleEvidence(s.setup);
+  const nervous = draw(s.setup.seed, n, 20) < (a.suspect === s.mole ? ev.nervousMole : ev.nervousInnocent);
   return { ...s, rounds: [...s.rounds, { clue, interrogated: a.suspect, nervous, accusations }] };
 }
 
@@ -229,7 +251,7 @@ function moleDebrief(s: MoleState): Debrief {
   const insight =
     s.accused !== m && best === m
       ? 'Weigh every clue together instead of the loudest one: one camera pair or one nervous answer is weak alone, but they multiply. An accusation that echoes the crowd is only as good as the crowd’s evidence.'
-      : `Clues here are right ${Math.round(clueTrue(s.setup.variant) * 100)}% of the time and interrogations 75%: each is weak, so confidence should come from several pointing the same way. ${plural(crowdRight, 'innocent accusation')} of ${innocentVotes.length} named the real Mole — the crowd is evidence too, but the Mole votes in it.`;
+      : `Clues here include the Mole ${Math.round(moleEvidence(s.setup).camera * 100)}% of the time and a nervous answer comes from the Mole ${Math.round(moleEvidence(s.setup).nervousMole * 100)}% of the time: each is weak, so confidence should come from several pointing the same way. ${plural(crowdRight, 'innocent accusation')} of ${innocentVotes.length} named the real Mole — the crowd is evidence too, but the Mole votes in it.`;
   const style = s.setup.persona;
   const mv = h.map((r) => r.accusations[m]);
   const named = mv.map((t, i) => `round ${i + 1}: ${suspectName(t)}`).slice(0, 3).join(', ');

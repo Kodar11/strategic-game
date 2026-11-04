@@ -17,7 +17,7 @@ import { type ArenaEngine, type Debrief, type Level, LENGTH_ROUNDS, type Setup, 
  *
  * Score (team): 2 per district still standing + water left, +5 for holding out. A shared result.
  *
- * Difficulty is the crisis, not a stronger teammate: ignitions per round are Easy 1 every other round, Normal 1 plus
+ * Difficulty is the crisis, not a stronger teammate: ignitions per round are Easy 1, Normal 1 plus
  * a second 25 % of rounds, Hard 1 plus a second 60 % of rounds. Spread and ignition places come from the seed; your teammate reasons the same
  * way on every level and never sees future ignitions.
  */
@@ -65,7 +65,9 @@ export const burnedOut = (s: StandState) => s.fire.filter((f) => f >= BURNED).le
 const alive = (f: number) => f < BURNED;
 
 export function ignitions(level: Level, seed: number, n: number): number[] {
-  const count = level === 'easy' ? (n % 2 === 1 ? 1 : 0) : 1 + (draw(seed, n, 30) < (level === 'normal' ? 0.25 : 0.6) ? 1 : 0);
+  // Easy was one ignition every other round until 2026-11-04 — few enough that the teammate held the valley alone and
+  // doing nothing won every time. One a round still holds for a player who covers what the teammate leaves.
+  const count = level === 'easy' ? 1 : 1 + (draw(seed, n, 30) < (level === 'normal' ? 0.25 : 0.6) ? 1 : 0);
   return Array.from({ length: count }, (_, k) => drawInt(seed, n, 31 + k, 0, N - 1));
 }
 

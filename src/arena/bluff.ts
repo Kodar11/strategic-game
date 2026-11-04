@@ -36,6 +36,12 @@ export const BLUFF_FINE = 2;
 export const CATCH_BONUS = 3;
 
 export type Token = 3 | 1 | 0 | 'crack';
+
+/**
+ * How often the Confident Risk Taker bluffs a claim (Hard: by how often you call). Until 2026-11-04 it bluffed every
+ * claim, so calling everything beat it about 96 % of the time on every level.
+ */
+export const RT_BLUFF = { easy: 0.6, normal: 0.4, hardTrusting: 0.55, hardWary: 0.15 } as const;
 const SAFE: { v: 3 | 1 | 0; p: number }[] = [
   { v: 3, p: 0.25 / 0.85 },
   { v: 1, p: 0.4 / 0.85 },
@@ -105,8 +111,10 @@ function playerHabits(s: BluffState) {
  * Cautious Bluffer — Easy: never presses, claims exactly its value. Normal: presses to 3 tokens; claims its value, +1 on
  *   20 % of rounds. Hard: presses to 3 (to 4 if it holds 2 or less), claims value +1 when you call less than a third
  *   of the time.
- * Confident Risk Taker — presses to 5 (Easy), to 4 (Normal, 5 if the value so far is low); claims value + 2 (Easy +3).
- *   Hard sizes the bluff to your calling: +3 if you rarely call, +1 if you call often.
+ * Confident Risk Taker — presses to 5 (Easy), to 4 (Normal, 5 if the value so far is low), so its big claims are often
+ *   true. It bluffs on some claims only (RT_BLUFF, seeded: Easy 60 %, Normal 40 %), by value + 2 (Easy + 3). Hard sizes
+ *   the bluff and how often it bluffs to your calling: +3 on 55 % of claims if you rarely call, +1 on 15 % if you call
+ *   often, +2 on 40 % otherwise.
  * Observant Challenger — honest by default: presses to 3; claims its value. Hard adds +1 when you have never called and
  *   the claim would still look ordinary for its token count.
  * Unpredictable Performer — presses a random 2–5 tokens (seeded); claims value + 0–3 at random. Hard keeps the bluff
@@ -141,7 +149,11 @@ export function botTurn(s: BluffState, n: number): { tokens: Token[]; bust: bool
     if (level === 'normal' && u(1) < 0.2) claim = v + 1;
     if (level === 'hard' && habits.callRate < 1 / 3) claim = v + 1;
   } else if (persona === 'risk-taker') {
-    claim = wary ? v : v + (level === 'easy' ? 3 : level === 'normal' ? 2 : habits.callRate < 0.3 ? 3 : habits.callRate > 0.5 ? 1 : 2);
+    // It presses deep, so a big claim is often true. It bluffs on some claims only (seeded), more against a player who
+    // rarely calls: an always-call habit then pays the call cost on its honest big claims.
+    const rate = level === 'easy' ? RT_BLUFF.easy : level === 'normal' ? RT_BLUFF.normal : habits.callRate < 0.3 ? RT_BLUFF.hardTrusting : habits.callRate > 0.5 ? RT_BLUFF.hardWary : RT_BLUFF.normal;
+    const bluffs = !wary && u(3) < rate;
+    claim = bluffs ? v + (level === 'easy' ? 3 : level === 'normal' ? 2 : habits.callRate < 0.3 ? 3 : habits.callRate > 0.5 ? 1 : 2) : v;
   } else if (persona === 'observant') {
     if (level === 'hard' && s.rounds.every((r) => r.claimant !== 'bot' || !r.call) && v + 1 <= EXPECTED_TOKEN * tokens.length) claim = v + 1;
   } else {

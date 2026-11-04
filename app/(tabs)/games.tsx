@@ -61,7 +61,7 @@ export default function GamesScreen() {
               <IconButton icon={Settings} label="Settings" onPress={() => router.navigate('/settings')} />
             </View>
             <AppText variant="small" color={colors.textMuted}>
-              {LIBRARY_COUNT} strategic games against bots with personalities.
+              {LIBRARY_COUNT} strategic games against opponents with personalities.
             </AppText>
           </View>
 

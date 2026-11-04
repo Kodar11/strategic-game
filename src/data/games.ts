@@ -26,6 +26,7 @@ export type GameRefusal =
   | 'nickname_length'
   | 'nickname_characters'
   | 'nickname_reserved'
+  | 'nickname_not_allowed'
   | 'nickname_taken';
 
 const REFUSAL_MESSAGES: Record<GameRefusal, string> = {
@@ -43,7 +44,8 @@ const REFUSAL_MESSAGES: Record<GameRefusal, string> = {
   rate_limited: 'That’s a lot in one day. Try again tomorrow.',
   nickname_length: 'Use 3 to 20 characters.',
   nickname_characters: 'Use letters, numbers, single spaces, and _ . - (start with a letter or number).',
-  nickname_reserved: 'That name is reserved. Try another.',
+  nickname_reserved: 'That name is reserved — it could be mistaken for Tactiqo or its staff. Try another.',
+  nickname_not_allowed: 'That name isn’t allowed on public boards. Try another.',
   nickname_taken: 'Someone already uses that name. Try another.',
 };
 

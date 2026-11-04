@@ -105,9 +105,9 @@ export const GAMES: Record<GameId, GameInfo> = {
   },
   ultimatum: {
     id: 'ultimatum',
-    title: 'The Ultimatum',
+    title: 'Quick Ultimatum',
     action: `Split ${ULT_PIE} coins: propose a division, or accept or reject one. ${ULT_ROUNDS} rounds, roles swap.`,
-    concept: 'Money versus fairness — and what a credible “no” is worth.',
+    concept: 'The quick version of The Ultimatum Game: money versus fairness, and what a credible “no” is worth.',
     rules: [
       `Each round divides ${ULT_PIE} coins. The proposer offers the responder ${ULT_MIN_OFFER} to ${ULT_MAX_OFFER} coins and keeps the rest.`,
       'If the responder accepts, the division happens. If they reject, both get nothing that round.',

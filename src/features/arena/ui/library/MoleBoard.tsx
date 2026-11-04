@@ -6,7 +6,7 @@ import { CompactReveal, MatchLog } from '@/src/components/game/MatchLog';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Camera, Gavel, type LucideIcon, MessageCircle, ScanEye, Search, StickyNote } from '@/src/components/ui/icons';
-import { type MoleAction, type MoleRound, type MoleState, SUSPECTS, molePrompt, suspectName } from '@/src/arena/mole';
+import { type MoleAction, type MoleRound, type MoleState, SUSPECTS, moleEvidence, molePrompt, suspectName } from '@/src/arena/mole';
 import { haptic } from '@/src/utils/feedback';
 import { colors, fonts, radius, space } from '@/src/theme/tokens';
 import { type BoardProps, Reveal, Row } from '../parts';
@@ -77,6 +77,7 @@ function AccusationWeb({ rounds }: { rounds: readonly MoleRound[] }) {
  */
 export function MoleBoard({ state, act, over }: BoardProps<MoleState, MoleAction>) {
   const p = molePrompt(state);
+  const ev = moleEvidence(state.setup);
   const [pick, setPick] = useState<number | null>(null);
   const h = state.rounds;
   const last = h[h.length - 1];
@@ -139,7 +140,7 @@ export function MoleBoard({ state, act, over }: BoardProps<MoleState, MoleAction
           <Button label={pick === null ? (p.phase === 'accuse' ? 'Choose a suspect' : 'Choose whom to question') : p.phase === 'accuse' ? `Accuse ${suspectName(pick)}` : `Question ${suspectName(pick)}`} icon={p.phase === 'accuse' ? Gavel : Search} iconPosition="left" disabled={pick === null} onPress={commit} />
           {p.phase === 'investigate' ? (
             <AppText variant="caption" color={colors.textMuted}>
-              Camera pairs include the Mole {state.setup.variant === 'blurry' ? '60' : '75'}% of the time. The Mole seems nervous 75% of the time, innocents 25%.
+              Camera pairs include the Mole {Math.round(ev.camera * 100)}% of the time. The Mole seems nervous {Math.round(ev.nervousMole * 100)}% of the time, innocents {Math.round(ev.nervousInnocent * 100)}%.{state.setup.level === 'hard' ? ' On Hard the Mole is composed: weaker tells, so build a stronger case.' : ''}
             </AppText>
           ) : null}
         </Panel>

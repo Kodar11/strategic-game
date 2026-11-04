@@ -1,6 +1,6 @@
 # Data architecture
 
-The app has three layers. Content and learner progress live in Supabase PostgreSQL. Behaviour lives in TypeScript. The device keeps only its own preferences and a queue of writes not yet saved.
+The app has three layers. Content and learner progress live in Supabase PostgreSQL. Behaviour lives in TypeScript. The device keeps its own preferences, queues of writes not yet saved, and a few device-only records (Stories progress, detailed Arena tallies); the full inventory, and what account deletion clears, is `DEVICE_DATA` in `src/data/device-data.ts`.
 
 | Layer | Where | What |
 |---|---|---|
@@ -86,6 +86,7 @@ Each install calls `signInAnonymously()` once. The session is kept in AsyncStora
 
 Limits:
 
+- **Arena match summaries** (2026-11-04): each finished Arena match also uploads a summary (game, opponent, level, variant, length, outcome, scores, rounds, time — no seed or hidden state) to `arena_matches` through `record_arena_matches`, owner-only RLS, insert-only, idempotent on the device-made id (`src/data/arena.ts`, owner-scoped queue `tactiqo/arena-uploads/v1`). Matches played before this change stay device-only: the device records aren't tied to an account, so they aren't back-filled.
 - **Clearing app data, reinstalling or a new device starts a new anonymous user.** The old progress stays in the database but is unreachable from the app.
 - The same learner on web and phone means two users.
 - Anonymous users count toward Supabase's monthly active users. Supabase recommends CAPTCHA or rate limits against abuse of anonymous sign-ups.

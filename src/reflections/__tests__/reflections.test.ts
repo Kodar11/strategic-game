@@ -399,3 +399,13 @@ describe('spoilers and hidden state', () => {
     }
   });
 });
+
+describe('lesson links', () => {
+  it('all 23 games link a lesson that teaches their idea (Defusal and Gambit were missing)', () => {
+    const games = Object.keys(REFLECTIONS);
+    assert.equal(games.length, 23);
+    for (const g of games) assert.ok(REFLECTIONS[g as keyof typeof REFLECTIONS].lesson, `${g} has no lesson link`);
+    assert.equal(REFLECTIONS.defusal.lesson, 'bayesian-uncertainty');
+    assert.equal(REFLECTIONS.gambit.lesson, 'bayesian-uncertainty');
+  });
+});

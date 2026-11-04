@@ -95,4 +95,6 @@ opponent, level, variant and length, plus two scripted cases for moves the move 
 
 - Recency is per session and in memory; it resets when the app restarts.
 - No comparisons across matches ("you improved"): there is no reliable baseline for that yet.
-- Lesson links exist only where a lesson teaches the same idea; Defusal, Power Play, Last Stand and the Gambit have none.
+- Every game links a lesson (2026-11-04: Defusal and the Gambit now link Decisions Under Uncertainty — combining
+  partial evidence, and odds × payoff / decision versus outcome; Power Play links Threats and Credibility and Last
+  Stand links The Coordination Problem). A test requires a link for all 23 games.

@@ -77,6 +77,7 @@ async function populate(id: string, name: string, n: number) {
   });
   await rpc(id, 'set_nickname', { nickname: name });
   await rpc(id, 'record_practice_game', { id: `0f8fad5b-d9cb-469f-a165-7086772895${n.toString().padStart(2, '0')}`, game: 'ultimatum', bot: 'fair', difficulty: 'easy', playerScore: 30, botScore: 30, outcome: 'draw' });
+  await rpc(id, 'record_arena_matches', { matches: [{ id: `1f8fad5b-d9cb-469f-a165-7086772895${n.toString().padStart(2, '0')}`, game: 'market', opponent: 'banker', level: 'hard', variant: 'standard', length: 'standard', outcome: 'win', playerScore: 1200, rivalScore: 1100, rounds: 8, playedAt: Date.now() }] });
   const challenge = await rpc(id, 'create_challenge', { game: 'rps', bot: 'mind-reader', difficulty: 'hard' });
   await rpc(id, 'start_match', { kind: 'challenge', token: challenge.token });
   return challenge.token as string;
@@ -97,7 +98,7 @@ describe('delete_my_account', () => {
   it('every user table is populated for both players before deletion', async () => {
     for (const id of [ALICE, BOB]) {
       const rows = await rowsFor(id);
-      for (const key of ['learner_profiles.user_id', 'learning_attempts.user_id', 'player_profiles.user_id', 'game_practice_results.user_id', 'game_challenges.created_by', 'game_matches.user_id']) {
+      for (const key of ['learner_profiles.user_id', 'learning_attempts.user_id', 'player_profiles.user_id', 'game_practice_results.user_id', 'arena_matches.user_id', 'game_challenges.created_by', 'game_matches.user_id']) {
         assert.ok(rows[key] > 0, `${id} ${key}`);
       }
     }

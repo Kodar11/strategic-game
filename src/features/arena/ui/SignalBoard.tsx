@@ -6,14 +6,14 @@ import { ChoiceTile } from '@/src/components/game/MatchChrome';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Check, Eye, EyeOff, HandCoins, type LucideIcon, Megaphone, ScanSearch, ShieldAlert, X } from '@/src/components/ui/icons';
-import { FEE, GAIN, LOSS, STAKE, type Signal, type SignalAction, type SignalRound, type SignalState, TEST_COST, afterTest, signalPrompt, testAccuracy } from '@/src/arena/signal';
+import { FEE, GAIN, PITCH_REFUND, STAKE, type Signal, type SignalAction, type SignalRound, type SignalState, TEST_COST, afterTest, signalPar, signalPrompt, testAccuracy, weakLoss } from '@/src/arena/signal';
 import { haptic, useMotionReduced } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
 import { type BoardProps, Row, signed } from './parts';
 
 const SIG: Record<Signal, { name: string; icon: LucideIcon; claim: string; cost: string; tint: string; bg: string }> = {
   warn: { name: 'Warn', icon: ShieldAlert, claim: '“This one is weak.”', cost: 'Free to send.', tint: colors.rivalText, bg: colors.rivalSoft },
-  pitch: { name: 'Pitch', icon: Megaphone, claim: '“This one is strong.”', cost: 'Free to send, true or not.', tint: colors.insight, bg: colors.insightSoft },
+  pitch: { name: 'Pitch', icon: Megaphone, claim: '“This one is strong.”', cost: `Free to send. If false and you invest, the sender refunds ${PITCH_REFUND}.`, tint: colors.insight, bg: colors.insightSoft },
   stake: { name: 'Stake', icon: HandCoins, claim: '“Strong, and I’ll back it.”', cost: `If false and you invest, the sender pays you ${STAKE}.`, tint: colors.success, bg: colors.successSoft },
 };
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -108,7 +108,7 @@ function Receive({ s, prior, signal, test, act, name }: { s: SignalState; prior:
         </View>
       )}
       <View style={{ flexDirection: 'row', gap: space.sm }}>
-        <ChoiceTile compact label="Invest" hint={`${signed(GAIN)} Strong · ${signed(signal === 'stake' ? -LOSS + STAKE : -LOSS)} Weak`} icon={<Check size={18} color={colors.success} />} tint={colors.success} bg={colors.successSoft} onPress={() => act('invest')} />
+        <ChoiceTile compact label="Invest" hint={`${signed(GAIN)} Strong · ${signed(-weakLoss(signal))} Weak`} icon={<Check size={18} color={colors.success} />} tint={colors.success} bg={colors.successSoft} onPress={() => act('invest')} />
         <ChoiceTile compact label="Pass" hint={test === null ? '0 either way' : `${signed(-TEST_COST)} (test paid)`} icon={<X size={18} color={colors.textBody} />} tint={colors.textBody} bg={colors.surfaceHigh} onPress={() => act('pass')} />
       </View>
     </View>
@@ -134,7 +134,7 @@ function Send({ s, prior, strong, act, name }: { s: SignalState; prior: number; 
       <View style={{ flexDirection: 'row', gap: space.xs }}>
         {(['warn', 'pitch', 'stake'] as const).map((x) => {
           const Icon = SIG[x].icon;
-          return <ChoiceTile key={x} label={SIG[x].name} hint={x === 'stake' && !strong ? `${signed(FEE - STAKE)} if invested` : `${signed(FEE)} if invested`} icon={<Icon size={20} color={SIG[x].tint} />} tint={SIG[x].tint} bg={SIG[x].bg} onPress={() => act(x)} />;
+          return <ChoiceTile key={x} label={SIG[x].name} hint={x === 'stake' && !strong ? `${signed(FEE - STAKE)} if invested` : x === 'pitch' && !strong ? `${signed(FEE - PITCH_REFUND)} if invested` : `${signed(FEE)} if invested`} icon={<Icon size={20} color={SIG[x].tint} />} tint={SIG[x].tint} bg={SIG[x].bg} onPress={() => act(x)} />;
         })}
       </View>
     </View>
@@ -155,8 +155,13 @@ export function SignalBoard({ state, act, over, rivalName }: BoardProps<SignalSt
   const h = state.rounds;
   const last = h[h.length - 1];
   const p = signalPrompt(state);
+  const par = signalPar(state.setup, state.total);
+  const mine = h.reduce((t, r) => t + r.ps, 0);
   return (
     <View style={{ gap: space.sm }}>
+      <AppText variant="caption" color={colors.textMuted} tabular>
+        Win benchmark: {par} tokens · you have {mine}
+      </AppText>
       {last ? <CompactReveal revealKey={h.length} tone={last.ps > 0 ? 'good' : last.ps < 0 ? 'bad' : 'plain'} overline={`Venture ${h.length} · ${last.strong ? 'STRONG' : 'WEAK'} · prior ${pct(last.prior)}`} summary={verdict(last, rivalName)} /> : null}
 
       {!over && p ? (

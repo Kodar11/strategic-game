@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { type ReactNode, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,7 +10,7 @@ import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
-import { ChartNoAxesColumn, ChevronRight, Download, Pencil, RotateCcw, Sparkles, Trash, UserRound, X } from '@/src/components/ui/icons';
+import { Bug, ChartNoAxesColumn, ChevronRight, Download, ExternalLink, FileText, Info, Mail, Pencil, RotateCcw, Shield, Sparkles, Trash, UserRound, X } from '@/src/components/ui/icons';
 import { allLessons } from '@/src/content/lessons';
 import { accountDeletionError } from '@/src/data/account';
 import { deleteAccount, useSyncStatus } from '@/src/data/session';
@@ -17,13 +18,16 @@ import { allGoals, buildLearningExport, exportFileName } from '@/src/features/le
 import { shareJsonFile } from '@/src/features/learning/shareFile';
 import { type ShareOutcome, isShareFailure, shareOutcomeMessage } from '@/src/features/learning/shareOutcome';
 import { useNickname } from '@/src/features/profile/nickname';
+import { ABOUT_TEXT, LINKS, SUPPORT_EMAIL, supportMailto, versionLabel } from '@/src/features/settings/about';
+import { appVersion, platformLabel } from '@/src/features/settings/version';
 import { useProgress } from '@/src/store/progress';
 import { useMotionReduced } from '@/src/utils/feedback';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
 /**
  * One place for everything you can change, in a fixed order: who you are (nickname, goal), how the app behaves
- * (narration, motion, haptics), your learning data (export, reset) and a way to your progress. Opened from the gear on every tab.
+ * (narration, motion, haptics), your learning data (export, reset), a way to your progress, about and support (legal
+ * pages, contact, version) and the account. Opened from the gear on every tab.
  */
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -45,6 +49,7 @@ export default function SettingsScreen() {
           <ExperienceSection />
           <LearningDataSection onReset={close} />
           <ProgressSection />
+          <AboutSection />
           <AccountSection />
         </View>
       </ScrollView>
@@ -344,6 +349,68 @@ function ProgressSection() {
   );
 }
 
+// ── About and support ───────────────────────────────────────────────────────
+
+/** Opens a page of the Tactiqo website in the in-app browser; falls back to the system browser. */
+function openPage(url: string) {
+  WebBrowser.openBrowserAsync(url).catch(() => Linking.openURL(url).catch(() => undefined));
+}
+
+function LinkRow({ icon: Icon, title, body, onPress, external = true }: { icon: typeof Info; title: string; body?: string; onPress: () => void; external?: boolean }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="link" accessibilityLabel={body ? `${title}. ${body}` : title} style={({ pressed }) => [styles.linkRow, pressed && { backgroundColor: colors.surfaceHigh }]}>
+      <Icon size={18} color={colors.primaryText} />
+      <View style={{ flex: 1, gap: 2 }}>
+        <AppText variant="bodyStrong">{title}</AppText>
+        {body ? (
+          <AppText variant="small" color={colors.textMuted}>
+            {body}
+          </AppText>
+        ) : null}
+      </View>
+      {external ? <ExternalLink size={16} color={colors.textMuted} /> : <ChevronRight size={18} color={colors.textMuted} />}
+    </Pressable>
+  );
+}
+
+/**
+ * Who makes the app and how to reach them: the website's legal pages (checked to exist, src/features/settings/about.ts),
+ * email support with the version filled in, and the running version and build.
+ */
+function AboutSection() {
+  const v = appVersion();
+  const [note, setNote] = useState<string | null>(null);
+  const mail = (kind: 'problem' | 'feedback') => {
+    Linking.openURL(supportMailto(kind, v, platformLabel())).catch(() => setNote(`No email app opened. Write to ${SUPPORT_EMAIL}.`));
+  };
+  return (
+    <Section label="About and support">
+      <Card style={{ gap: space.xs }}>
+        <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'flex-start', paddingBottom: space.sm }}>
+          <Info size={18} color={colors.insight} style={{ marginTop: 2 }} />
+          <AppText variant="small" color={colors.textBody} style={{ flex: 1 }}>
+            {ABOUT_TEXT}
+          </AppText>
+        </View>
+        <LinkRow icon={Mail} title="Report a problem" body="Opens an email with your app version filled in." onPress={() => mail('problem')} external={false} />
+        <LinkRow icon={Mail} title="Send feedback" onPress={() => mail('feedback')} external={false} />
+        <LinkRow icon={Bug} title="Support" body="Help and how to reach us." onPress={() => openPage(LINKS.support)} />
+        <LinkRow icon={Shield} title="Privacy Policy" onPress={() => openPage(LINKS.privacy)} />
+        <LinkRow icon={FileText} title="Terms & Conditions" onPress={() => openPage(LINKS.terms)} />
+        <LinkRow icon={Info} title="About Tactiqo" onPress={() => openPage(LINKS.about)} />
+        {note ? (
+          <AppText variant="small" color={colors.textMuted} selectable accessibilityLiveRegion="polite">
+            {note}
+          </AppText>
+        ) : null}
+        <AppText variant="caption" color={colors.textMuted} style={{ paddingTop: space.sm }} selectable accessibilityLabel={`App version ${versionLabel(v)}`}>
+          Version {versionLabel(v)}
+        </AppText>
+      </Card>
+    </Section>
+  );
+}
+
 // ── Account ─────────────────────────────────────────────────────────────────
 
 /**
@@ -380,7 +447,10 @@ function AccountSection() {
     <Section label="Account">
       <Card style={{ gap: space.md }}>
         <AppText variant="small" color={colors.textMuted}>
-          Your account is anonymous and kept on this device.
+          Your account is anonymous and linked to this app installation — no name, email or password. Your learning progress, answers, Daily Challenge history, nickname and game results are saved to our server under it. Some things stay only on this device: story progress, the detailed Arena tallies and setups, and your preferences.
+        </AppText>
+        <AppText variant="caption" color={colors.textMuted}>
+          Reinstalling the app or changing phones starts a new account; the old one can’t be recovered.
         </AppText>
         <Pressable
           onPress={() => setOpen(true)}
@@ -393,6 +463,11 @@ function AccountSection() {
             Delete account
           </AppText>
         </Pressable>
+        <Pressable onPress={() => openPage(LINKS.deletion)} accessibilityRole="link" style={{ minHeight: 44, justifyContent: 'center' }}>
+          <AppText variant="small" color={colors.primaryText}>
+            What deletion removes, and how to ask by email if the app can’t
+          </AppText>
+        </Pressable>
       </Card>
 
       <Modal visible={open} transparent animationType={reduced ? 'none' : 'fade'} onRequestClose={close} statusBarTranslucent>
@@ -402,10 +477,13 @@ function AccountSection() {
               Delete your account?
             </AppText>
             <AppText variant="small" color={colors.textBody}>
-              This permanently deletes your anonymous account and everything tied to it: lesson progress, answers, daily challenge history, your nickname and game records. It can’t be undone.
+              This permanently deletes your anonymous account and everything saved on our server under it: lesson progress and answers, Daily Challenge history, your nickname, practice and Arena match results, Game of the Week results and friend challenges you created. It can’t be undone.
+            </AppText>
+            <AppText variant="small" color={colors.textBody}>
+              Once the server confirms, this device also forgets the account: story progress, Arena records and anything still waiting to upload. Your motion, haptics and narration preferences stay.
             </AppText>
             <AppText variant="caption" color={colors.textMuted}>
-              Want a copy first? Cancel and use Export data.
+              Want a copy first? Cancel and use Export data. Exported or shared files aren’t affected.
             </AppText>
             {error ? (
               <AppText variant="small" color={colors.danger} accessibilityLiveRegion="assertive">
@@ -441,6 +519,7 @@ const styles = StyleSheet.create({
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 48 },
   avatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primary },
   divider: { height: 1, backgroundColor: colors.border },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 48, paddingVertical: space.sm, paddingHorizontal: space.xs, borderRadius: radius.md },
   navRow: {
     flexDirection: 'row',
     alignItems: 'center',

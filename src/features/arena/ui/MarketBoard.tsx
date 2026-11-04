@@ -7,7 +7,7 @@ import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Tag } from '@/src/components/ui/icons';
 import { Slider } from '@/src/components/ui/Slider';
-import { type Conditions, type MarketRound, type MarketState, PRICE_MAX, PRICE_MIN, marketOutcome, marketPar, marketPrompt, marketSeatName as seatNameOf } from '@/src/arena/market';
+import { type Conditions, type MarketRound, type MarketState, PRICE_MAX, PRICE_MIN, marketOutcome, marketPar, marketPrompt, marketSeatName as seatNameOf, moodName } from '@/src/arena/market';
 import { haptic } from '@/src/utils/feedback';
 import { colors, fonts, radius, space } from '@/src/theme/tokens';
 import { AnimatedBar, type BoardProps, Row, Stat, signed } from './parts';
@@ -157,7 +157,7 @@ export function MarketBoard({ state, act, over, nameOf }: BoardProps<MarketState
       {!over && p ? (
         <View style={{ gap: space.sm, padding: space.md, borderRadius: radius.lg, borderWidth: 1, borderColor: 'rgba(34,211,238,0.3)', backgroundColor: colors.surface }}>
           <AppText variant="caption" color={colors.textBody} tabular>
-            {p.cond.customers} customers · unit cost {p.cond.cost} · {p.cond.beta > 0.4 ? 'very price-sensitive' : 'normal sensitivity'}
+            {p.cond.customers} customers · unit cost {p.cond.cost} · {moodName(state.setup.variant, p.cond.beta)}
           </AppText>
           <PricePanel key={h.length} s={state} cond={p.cond} last={p.lastPrices} act={act} />
         </View>

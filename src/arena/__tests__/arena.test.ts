@@ -5,9 +5,9 @@ import { describe, it } from 'node:test';
 import { ARENA } from '../catalog.ts';
 import { BIDDERS, auction, auctionBotBid, auctionLot, auctionPrompt, auctionSeats, posteriorMean, type AuctionState } from '../auction.ts';
 import { ARENA_IDS, LENGTHS, LEVELS, PERSONAS, type AnyArenaEngine, type Level, type Persona, type Setup, resultFrom } from '../core.ts';
-import { PRICE_MAX, PRICE_MIN, bestReply, conditions, equilibriumPrice, market, marketBotPrice, marketOutcome, marketPar, type MarketState } from '../market.ts';
+import { MOODS, PRICE_MAX, PRICE_MIN, moodName, bestReply, conditions, equilibriumPrice, market, marketBotPrice, marketOutcome, marketPar, type MarketState } from '../market.ts';
 import { ARENA_ENGINES } from '../registry.ts';
-import { FEE, GAIN, LOSS, STAKE, TEST_COST, afterTest, botBelief, hiddenSignal, payoffs, signalBotReceive, signalBotSend, signalPrompt, venture, type SignalState } from '../signal.ts';
+import { FEE, GAIN, LOSS, PITCH_REFUND, STAKE, TEST_COST, afterTest, signalPar, botBelief, hiddenSignal, payoffs, signalBotReceive, signalBotSend, signalPrompt, venture, type SignalState } from '../signal.ts';
 import { ULT_POOLS, playerProposesUlt, ultBotMinAccept, ultBotOffer, ultPrompt, ultTerms, ultimatumGame, type UltState } from '../ultimatum-game.ts';
 
 const setup = <V extends string>(persona: Persona, level: Level, variant: V, seed = 42, length: Setup['length'] = 'standard'): Setup<V> => ({ persona, level, variant, length, seed });
@@ -382,10 +382,42 @@ describe('market rivals', () => {
   it('conditions are public, seeded and independent of difficulty; the variants change them as documented', () => {
     for (let n = 0; n < 12; n++) {
       assert.deepEqual(conditions(setup('banker', 'easy', 'standard', 3), n), conditions(setup('opportunist', 'hard', 'standard', 3), n));
-      assert.equal(conditions(setup('banker', 'easy', 'price-war', 3), n).beta, 0.6);
+      assert.ok(MOODS['price-war'].includes(conditions(setup('banker', 'easy', 'price-war', 3), n).beta));
+      assert.ok(MOODS.standard.includes(conditions(setup('banker', 'easy', 'standard', 3), n).beta));
+      assert.equal(conditions(setup('banker', 'easy', 'volatile', 3), n).beta, 0.35);
       const v = conditions(setup('banker', 'easy', 'volatile', 3), n).cost;
       assert.ok(v >= 4 && v <= 9);
     }
+  });
+
+  it('the shoppers’ mood moves the right price, and every mood appears over a season', () => {
+    const eqs = MOODS.standard.map((beta) => equilibriumPrice({ customers: 100, cost: 6, beta }));
+    assert.ok(eqs[0] > eqs[1] && eqs[1] > eqs[2], `loyal > ordinary > bargain: ${eqs}`);
+    const seen = new Set<number>();
+    for (let seed = 1; seed <= 20; seed++) for (let n = 0; n < 8; n++) seen.add(conditions(setup('banker', 'easy', 'standard', seed), n).beta);
+    assert.deepEqual([...seen].sort(), [...MOODS.standard].sort());
+    assert.equal(moodName('standard', 0.25), 'loyal shoppers');
+    assert.equal(moodName('standard', 0.5), 'bargain hunters');
+  });
+
+  it('no fixed price dominates on Normal or Hard (the old fixed-10 strategy won ~92%)', () => {
+    for (const level of ['normal', 'hard'] as const)
+      for (const variant of ['standard', 'price-war'] as const) {
+        let best = 0;
+        for (let price = 8; price <= 12; price++) {
+          let wins = 0;
+          let games = 0;
+          for (const persona of PERSONAS)
+            for (let i = 0; i < 25; i++) {
+              let s = market.create(setup(persona, level, variant, (i * 2654435761 + 97) >>> 0)) as MarketState;
+              while (!market.isOver(s)) s = market.apply(s, price);
+              games += 1;
+              if (market.result(s).outcome === 'win') wins += 1;
+            }
+          best = Math.max(best, wins / games);
+        }
+        assert.ok(best < 0.6, `${variant}/${level}: a fixed price won ${Math.round(best * 100)}%`);
+      }
   });
 
   it('bots price without seeing the player’s current price, inside the bounds', () => {
@@ -436,7 +468,7 @@ describe('hidden signal', () => {
   it('pays the documented outcomes', () => {
     const base = { tested: false, sender: 'bot' as const };
     assert.deepEqual(payoffs({ ...base, strong: true, signal: 'pitch', invested: true }), [GAIN, FEE]);
-    assert.deepEqual(payoffs({ ...base, strong: false, signal: 'pitch', invested: true }), [-LOSS, FEE]);
+    assert.deepEqual(payoffs({ ...base, strong: false, signal: 'pitch', invested: true }), [-LOSS + PITCH_REFUND, FEE - PITCH_REFUND]);
     assert.deepEqual(payoffs({ ...base, strong: false, signal: 'stake', invested: true }), [-LOSS + STAKE, FEE - STAKE]);
     assert.deepEqual(payoffs({ ...base, strong: false, signal: 'stake', invested: false }), [0, 0]);
     assert.deepEqual(payoffs({ ...base, strong: true, signal: 'warn', invested: false, tested: true }), [-TEST_COST, 0]);
@@ -445,6 +477,37 @@ describe('hidden signal', () => {
 
   it('a stake is credible: staking on a Weak venture costs the sender', () => {
     assert.ok(FEE - STAKE < 0);
+  });
+
+  it('a false pitch carries a small liability: a landed bluff still pays, but less than an honest sale', () => {
+    assert.ok(PITCH_REFUND > 0 && FEE - PITCH_REFUND > 0 && PITCH_REFUND < STAKE);
+  });
+
+  it('wins by reaching the benchmark, and neither always-pitch nor honesty dominates', () => {
+    const play = (send: (strong: boolean) => 'warn' | 'pitch' | 'stake', level: Level) => {
+      let wins = 0;
+      let games = 0;
+      for (const persona of PERSONAS)
+        for (let i = 0; i < 40; i++) {
+          let s = hiddenSignal.create(setup(persona, level, 'standard', (i * 2654435761 + 97) >>> 0)) as SignalState;
+          while (!hiddenSignal.isOver(s)) {
+            const p = signalPrompt(s)!;
+            s = hiddenSignal.apply(s, p.role === 'send' ? send(p.strong) : p.signal === 'warn' ? 'pass' : 'invest');
+          }
+          const r = hiddenSignal.result(s);
+          assert.equal(r.par, signalPar(s.setup, s.total));
+          assert.equal(r.outcome === 'win', r.player >= r.par!);
+          games += 1;
+          if (r.outcome === 'win') wins += 1;
+        }
+      return wins / games;
+    };
+    for (const level of ['normal', 'hard'] as const) {
+      const pitch = play(() => 'pitch', level);
+      const honest = play((strong) => (strong ? 'stake' : 'warn'), level);
+      assert.ok(pitch < 0.66, `always pitch won ${Math.round(pitch * 100)}% on ${level} (was ~70%)`);
+      assert.ok(honest > 0.5, `honest signalling won ${Math.round(honest * 100)}% on ${level} (was ~28%)`);
+    }
   });
 
   it('the hidden state is fixed by the seed, matches its prior on average, and ignores difficulty', () => {

@@ -595,7 +595,8 @@ export const BLUFF: GameReflections<BluffState> = {
 
 export const DEFUSAL: GameReflections<DefusalState> = {
   game: 'defusal',
-  lesson: null,
+  // Combining partial clues to see which possibilities survive: the evidence idea of Decisions Under Uncertainty.
+  lesson: 'bayesian-uncertainty',
   rules: [
     rule({
       id: 'live-cut',
@@ -1000,7 +1001,8 @@ const turnOf = (i: number) => Math.floor(i / 2) + 1;
 
 export const GAMBIT: GameReflections<GambitState> = {
   game: 'gambit',
-  lesson: null,
+  // Odds × payoff, and a good decision versus a good outcome: Decisions Under Uncertainty.
+  lesson: 'bayesian-uncertainty',
   rules: [
     rule({
       id: 'failed-risk',

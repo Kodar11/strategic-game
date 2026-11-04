@@ -6,9 +6,11 @@ import { ARENA_IDS, type ArenaGameId, LENGTHS, LEVELS, type Level, type MatchLen
 import { MYSTERY, type ReadVerdict } from '@/src/arena/reads';
 
 /**
- * Strategy Arena records, kept on this device only: win/loss per game and per opponent, best score, the last few
- * matches, which games' coach tips have been seen, and the last setup used. Arena matches never touch the backend —
- * there is nothing competitive to verify — so a cleared device just starts fresh. Everything read back is validated.
+ * Strategy Arena records on this device: win/loss per game and per opponent, best score, the last few matches, which
+ * games' coach tips have been seen, and the last setup used. Matches run on the device and never call the backend
+ * while they're played; when one finishes, its summary is also queued for upload to the player's account
+ * (src/data/arena-session.ts) — these local records stay the source for the Arena screens. Everything read back is
+ * validated.
  */
 
 const KEY = 'tactiqo/arena-records/v1';
@@ -66,6 +68,8 @@ interface ArenaRecordsState extends Stored {
   savePrefs: (game: ArenaGameId, prefs: ArenaPrefs) => void;
   /** Records a scored personality prediction. Unscored (no guess) records nothing. */
   recordRead: (game: ArenaGameId, verdict: ReadVerdict) => void;
+  /** Forget everything (account deletion): memory and the saved copy. */
+  reset: () => Promise<void>;
 }
 
 const int = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? Math.round(x) : null);
@@ -130,6 +134,10 @@ export const useArenaRecords = create<ArenaRecordsState>()((set, get) => ({
       set({ loaded: true });
     }
   },
+  reset: async () => {
+    set({ games: {}, coached: {}, prefs: {}, reads: {}, loaded: true });
+    await AsyncStorage.removeItem(KEY).catch(() => undefined);
+  },
   record: (game, m) => {
     const prev = get().games[game] ?? { w: 0, l: 0, d: 0, best: null, byPersona: {}, recent: [] };
     const key = m.outcome === 'win' ? 'w' : m.outcome === 'loss' ? 'l' : 'd';
@@ -163,6 +171,8 @@ export const useArenaRecords = create<ArenaRecordsState>()((set, get) => ({
     persist(get());
   },
 }));
+
+export const ARENA_RECORDS_KEY = KEY;
 
 export const played = (r: GameRecord | undefined) => (r ? r.w + r.l + r.d : 0);
 

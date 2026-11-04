@@ -2,7 +2,7 @@ import { BUDGET_PER_LOT, auctionLots } from './auction.ts';
 import { COOP_PAYOFFS, coopRounds } from './cooperation.ts';
 import { ARENA_IDS, type ArenaGameId, type Level, type MatchLength, PERSONAS, PERSONA_NAME, type Persona } from './core.ts';
 import { PRICE_MAX, PRICE_MIN, marketRounds } from './market.ts';
-import { FEE, GAIN, LOSS, STAKE, TEST_COST, signalRounds } from './signal.ts';
+import { FEE, GAIN, LOSS, PITCH_REFUND, STAKE, TEST_COST, signalRounds } from './signal.ts';
 import { ultRounds } from './ultimatum-game.ts';
 import { LIBRARY_INFO } from './catalog-library.ts';
 
@@ -166,7 +166,8 @@ export const ARENA: Record<ArenaGameId, ArenaInfo> = {
     question: 'Can you outprice your rivals without destroying your profits?',
     decisions: ['Your price every round', 'When to undercut and when to hold', 'Share versus margin'],
     rules: [
-      `Each round you set a price from ${PRICE_MIN} to ${PRICE_MAX}; rivals set theirs at the same time. Customers and unit cost are shown first.`,
+      `Each round you set a price from ${PRICE_MIN} to ${PRICE_MAX}; rivals set theirs at the same time. Customers, unit cost and the shoppers’ mood are shown first.`,
+      'The mood changes from round to round: loyal shoppers let you hold a margin, bargain hunters reward a cut. No single price is right all season.',
       'Lower prices win more customers — smoothly, not all-or-nothing — and very high prices send some customers away entirely. Equal prices split sales equally.',
       'Profit = units sold × (price − unit cost).',
       'The projection shows what you would earn if rivals repeated last round’s prices. To win, earn the most profit and at least the price-war-free benchmark shown on the board.',
@@ -180,8 +181,8 @@ export const ARENA: Record<ArenaGameId, ArenaInfo> = {
       opportunist: 'Undercuts whenever it sees a gap worth taking.',
     }),
     variants: [
-      { id: 'standard', name: 'Standard', summary: 'Moderate price sensitivity, cost 6', challenge: false },
-      { id: 'price-war', name: 'Price war', summary: 'Customers are far more price-sensitive', challenge: true },
+      { id: 'standard', name: 'Standard', summary: 'Shoppers’ mood shifts each round, cost 6', challenge: false },
+      { id: 'price-war', name: 'Price war', summary: 'Customers are far more price-sensitive; the mood still shifts', challenge: true },
       { id: 'volatile', name: 'Volatile costs', summary: 'Unit cost changes each round (4–9)', challenge: true },
     ],
     rounds: marketRounds,
@@ -196,9 +197,9 @@ export const ARENA: Record<ArenaGameId, ArenaInfo> = {
     decisions: ['Invest, pass or investigate', 'How much a signal is worth', 'Whether to bluff as the sender'],
     rules: [
       'The prior shows how likely the venture is to be Strong. The sender knows the truth; the investor doesn’t.',
-      `The sender warns, pitches (free to send) or stakes — a stake pays the investor ${STAKE} if it invests and the venture is Weak.`,
+      `The sender warns, pitches or stakes. If the investor invests and the venture is Weak, a pitch refunds ${PITCH_REFUND} and a stake pays ${STAKE}.`,
       `The investor may pay ${TEST_COST} to investigate (a test that is right 80% of the time — 70% in the Murky line), then invests or passes. Invest: +${GAIN} if Strong, −${LOSS} if Weak. The sender earns ${FEE} whenever the investor invests.`,
-      'You invest in odd rounds and send in even rounds. The truth is revealed after every round. Most tokens wins.',
+      'You invest in odd rounds and send in even rounds. The truth is revealed after every round. Win by reaching the benchmark shown on the board: it’s about doing well, not making the other side do badly.',
     ],
     unit: 'tokens',
     tone: 'success',

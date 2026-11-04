@@ -35,6 +35,7 @@ export const LIBRARY_INFO: Record<LibraryId, ArenaInfo> = {
     rules: [
       'One of four suspects (Ash, Birch, Cedar, Dune) is the Mole. You are the investigator.',
       'Each round the vault camera catches two figures. Usually (75%) the Mole is one of them — but not always.',
+      'On Hard the Mole is composed: it is caught on camera a little less often and comes across nervous only 60% of the time. The board shows the exact rates.',
       'You interrogate one suspect. The Mole comes across nervous 75% of the time; an innocent 25%. Only you see it.',
       'Then every suspect accuses someone. Innocents follow their evidence; the Mole has its own way of hiding.',
       'After the last round, accuse one suspect. Separately, you can guess how the Mole was hiding — its personality.',

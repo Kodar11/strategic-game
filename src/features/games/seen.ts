@@ -15,6 +15,8 @@ interface SeenState {
   loaded: boolean;
   load: () => Promise<void>;
   markSeen: (id: GameId) => void;
+  /** Forget everything (account deletion): memory and the saved copy. */
+  reset: () => Promise<void>;
 }
 
 export const useSeenRules = create<SeenState>()((set, get) => ({
@@ -35,4 +37,10 @@ export const useSeenRules = create<SeenState>()((set, get) => ({
     set({ seen });
     AsyncStorage.setItem(KEY, JSON.stringify(seen)).catch(() => undefined);
   },
+  reset: async () => {
+    set({ seen: {}, loaded: true });
+    await AsyncStorage.removeItem(KEY).catch(() => undefined);
+  },
 }));
+
+export const GAMES_SEEN_KEY = KEY;

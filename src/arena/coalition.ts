@@ -113,6 +113,46 @@ function lowestAccepted(s: CoalitionState, seat: number): number | null {
   return lo;
 }
 
+/** The highest share `seat` has voted down so far (null if it never rejected). Public, like every vote. */
+function highestRejected(s: CoalitionState, seat: number): number | null {
+  let hi: number | null = null;
+  for (const r of s.rounds) if (r.responses[seat] === false) hi = hi === null ? r.proposal.shares[seat] : Math.max(hi, r.proposal.shares[seat]);
+  return hi;
+}
+
+/**
+ * The cheapest offer a party's public votes say it will take: one more than the most it has turned down, or — if it
+ * never said no — the least it has accepted. Untested parties fall back to `fallback`.
+ */
+export function revealedPrice(s: CoalitionState, seat: number, fallback: number): number {
+  const hi = highestRejected(s, seat);
+  return hi !== null ? hi + 1 : (lowestAccepted(s, seat) ?? fallback);
+}
+
+/**
+ * A party's outside option against a bill from `proposer`: the best seat-proportional share it would hold in any
+ * minimal winning coalition that leaves the proposer out. Zero when every majority needs the proposer.
+ */
+export function outsideOption(s: CoalitionState, seat: number, proposer: number): number {
+  let best = 0;
+  for (const c of minimalWinning(s, seat)) if (!c.includes(proposer)) best = Math.max(best, proportional(s, c, seat));
+  return best;
+}
+
+/** Hard responders only hold out while more than HOLDOUT_ROUNDS remain: near the end a "no" buys nothing later. */
+export const HOLDOUT_ROUNDS = 2;
+/** A proposer keeping more than GREED × its seat-proportional share tables a greedy bill. */
+export const GREED = 1.5;
+/** Hard proposers count a clear leader's partnership as LEADER_PENALTY points dearer: feeding the leader costs you. */
+export const LEADER_PENALTY = 3;
+export const LEADER_MARGIN = 3;
+
+/** The party clearly ahead on points (by LEADER_MARGIN or more over everyone else), or null. Scores are public. */
+export function clearLeader(s: CoalitionState): number | null {
+  const order = [0, 1, 2, 3].sort((a, b) => s.points[b] - s.points[a]);
+  return s.points[order[0]] - s.points[order[1]] >= LEADER_MARGIN ? order[0] : null;
+}
+
 function split(s: CoalitionState, proposer: number, members: number[], partnerShare: (seat: number) => number): Proposal {
   const shares = [0, 0, 0, 0];
   let left = PRIZE;
@@ -132,12 +172,16 @@ function split(s: CoalitionState, proposer: number, members: number[], partnerSh
  *   bill), with seat-proportional shares; without an ally, the smallest-seat coalition. Hard drops an ally that betrayed
  *   it (passed a bill without it).
  * Power Broker — picks the coalition whose partners are cheapest (fewest seats) and keeps most of the prize: partners get
- *   45 % (Easy 55 %) of their proportional share. Hard reads the record: it offers each partner one point more than the
- *   lowest share that partner has accepted, and pays proportionally only if its last bill failed.
+ *   45 % (Easy 55 %) of their proportional share. Hard reads the record instead: it prices every coalition by what each
+ *   member's votes have revealed (revealedPrice: one more than the most it rejected, or the least it accepted; untested
+ *   partners 60 % of proportional), adds a point for anyone who sank its last bill, counts a clear leader as
+ *   LEADER_PENALTY dearer, and buys the cheapest.
  * Opportunistic Switcher — goes wherever support is cheapest right now: the coalition whose partners have accepted the
  *   least so far (untested partners count as proportional), offering that lowest accepted share (Easy: proportional
- *   minus 1). It changes partners whenever another is cheaper.
- * Fair Negotiator — the smallest-seat minimal winning coalition, split by seats (rounded; the remainder to itself).
+ *   minus 1). It changes partners whenever another is cheaper. Hard uses revealed prices (never re-offering a share a
+ *   partner already turned down) and avoids a clear leader.
+ * Fair Negotiator — the smallest-seat minimal winning coalition, split by seats (rounded; the remainder to itself). Hard
+ *   picks, among equally small coalitions, one without a clear leader.
  */
 export function coalitionPropose(s: CoalitionState, seat: number): Proposal {
   const persona = s.seats[seat]!;
@@ -156,21 +200,27 @@ export function coalitionPropose(s: CoalitionState, seat: number): Proposal {
     const cheapest = [...options].sort((a, b) => seatsOf(s, a) - s.weights[seat] - (seatsOf(s, b) - s.weights[seat]) || a.length - b.length)[0];
     const lastOwn = [...s.rounds].reverse().find((r) => r.proposal.proposer === seat);
     if (level === 'hard') {
-      if (lastOwn && !lastOwn.passed) return split(s, seat, cheapest, prop(cheapest));
-      return split(s, seat, cheapest, (m) => {
-        const lo = lowestAccepted(s, m);
-        return lo === null ? proportional(s, cheapest, m) * 0.6 : lo + 1;
-      });
+      // Prices each coalition from what its members' votes have revealed, and buys the cheapest one.
+      const price = (c: number[]) => (m: number) => revealedPrice(s, m, proportional(s, c, m) * 0.6) + (lastOwn && !lastOwn.passed && lastOwn.responses[m] === false ? 1 : 0);
+      const leader = clearLeader(s);
+      const cost = (c: number[]) => c.filter((m) => m !== seat).reduce((t, m) => t + price(c)(m) + (m === leader ? LEADER_PENALTY : 0), 0);
+      const pick = [...options].sort((a, b) => cost(a) - cost(b) || seatsOf(s, a) - seatsOf(s, b))[0];
+      return split(s, seat, pick, price(pick));
     }
     const f = level === 'easy' ? 0.55 : 0.45;
     return split(s, seat, cheapest, (m) => proportional(s, cheapest, m) * f);
   }
   if (persona === 'switcher') {
-    const cost = (c: number[]) => c.filter((m) => m !== seat).reduce((t, m) => t + (lowestAccepted(s, m) ?? proportional(s, c, m)), 0);
+    const ask = (c: number[], m: number) => (level === 'hard' ? revealedPrice(s, m, proportional(s, c, m)) : (lowestAccepted(s, m) ?? proportional(s, c, m)));
+    const leader = level === 'hard' ? clearLeader(s) : null;
+    const cost = (c: number[]) => c.filter((m) => m !== seat).reduce((t, m) => t + ask(c, m) + (m === leader ? LEADER_PENALTY : 0), 0);
     const pick = [...options].sort((a, b) => cost(a) - cost(b) || seatsOf(s, a) - seatsOf(s, b))[0];
-    return split(s, seat, pick, (m) => (level === 'easy' ? proportional(s, pick, m) - 1 : (lowestAccepted(s, m) ?? proportional(s, pick, m))));
+    return split(s, seat, pick, (m) => (level === 'easy' ? proportional(s, pick, m) - 1 : ask(pick, m)));
   }
-  const pick = bySeats[0];
+  // Fair Negotiator: the smallest coalition; on Hard, among the equally small ones it leaves out a runaway leader.
+  const leader = level === 'hard' ? clearLeader(s) : null;
+  const small = bySeats.filter((c) => seatsOf(s, c) === seatsOf(s, bySeats[0]));
+  const pick = (leader !== null && leader !== seat ? small.find((c) => !c.includes(leader)) : undefined) ?? bySeats[0];
   return split(s, seat, pick, prop(pick));
 }
 
@@ -184,12 +234,25 @@ export function coalitionPropose(s: CoalitionState, seat: number): Proposal {
  *   one (at least 2): it compares, and follows the money.
  * Fair Negotiator — at least 80 % of its proportional share (Easy 60 %). Normal and Hard also reject a bill whose
  *   proposer keeps more than twice its own proportional share, even when the offer itself is acceptable.
+ * Hard, everyone (while more than HOLDOUT_ROUNDS remain; the Loyal Ally excepted for its ally): rejects a clear
+ *   leader's bill that pays less than a seat-fair share, and rejects a greedy bill (proposer keeps more than GREED × its
+ *   proportional share) when it has a better majority elsewhere (outsideOption). All from public seats, bills, votes
+ *   and scores.
  */
 export function coalitionAccepts(s: CoalitionState, seat: number, p: Proposal): boolean {
   const persona = s.seats[seat]!;
   const { level } = s.setup;
   const share = p.shares[seat];
   const fairShare = proportional(s, p.members, seat);
+  // Hard reads the deal, not just its own number, while enough rounds remain for a "no" to matter (near the end it
+  // takes what it can). The Loyal Ally never holds out against its ally.
+  if (level === 'hard' && s.total - s.rounds.length > HOLDOUT_ROUNDS && !(persona === 'loyal' && allyOf(s, seat) === p.proposer)) {
+    // Feeding a runaway leader is a bad deal unless it pays at least a seat-fair share.
+    const leader = clearLeader(s);
+    if (leader === p.proposer && leader !== seat && share < fairShare) return false;
+    // A greedy bill is a weak coalition when this party has a better majority elsewhere: it holds out.
+    if (outsideOption(s, seat, p.proposer) > share && p.shares[p.proposer] > GREED * proportional(s, p.members, p.proposer)) return false;
+  }
   if (persona === 'loyal') {
     const ally = allyOf(s, seat);
     if (level === 'hard' && betrayedBy(s, seat, p.proposer) && ally === p.proposer) return share >= fairShare * 1.2;

@@ -7,7 +7,7 @@
 | Welcome | One headline and one action, with a branching-paths animation. "Skip to the app" leaves immediately. |
 | Decision | Share or take against Maya, one round, with all four outcomes shown before choosing. |
 | Reveal | Both moves, the coins, what happened, and why Maya chose that way. "Go deeper" adds her incentives, the outcome table, labelled hypotheticals and what changes when players meet again. "Play it again" restarts with the same rules. |
-| World + next step | Learn, Play and Explore previews built from the live catalog, then one recommended lesson or "Explore on my own". |
+| World + next step | Learn, Games and Stories previews named after the tabs (Learn also counts the decision scenarios), built from the live catalog, then one recommended lesson or "Explore on my own". |
 
 ## The dilemma (`src/features/onboarding/dilemma.ts`)
 

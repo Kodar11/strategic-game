@@ -133,3 +133,7 @@ export { default as Camera } from 'lucide-react-native/icons/camera';
 export { default as MousePointerClick } from 'lucide-react-native/icons/mouse-pointer-click';
 export { default as StickyNote } from 'lucide-react-native/icons/sticky-note';
 export { default as CircleSlash } from 'lucide-react-native/icons/circle-slash';
+export { default as ExternalLink } from 'lucide-react-native/icons/external-link';
+export { default as FileText } from 'lucide-react-native/icons/file-text';
+export { default as Bug } from 'lucide-react-native/icons/bug';
+export { default as Mail } from 'lucide-react-native/icons/mail';
