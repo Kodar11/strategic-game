@@ -68,6 +68,7 @@ export function shareResultMessage(r: ShareResult, what: 'result' | 'invite', te
 /** A failed invite, in words the player can act on. Server refusals the app knows about keep their own message. */
 export function inviteFailure(e: unknown): string {
   const d = toDataError(e);
+  if (d.kind === 'signedOut') return 'Sign in with Google (Settings → Account) to challenge a friend. Practice games work without an account.';
   if (d instanceof GameError || d.transient) return d.message;
   return 'Couldn’t create an invite link right now. Practice games still work.';
 }

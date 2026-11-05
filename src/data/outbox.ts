@@ -46,6 +46,8 @@ export class Outbox {
   private failures = 0;
   private status: OutboxStatus = { pending: 0, state: 'idle', message: null };
   private waiters: (() => void)[] = [];
+  /** Bumped by restore() and clear(): a send still in flight for an earlier owner must not touch the new queue. */
+  private generation = 0;
 
   private readonly o: OutboxOptions;
 
@@ -55,6 +57,7 @@ export class Outbox {
 
   /** Load the saved queue for this user. A queue saved for anyone else is discarded. */
   async restore(owner: string): Promise<void> {
+    if (this.owner !== owner) this.generation++;
     this.owner = owner;
     try {
       const raw = await this.o.storage.load();
@@ -66,12 +69,14 @@ export class Outbox {
     this.emit(this.queue.length ? 'saving' : 'idle', null);
   }
 
-  enqueue(changes: ProgressChanges): void {
-    if (isEmpty(changes)) return;
+  /** Queue a change. The returned promise resolves once the queue is saved (await it before relying on a restart). */
+  enqueue(changes: ProgressChanges): Promise<void> {
+    if (isEmpty(changes)) return Promise.resolve();
     this.queue.push(changes);
-    void this.persist();
+    const saved = this.persist();
     this.emit(this.status.state === 'retrying' ? 'retrying' : 'saving', this.status.state === 'retrying' ? this.status.message : null);
     this.schedule(this.failures ? null : (this.o.debounceMs ?? 300));
+    return saved;
   }
 
   /** Send everything now. Resolves once the queue is empty, or rejects-free with false if it couldn't be emptied. */
@@ -94,6 +99,7 @@ export class Outbox {
   /** Drop every pending change and the saved copy, e.g. once the account they belong to has been deleted. */
   async clear(): Promise<void> {
     this.stop();
+    this.generation++;
     this.queue = [];
     this.owner = null;
     this.failures = 0;
@@ -139,13 +145,17 @@ export class Outbox {
   private async attempt(): Promise<boolean> {
     const count = this.queue.length;
     const batch = this.queue.slice(0, count).reduce(mergeChanges);
+    const generation = this.generation;
     try {
       await this.o.send(batch);
+      // Signed out, deleted or switched account while this was in flight: the queue now belongs to someone else.
+      if (generation !== this.generation) return true;
       this.queue.splice(0, count);
       this.failures = 0;
       this.emit(this.queue.length ? 'saving' : 'idle', null);
       return true;
     } catch (e) {
+      if (generation !== this.generation) return true;
       const { kind, message } = this.o.classify(e);
       if (kind === 'permanent') {
         this.queue.splice(0, count);
@@ -158,8 +168,10 @@ export class Outbox {
       this.schedule(null);
       return false;
     } finally {
-      await this.persist();
-      if (!this.queue.length) this.waiters.splice(0).forEach((w) => w());
+      if (generation === this.generation) {
+        await this.persist();
+        if (!this.queue.length) this.waiters.splice(0).forEach((w) => w());
+      }
     }
   }
 

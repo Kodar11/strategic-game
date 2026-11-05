@@ -21,7 +21,9 @@ import { allAssessments, type Assessment, getAssessment, moduleCheckpoint, split
 import { type AssessmentRun, finalUnlocked } from '@/src/features/assessments/scoring';
 import { useDaily } from '@/src/data/daily-session';
 import { formatDay, monthKey, monthOf } from '@/src/features/daily/dates';
+import { SignInInvite } from '@/src/features/account/SignInInvite';
 import { allScenarios } from '@/src/features/scenarios';
+import { useIsGuest } from '@/src/components/auth/SignInRequired';
 import { type LessonRuntime, useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, shadow, space } from '@/src/theme/tokens';
 import { useMotionReduced } from '@/src/utils/feedback';
@@ -157,6 +159,8 @@ export default function Home() {
             <DailyRow />
           </Animated.View>
 
+          <SignInInvite />
+
           <View style={styles.sectionHead} onLayout={(e) => (lessonsY.current = e.nativeEvent.layout.y)}>
             <AppText variant="heading" accessibilityRole="header">
               Lessons
@@ -208,17 +212,18 @@ function DailyRow() {
   const today = useDaily((s) => s.today);
   const loadMonth = useDaily((s) => s.loadMonth);
   const month = useDaily((s) => s.months[monthKey(monthOf(s.today))]);
+  const guest = useIsGuest();
 
   useFocusEffect(
     useCallback(() => {
-      void loadMonth(monthOf(today));
-    }, [loadMonth, today]),
+      if (!guest) void loadMonth(monthOf(today));
+    }, [guest, loadMonth, today]),
   );
 
-  const data = month?.status === 'ready' ? month.data : null;
+  const data = month?.status === 'ready' && !guest ? month.data : null;
   const answered = !!data?.attempts.get(formatDay(today));
   const open = !answered && !!data?.entries.get(formatDay(today));
-  const status = !data ? 'One decision a day' : answered ? 'Completed today · review your answer' : open ? 'Take today’s challenge' : 'No challenge today · past ones stay open';
+  const status = guest ? 'One decision a day · sign in to take part' : !data ? 'One decision a day' :answered ? 'Completed today · review your answer' : open ? 'Take today’s challenge' : 'No challenge today · past ones stay open';
 
   return (
     <Pressable

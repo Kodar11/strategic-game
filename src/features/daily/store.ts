@@ -24,6 +24,8 @@ export interface DailyState {
   loadMonth: (month: Month, opts?: { force?: boolean }) => Promise<void>;
   /** Submit today's official answer and fold the recorded attempt into the cache. */
   submit: (req: SubmitRequest & { date: Day }) => Promise<{ status: 'recorded' | 'existing'; attempt: DailyAttempt }>;
+  /** Forget everything loaded (signing out, switching or deleting the account); loads still running are ignored. */
+  reset: () => void;
 }
 
 /** A loaded month is reused for this long before a visit refetches it (content may be published meanwhile). */
@@ -31,6 +33,8 @@ export const MONTH_TTL_MS = 60_000;
 
 export function createDailyStore(repo: DailyRepository, now: () => number = Date.now) {
   const inflight = new Map<string, Promise<void>>();
+  /** Bumped by reset(): a response that belongs to the previous account is dropped instead of shown. */
+  let epoch = 0;
   const store = create<DailyState>()((set, get) => ({
     today: utcToday(now()),
     todayConfirmed: false,
@@ -45,20 +49,30 @@ export function createDailyStore(repo: DailyRepository, now: () => number = Date
       // Keep showing a loaded month while it refreshes; only a first load shows the spinner.
       if (cur?.status !== 'ready') set((s) => ({ months: { ...s.months, [key]: { status: 'loading' } } }));
       const { from, to } = monthRange(month);
+      const started = epoch;
       const p = repo
         .fetchRange(from, to)
         .then((data) => {
+          if (started !== epoch) return;
           set((s) => ({ today: data.today, todayConfirmed: true, history: data.history, months: { ...s.months, [key]: { status: 'ready', data, loadedAt: now() } } }));
         })
         .catch((e: unknown) => {
+          if (started !== epoch) return;
           const d = toDataError(e);
           // A read can't lose an answer, so say what failed instead of the generic "refused a change".
           const error = d.transient ? d : new DataError(d.kind, d.detail, 'Daily challenges aren’t available from the server right now. Try again later.');
           set((s) => (s.months[key]?.status === 'ready' ? s : { months: { ...s.months, [key]: { status: 'error', error } } }));
         })
-        .finally(() => inflight.delete(key));
+        .finally(() => {
+          if (inflight.get(key) === p) inflight.delete(key);
+        });
       inflight.set(key, p);
       return p;
+    },
+    reset: () => {
+      epoch++;
+      inflight.clear();
+      set({ months: {}, history: null, todayConfirmed: false });
     },
     submit: async (req) => {
       const { date, ...request } = req;

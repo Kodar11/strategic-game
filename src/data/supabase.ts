@@ -1,14 +1,22 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { type SupabaseClient, createClient } from '@supabase/supabase-js';
+import { type AuthChangeEvent, type Session, type SupabaseClient, createClient } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
 
+import { installCryptoPolyfill } from '@/src/auth/crypto-polyfill';
+import { sessionStorage } from '@/src/auth/session-storage';
+import { currentUserId } from '@/src/auth/store';
 import type { Database, Json } from './database.types';
-import { DataError, toDataError } from './errors';
+import { DataError } from './errors';
+import { PUBLIC_RPCS } from './public-rpcs';
 import type { Rpc } from './repositories';
 
 /**
  * The one Supabase client. It uses only the project URL and the publishable (anon) key — values meant to ship in the
  * app; row level security decides what they can reach. A secret / service-role key is refused outright.
+ *
+ * Identity is Google only (src/auth/google.ts → `signInWithIdToken` in src/data/session.ts). Supabase owns the session:
+ * it issues and refreshes the access and refresh tokens and keeps them in OS-backed secure storage
+ * (src/auth/session-storage.ts). The app never stores, logs or forwards a token itself.
  *
  * `EXPO_PUBLIC_*` variables are inlined at build time, so they must be read with these literal names.
  */
@@ -47,22 +55,52 @@ const fetchWithTimeout: typeof fetch = (input, init) => {
 };
 
 let client: SupabaseClient<Database> | null = null;
+let appStateHooked = false;
+
+type AuthListener = (event: AuthChangeEvent, session: Session | null) => void;
+const authListeners = new Set<AuthListener>();
+
+/**
+ * Follow auth changes (sign-in, refresh, sign-out — including a session that ends by itself) on whichever client is
+ * current. Supabase runs these callbacks inside its session lock, so a listener must not await Supabase calls itself;
+ * src/data/session.ts defers its work.
+ */
+export function subscribeAuth(listener: AuthListener): () => void {
+  authListeners.add(listener);
+  return () => authListeners.delete(listener);
+}
 
 export function supabase(): SupabaseClient<Database> {
   if (client) return client;
   if (!url || !key) throw new DataError('config', 'EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_KEY is not set');
   if (isPrivilegedKey(key)) throw new DataError('config', 'EXPO_PUBLIC_SUPABASE_KEY is a secret key; the app must use the publishable key');
+  // Before the client exists: PKCE then gets real random values and an SHA-256 challenge (React Native has no WebCrypto).
+  installCryptoPolyfill();
   client = createClient<Database>(url, key, {
     auth: {
-      storage: isServer ? undefined : AsyncStorage,
+      storage: isServer ? undefined : sessionStorage,
       autoRefreshToken: !isServer,
       persistSession: !isServer,
       detectSessionInUrl: false,
+      // PKCE for the browser Google sign-in (src/auth/browser-sign-in.ts): the code that comes back through the
+      // redirect is useless without the verifier kept on this device; the SHA-256 challenge comes from
+      // installCryptoPolyfill above. The native ID-token sign-in that release builds use doesn't involve PKCE. Session refreshes are coordinated by supabase-js itself
+      // (2.118+: the old `lock` option is deprecated), so no lock is configured.
+      flowType: 'pkce',
     },
     global: { fetch: fetchWithTimeout },
   });
-  // Refresh tokens only while the app is in the foreground (Supabase's guidance for React Native).
-  if (Platform.OS !== 'web') {
+  const created = client;
+  created.auth.onAuthStateChange((event, session) => {
+    // A client replaced by endLocalSession may still emit; only the current one speaks for the app.
+    if (created !== client) return;
+    authListeners.forEach((l) => l(event, session));
+  });
+  // Refresh tokens only while the app is in the foreground (Supabase's guidance for React Native). One listener for
+  // the app's lifetime; it follows whichever client is current.
+  if (Platform.OS !== 'web' && !appStateHooked) {
+    appStateHooked = true;
+    if (AppState.currentState === 'active') client.auth.startAutoRefresh();
     AppState.addEventListener('change', (state) => {
       if (state === 'active') client?.auth.startAutoRefresh();
       else client?.auth.stopAutoRefresh();
@@ -72,23 +110,39 @@ export function supabase(): SupabaseClient<Database> {
 }
 
 /**
- * The signed-in user's id, signing in anonymously the first time. The session is kept on the device, so the same
- * learner comes back on every launch until the app's storage is cleared (see docs/DATA_ARCHITECTURE.md).
+ * End the session on this device even when the server can't be reached. supabase-js keeps the session if its
+ * sign-out request fails for lack of a network, so the saved session is then removed directly and the client
+ * replaced: the next `supabase()` starts from empty storage. Only this device is signed out (`scope: 'local'`).
  */
-export async function ensureUser(): Promise<string> {
-  const auth = supabase().auth;
-  const { data: current, error: sessionError } = await auth.getSession();
-  if (sessionError) throw toDataError(sessionError);
-  if (current.session?.user) return current.session.user.id;
-  const { data, error } = await auth.signInAnonymously();
-  if (error?.code === 'anonymous_provider_disabled')
-    throw new DataError('config', error.message, 'Anonymous sign-in is turned off for this Supabase project. Turn it on under Authentication → Sign In / Providers, then try again.');
-  if (error || !data.user) throw new DataError('auth', error ? `${error.code ?? ''} ${error.message}` : 'no user returned');
-  return data.user.id;
+export async function endLocalSession(): Promise<void> {
+  const c = supabase();
+  const { error } = await c.auth.signOut({ scope: 'local' }).catch((e: unknown) => ({ error: e }));
+  if (!error) return;
+  await c.auth.stopAutoRefresh().catch(() => undefined);
+  if (url) await sessionStorage.removeItem(storageKeyFor(url)).catch(() => undefined);
+  client = null;
+  supabase();
 }
 
+/** supabase-js's storage key for a project: `sb-<project ref>-auth-token`. */
+export function storageKeyFor(projectUrl: string): string {
+  const ref = new URL(projectUrl).hostname.split('.')[0];
+  return `sb-${ref}-auth-token`;
+}
+
+/**
+ * Builds before Google sign-in kept an anonymous session in AsyncStorage. It is never used again; remove it so no
+ * token outlives the model it belonged to.
+ */
+export async function removeLegacySession(): Promise<void> {
+  if (!url || isServer) return;
+  await AsyncStorage.removeItem(storageKeyFor(url)).catch(() => undefined);
+}
+
+/** Every database call. A guest asking for a per-player function gets a `signedOut` error without a request. */
 export const supabaseRpc: Rpc = {
   async call(fn, args) {
+    if (!PUBLIC_RPCS.has(fn) && !currentUserId()) throw new DataError('signedOut', `${fn} needs a signed-in user`);
     const { data, error } = await supabase().rpc(fn, (args ?? {}) as { changes: Json });
     if (error) throw error;
     return data;

@@ -15,7 +15,7 @@ const SUPABASE_SHIM = `
   create role anon nologin noinherit;
   create role authenticated nologin noinherit;
   create schema auth;
-  create table auth.users (id uuid primary key, is_anonymous boolean not null default true);
+  create table auth.users (id uuid primary key, is_anonymous boolean not null default false);
   create function auth.uid() returns uuid language sql stable as $$
     select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid
   $$;

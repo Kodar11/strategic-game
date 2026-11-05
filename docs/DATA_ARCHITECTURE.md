@@ -7,7 +7,7 @@ The app has three layers. Content and learner progress live in Supabase PostgreS
 | **Content** | Supabase, `content_*` tables (`supabase/migrations/20261027120000_content_catalog.sql`) | Modules and lessons (titles, order, metadata), curriculum lesson material, labs (prompts, sliders, payoff tables, reveal cards), all 66 scenarios (setup, rules, formal spec, visuals, prediction, options, verdicts, feedback, explanations, takeaways, comparison settings), practice challenges and concept reviews, assessments and their items, skills, goals, and the metadata of the original lessons' predictions. |
 | **Engine** | TypeScript | Game rules (`src/game/`), scenario state machines (`src/features/scenarios/engines/`), lab calculations (`LAB_ENGINES` in `src/features/lessons/curriculum/labs.ts`), solvers (`predict.solve`, `src/features/assessments/solvers.ts`), scoring, the learning-record and profile rules, and the five original lessons (`src/features/lessons/<lesson>/`), whose copy is bound to narrated audio. |
 | **Learner progress** | Supabase, `learner_profiles`, `lesson_progress`, `scenario_runs`, `scenario_completions`, `challenge_drafts`, `assessment_runs`, `learning_attempts` (`…_learner_progress.sql`) | Completed lessons, a lesson's in-progress step, scenario runs (prediction, inputs, seed), finished scenarios, challenge drafts, assessment answers and scores, every learning attempt, the goal. |
-| **Device** | AsyncStorage | Settings (`strategic-game/settings`: narration, motion, haptics). These are device preferences. Also the Supabase session (anonymous user token) and the sync outbox (`strategic-game/outbox`: writes not yet acknowledged). |
+| **Device** | AsyncStorage | Settings (`strategic-game/settings`: narration, motion, haptics). These are device preferences. Also the sync outbox (`strategic-game/outbox`: writes not yet acknowledged). |
 
 The learning profile is never stored. It is computed on the device with the same rules as before (`src/features/learning/profile.ts`), from:
 - the learning record
@@ -53,7 +53,7 @@ Everything goes through three database functions, so each read is one consistent
 - `get_my_progress()` returns the learner's progress in the shape the store has always persisted. It goes through the store's existing sanitizers (`sanitizeProgress`), so loading rules are unchanged.
 - `apply_progress_changes(changes)` applies one batch of changes atomically.
 
-**Start-up (`src/data/session.ts`)** is online-first. It fetches the content and the anonymous session in parallel, installs the catalog, sends any writes left in the outbox, loads progress, then renders the app. On failure it shows a "Couldn't load the lessons" screen with **Try again**. There is no built-in content to fall back to. Static web export pre-renders every route from the engine registries; the pages fill in once the data loads.
+**Start-up (`src/data/session.ts`)** is online-first. It fetches the content and confirms the saved session with the server in parallel, installs the catalog, sends any writes left in the outbox, loads progress, then renders the app. On failure it shows a "Couldn't load the lessons" screen with **Try again**. There is no built-in content to fall back to. Static web export pre-renders every route from the engine registries; the pages fill in once the data loads.
 
 **Writes (`src/data/changes.ts`, `outbox.ts`):**
 
@@ -66,7 +66,7 @@ Everything goes through three database functions, so each read is one consistent
 - The queue is saved to the device and sent first on the next launch, for the same user only.
 - Settings shows whether everything is saved.
 
-**Conflicts.** One anonymous user is one install, so there is one writer.
+**Conflicts.** A player normally writes from one device at a time.
 
 - Attempts and completions only grow; the first record for an id wins, as in the app.
 - In-progress state (lesson step, scenario run, draft, assessment run) is replaced by the latest write, deliberately, because it belongs to one device.
@@ -80,18 +80,13 @@ Everything goes through three database functions, so each read is one consistent
 - `content_admin.*` (import and validation) lives in a schema the Data API doesn't expose, and only the owner can execute it.
 - These rules are tested against the real migrations in `supabase/__tests__/database.test.ts`.
 
-## Identity: anonymous sign-in
+## Identity: Google sign-in (optional)
 
-Each install calls `signInAnonymously()` once. The session is kept in AsyncStorage and refreshed by supabase-js. This is a real Supabase Auth user (`auth.users.is_anonymous = true`). It has no name or email, and the app shows no login.
-
-Limits:
+Players sign in with Google only, and only if they want to. Supabase Auth verifies the Google ID token (with a nonce) and owns the session, which is kept in the OS secure store. A guest has no server identity: their lesson progress is kept on the device (`tactiqo/guest-progress/v1`) and handed to the account on sign-in through the outbox. Features with per-player server records (Daily Challenge, Game of the Week, friend challenges, nickname) invite a guest to sign in. The full design, the security review and the external setup are in `docs/AUTHENTICATION.md`.
 
 - **Arena match summaries** (2026-11-04): each finished Arena match also uploads a summary (game, opponent, level, variant, length, outcome, scores, rounds, time — no seed or hidden state) to `arena_matches` through `record_arena_matches`, owner-only RLS, insert-only, idempotent on the device-made id (`src/data/arena.ts`, owner-scoped queue `tactiqo/arena-uploads/v1`). Matches played before this change stay device-only: the device records aren't tied to an account, so they aren't back-filled.
-- **Clearing app data, reinstalling or a new device starts a new anonymous user.** The old progress stays in the database but is unreachable from the app.
-- The same learner on web and phone means two users.
-- Anonymous users count toward Supabase's monthly active users. Supabase recommends CAPTCHA or rate limits against abuse of anonymous sign-ups.
-
-**Later: account linking.** Supabase can link an email or OAuth identity to the anonymous user (`linkIdentity` / `updateUser`). The user id stays the same, so all rows are kept with no migration. Merging two existing users (two devices) would need a server-side merge that renumbers attempts by `lockedAt`. That isn't built.
+- Signing in on a second device reaches the same account and the same progress.
+- Signing out or deleting the account clears everything the device held for that player (`src/data/device-data.ts`). A device-owner marker clears it whenever start-up finds it belongs to someone else (`src/data/device-owner.ts`).
 
 ## Seeding, editing and versioning content
 

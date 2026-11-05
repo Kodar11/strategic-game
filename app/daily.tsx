@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SignInRequiredScreen, useIsGuest } from '@/src/components/auth/SignInRequired';
 import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
@@ -35,13 +36,24 @@ export default function DailyScreen() {
   const loadMonth = useDaily((s) => s.loadMonth);
   const [month, setMonth] = useState<Month>(() => monthOf(today));
   const [selected, setSelected] = useState<Day>(today);
+  const guest = useIsGuest();
 
   useFocusEffect(
     useCallback(() => {
+      // Official answers are per player: a guest is invited to sign in, and the calendar loads once they have.
+      if (guest) return;
       void loadMonth(month);
       if (compareMonths(month, monthOf(today)) !== 0) void loadMonth(monthOf(today));
-    }, [loadMonth, month, today]),
+    }, [guest, loadMonth, month, today]),
   );
+
+  if (guest)
+    return (
+      <SignInRequiredScreen
+        title="Daily challenge"
+        body="One short strategic decision a day, with your streak and a calendar of past challenges. Sign in with Google so your official answers are saved to your account."
+      />
+    );
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
   const shown = months[monthKey(month)];

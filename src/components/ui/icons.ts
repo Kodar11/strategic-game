@@ -137,3 +137,4 @@ export { default as ExternalLink } from 'lucide-react-native/icons/external-link
 export { default as FileText } from 'lucide-react-native/icons/file-text';
 export { default as Bug } from 'lucide-react-native/icons/bug';
 export { default as Mail } from 'lucide-react-native/icons/mail';
+export { default as LogOut } from 'lucide-react-native/icons/log-out';

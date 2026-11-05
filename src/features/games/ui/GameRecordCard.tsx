@@ -2,6 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
+import { useIsGuest } from '@/src/components/auth/SignInRequired';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
@@ -22,10 +23,11 @@ const OUTCOME = { win: 'Won', loss: 'Lost', draw: 'Drew' } as const;
 export function GameRecordCard() {
   const mine = useGames((s) => s.mine);
   const loadMine = useGames((s) => s.loadMine);
+  const guest = useIsGuest();
   useFocusEffect(
     useCallback(() => {
-      void loadMine();
-    }, [loadMine]),
+      if (!guest) void loadMine();
+    }, [guest, loadMine]),
   );
 
   return (
@@ -38,7 +40,14 @@ export function GameRecordCard() {
         Separate from your learning profile: points come from Game of the Week placings, not lesson answers.
       </AppText>
 
-      {mine.status === 'loading' || mine.status === 'idle' ? (
+      {guest ? (
+        <View style={{ gap: space.sm }}>
+          <AppText variant="small" color={colors.textMuted}>
+            Your game record is kept with your account. Sign in to see your practice results and weekly placings here.
+          </AppText>
+          <Button label="Sign in" variant="secondary" compact onPress={() => router.navigate('/sign-in')} style={{ alignSelf: 'flex-start' }} />
+        </View>
+      ) : mine.status === 'loading' || mine.status === 'idle' ? (
         <ActivityIndicator color={colors.primary} accessibilityLabel="Loading your game record" />
       ) : mine.status === 'error' ? (
         <View style={{ gap: space.sm }}>

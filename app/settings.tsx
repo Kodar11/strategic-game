@@ -10,10 +10,12 @@ import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
-import { Bug, ChartNoAxesColumn, ChevronRight, Download, ExternalLink, FileText, Info, Mail, Pencil, RotateCcw, Shield, Sparkles, Trash, UserRound, X } from '@/src/components/ui/icons';
+import { Bug, ChartNoAxesColumn, ChevronRight, Download, ExternalLink, FileText, Info, LogOut, Mail, Pencil, RotateCcw, Shield, Sparkles, Trash, UserRound, X } from '@/src/components/ui/icons';
+import { useAuth } from '@/src/auth/store';
+import { SignInPanel } from '@/src/components/auth/SignInPanel';
 import { allLessons } from '@/src/content/lessons';
 import { accountDeletionError } from '@/src/data/account';
-import { deleteAccount, useSyncStatus } from '@/src/data/session';
+import { UNSAVED_MESSAGE, deleteAccount, signOut, useSyncStatus } from '@/src/data/session';
 import { allGoals, buildLearningExport, exportFileName } from '@/src/features/learning/records';
 import { shareJsonFile } from '@/src/features/learning/shareFile';
 import { type ShareOutcome, isShareFailure, shareOutcomeMessage } from '@/src/features/learning/shareOutcome';
@@ -69,10 +71,13 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
 // ── A. Profile ───────────────────────────────────────────────────────────────
 
 function ProfileSection() {
-  const { name, failed, reload } = useNickname();
-  const editProfile = () => router.navigate('/nickname');
-  const loading = name === undefined && !failed;
-  const display = name === undefined ? (failed ? 'Couldn’t load your nickname' : 'Loading…') : (name ?? 'Anonymous player');
+  const { name: loaded, failed, reload } = useNickname();
+  // A nickname belongs to an account (it's what leaderboards show), so a guest is offered sign-in instead.
+  const guest = useAuth((s) => s.status !== 'signedIn' && s.status !== 'signingOut' && s.status !== 'deleting');
+  const name = guest ? null : loaded;
+  const editProfile = () => router.navigate(guest ? '/sign-in' : '/nickname');
+  const loading = !guest && name === undefined && !failed;
+  const display = guest ? 'Guest' : name === undefined ? (failed ? 'Couldn’t load your nickname' : 'Loading…') : (name ?? 'Anonymous player');
 
   return (
     <Section label="Profile">
@@ -81,7 +86,7 @@ function ProfileSection() {
           onPress={editProfile}
           disabled={name === undefined}
           accessibilityRole="button"
-          accessibilityLabel={name === undefined ? display : `Nickname: ${name ?? 'none, shown as Anonymous player'}. Edit profile`}
+          accessibilityLabel={guest ? 'Guest. Sign in to choose a nickname' : name === undefined ? display : `Nickname: ${name ?? 'none, shown as Anonymous player'}. Edit profile`}
           style={({ pressed }) => [styles.profileRow, pressed && { opacity: 0.8 }]}>
           <View style={styles.avatar} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
             {name ? (
@@ -97,12 +102,14 @@ function ProfileSection() {
               {display}
             </AppText>
             <AppText variant="caption" color={colors.textMuted}>
-              Your nickname may appear to other players.
+              {guest ? 'Sign in to choose a nickname for leaderboards.' : 'Your nickname may appear to other players.'}
             </AppText>
           </View>
           {loading ? <ActivityIndicator color={colors.primaryText} /> : null}
         </Pressable>
-        {failed && name === undefined ? (
+        {guest ? (
+          <Button label="Sign in to choose a nickname" variant="secondary" compact icon={UserRound} iconPosition="left" onPress={editProfile} />
+        ) : failed && name === undefined ? (
           <Button label="Try again" variant="secondary" compact icon={RotateCcw} iconPosition="left" onPress={reload} />
         ) : (
           <Button label="Edit profile" variant="secondary" compact icon={Pencil} iconPosition="left" disabled={name === undefined} onPress={editProfile} />
@@ -414,19 +421,179 @@ function AboutSection() {
 // ── Account ─────────────────────────────────────────────────────────────────
 
 /**
- * Permanently delete the anonymous account on the server (src/data/session.ts → delete_my_account). On success the
- * app starts over as a new anonymous player and shows the welcome; on failure the dialog stays open with the reason.
+ * Who is signed in, and the account's actions. A guest sees why an account helps and "Continue with Google". A
+ * signed-in player sees the Google email, Sign out (the account and its data stay on the server) and Delete account
+ * (src/data/session.ts → delete_my_account: permanent, and only reported once the server confirms it).
  */
 function AccountSection() {
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const status = useAuth((s) => s.status);
+  const user = useAuth((s) => s.user);
+  const signedIn = (status === 'signedIn' || status === 'signingOut' || status === 'deleting') && !!user;
+
+  return (
+    <Section label="Account">
+      {signedIn ? (
+        <SignedInAccount email={user.email} />
+      ) : (
+        <Card style={{ gap: space.md }}>
+          <View style={styles.row}>
+            <View style={styles.navIcon}>
+              <UserRound size={18} color={colors.primaryText} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppText variant="bodyStrong">Not signed in</AppText>
+              <AppText variant="caption" color={colors.textMuted}>
+                Your progress is saved on this device only.
+              </AppText>
+            </View>
+          </View>
+          <AppText variant="small" color={colors.textBody}>
+            Sign in with Google to keep your progress safe and pick it up on any device. An account also lets you take the Daily Challenge, play Game of the Week, choose a nickname and challenge friends.
+          </AppText>
+          <SignInPanel card={false} />
+        </Card>
+      )}
+    </Section>
+  );
+}
+
+function SignedInAccount({ email }: { email: string | null }) {
+  const status = useAuth((s) => s.status);
+  const [dialog, setDialog] = useState<'signOut' | 'delete' | null>(null);
+
+  return (
+    <Card style={{ gap: space.md }}>
+      <View style={styles.row}>
+        <View style={styles.navIcon}>
+          <UserRound size={18} color={colors.primaryText} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <AppText variant="bodyStrong" numberOfLines={1} selectable>
+            {email ?? 'Google account'}
+          </AppText>
+          <AppText variant="caption" color={colors.textMuted}>
+            Signed in with Google
+          </AppText>
+        </View>
+      </View>
+      <AppText variant="small" color={colors.textMuted}>
+        Your learning progress, answers, Daily Challenge history, nickname and game results are saved to your account. Story progress, detailed Arena tallies and your preferences stay on this device.
+      </AppText>
+      <Button label="Sign out" variant="secondary" compact icon={LogOut} iconPosition="left" disabled={status !== 'signedIn'} onPress={() => setDialog('signOut')} />
+      <Pressable
+        onPress={() => setDialog('delete')}
+        disabled={status !== 'signedIn'}
+        accessibilityRole="button"
+        accessibilityLabel="Delete account"
+        accessibilityHint="Opens a confirmation. Deleting is permanent."
+        style={({ pressed }) => [styles.danger, pressed && { backgroundColor: colors.dangerSoft }]}>
+        <Trash size={18} color={colors.danger} strokeWidth={2.2} />
+        <AppText variant="bodyStrong" color={colors.danger}>
+          Delete account
+        </AppText>
+      </Pressable>
+      <Pressable onPress={() => openPage(LINKS.deletion)} accessibilityRole="link" style={{ minHeight: 44, justifyContent: 'center' }}>
+        <AppText variant="small" color={colors.primaryText}>
+          What deletion removes, and how to ask by email if the app can’t
+        </AppText>
+      </Pressable>
+      <SignOutDialog open={dialog === 'signOut'} onClose={() => setDialog(null)} />
+      <DeleteDialog open={dialog === 'delete'} onClose={() => setDialog(null)} />
+    </Card>
+  );
+}
+
+function Dialog({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
   const reduced = useMotionReduced();
+  return (
+    <Modal visible={open} transparent animationType={reduced ? 'none' : 'fade'} onRequestClose={onClose} statusBarTranslucent>
+      <View style={styles.scrim}>
+        <View style={styles.dialog} accessibilityViewIsModal>
+          {children}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/** Back to the app's first screen, with nothing of the previous account left on the stack. */
+function leaveToStart() {
+  if (router.canDismiss()) router.dismissAll();
+  router.replace('/');
+}
+
+/**
+ * Signing out keeps the account. If changes are still waiting to upload (offline), the dialog says so and offers
+ * "Sign out anyway" rather than dropping them silently.
+ */
+function SignOutDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const status = useAuth((s) => s.status);
+  const [unsaved, setUnsaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const busy = status === 'signingOut';
 
   const close = () => {
     if (busy) return;
-    setOpen(false);
+    setUnsaved(false);
     setError(null);
+    onClose();
+  };
+
+  const confirm = async (force: boolean) => {
+    if (busy) return;
+    setError(null);
+    const result = await signOut({ force });
+    if (result === 'signedOut') {
+      onClose();
+      leaveToStart();
+    } else if (result === 'unsaved') {
+      setUnsaved(true);
+    } else {
+      setError(useAuth.getState().error ?? 'Couldn’t sign out. Please try again.');
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={close}>
+      <AppText variant="heading" accessibilityRole="header">
+        Sign out?
+      </AppText>
+      <AppText variant="small" color={colors.textBody}>
+        Your account and everything saved to it stay safe. Sign in with Google again to pick up where you left off.
+      </AppText>
+      <AppText variant="small" color={colors.textBody}>
+        This device forgets the account: story progress and Arena records kept only here are removed. Signing out doesn’t delete your account.
+      </AppText>
+      {unsaved ? (
+        <AppText variant="small" color={colors.insight} accessibilityLiveRegion="assertive">
+          {UNSAVED_MESSAGE}
+        </AppText>
+      ) : null}
+      {error ? (
+        <AppText variant="small" color={colors.danger} accessibilityLiveRegion="assertive">
+          {error}
+        </AppText>
+      ) : null}
+      <View style={{ gap: space.sm }}>
+        <Button label={busy ? 'Signing out…' : unsaved ? 'Sign out anyway' : 'Sign out'} icon={LogOut} iconPosition="left" disabled={busy} onPress={() => void confirm(unsaved)} />
+        <Button label="Cancel" variant="secondary" compact disabled={busy} onPress={close} />
+      </View>
+    </Dialog>
+  );
+}
+
+/**
+ * Permanently delete the account on the server. Success is shown only once the server confirms; the app then
+ * continues as a new guest and shows the welcome. On failure the dialog stays open with the reason.
+ */
+function DeleteDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const close = () => {
+    if (busy) return;
+    setError(null);
+    onClose();
   };
 
   const confirm = async () => {
@@ -435,8 +602,9 @@ function AccountSection() {
     setError(null);
     try {
       await deleteAccount();
-      // The app is restarting as a new player; this screen goes with it.
-      if (router.canDismiss()) router.dismissAll();
+      setBusy(false);
+      onClose();
+      leaveToStart();
     } catch (e) {
       setError(accountDeletionError(e));
       setBusy(false);
@@ -444,71 +612,40 @@ function AccountSection() {
   };
 
   return (
-    <Section label="Account">
-      <Card style={{ gap: space.md }}>
-        <AppText variant="small" color={colors.textMuted}>
-          Your account is anonymous and linked to this app installation — no name, email or password. Your learning progress, answers, Daily Challenge history, nickname and game results are saved to our server under it. Some things stay only on this device: story progress, the detailed Arena tallies and setups, and your preferences.
+    <Dialog open={open} onClose={close}>
+      <AppText variant="heading" accessibilityRole="header">
+        Delete your account?
+      </AppText>
+      <AppText variant="small" color={colors.textBody}>
+        Your Tactiqo account and associated personal data will be permanently deleted. This action cannot be undone.
+      </AppText>
+      <AppText variant="small" color={colors.textBody}>
+        That includes lesson progress and answers, Daily Challenge history, your nickname, practice and Arena match results, Game of the Week results and friend challenges you created. This device also forgets the account; your motion, haptics and narration preferences stay.
+      </AppText>
+      <AppText variant="caption" color={colors.textMuted}>
+        Only want to leave this device? Cancel and sign out instead — that keeps your account. Want a copy first? Cancel and use Export data.
+      </AppText>
+      {error ? (
+        <AppText variant="small" color={colors.danger} accessibilityLiveRegion="assertive">
+          {error}
         </AppText>
-        <AppText variant="caption" color={colors.textMuted}>
-          Reinstalling the app or changing phones starts a new account; the old one can’t be recovered.
-        </AppText>
+      ) : null}
+      <View style={{ gap: space.sm }}>
         <Pressable
-          onPress={() => setOpen(true)}
+          onPress={() => void confirm()}
+          disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel="Delete account"
-          accessibilityHint="Opens a confirmation. Deleting is permanent."
-          style={({ pressed }) => [styles.danger, pressed && { backgroundColor: colors.dangerSoft }]}>
-          <Trash size={18} color={colors.danger} strokeWidth={2.2} />
-          <AppText variant="bodyStrong" color={colors.danger}>
-            Delete account
+          accessibilityLabel={busy ? 'Deleting account' : 'Delete Account'}
+          accessibilityState={{ disabled: busy, busy }}
+          style={({ pressed }) => [styles.dangerSolid, (pressed || busy) && { opacity: 0.8 }]}>
+          {busy ? <ActivityIndicator color="#fff" size="small" /> : null}
+          <AppText variant="bodyStrong" color="#fff" style={{ flexShrink: 1 }}>
+            {busy ? 'Deleting…' : 'Delete Account'}
           </AppText>
         </Pressable>
-        <Pressable onPress={() => openPage(LINKS.deletion)} accessibilityRole="link" style={{ minHeight: 44, justifyContent: 'center' }}>
-          <AppText variant="small" color={colors.primaryText}>
-            What deletion removes, and how to ask by email if the app can’t
-          </AppText>
-        </Pressable>
-      </Card>
-
-      <Modal visible={open} transparent animationType={reduced ? 'none' : 'fade'} onRequestClose={close} statusBarTranslucent>
-        <View style={styles.scrim}>
-          <View style={styles.dialog} accessibilityViewIsModal>
-            <AppText variant="heading" accessibilityRole="header">
-              Delete your account?
-            </AppText>
-            <AppText variant="small" color={colors.textBody}>
-              This permanently deletes your anonymous account and everything saved on our server under it: lesson progress and answers, Daily Challenge history, your nickname, practice and Arena match results, Game of the Week results and friend challenges you created. It can’t be undone.
-            </AppText>
-            <AppText variant="small" color={colors.textBody}>
-              Once the server confirms, this device also forgets the account: story progress, Arena records and anything still waiting to upload. Your motion, haptics and narration preferences stay.
-            </AppText>
-            <AppText variant="caption" color={colors.textMuted}>
-              Want a copy first? Cancel and use Export data. Exported or shared files aren’t affected.
-            </AppText>
-            {error ? (
-              <AppText variant="small" color={colors.danger} accessibilityLiveRegion="assertive">
-                {error}
-              </AppText>
-            ) : null}
-            <View style={{ gap: space.sm }}>
-              <Pressable
-                onPress={() => void confirm()}
-                disabled={busy}
-                accessibilityRole="button"
-                accessibilityLabel={busy ? 'Deleting account' : 'Delete account'}
-                accessibilityState={{ disabled: busy, busy }}
-                style={({ pressed }) => [styles.dangerSolid, (pressed || busy) && { opacity: 0.8 }]}>
-                {busy ? <ActivityIndicator color="#fff" size="small" /> : null}
-                <AppText variant="bodyStrong" color="#fff" style={{ flexShrink: 1 }}>
-                  {busy ? 'Deleting…' : 'Delete account'}
-                </AppText>
-              </Pressable>
-              <Button label="Cancel" variant="secondary" compact disabled={busy} onPress={close} />
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </Section>
+        <Button label="Cancel" variant="secondary" compact disabled={busy} onPress={close} />
+      </View>
+    </Dialog>
   );
 }
 

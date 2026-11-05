@@ -3,12 +3,14 @@
  * `detail` (for logs during development) and never reach the screen.
  */
 
-export type DataErrorKind = 'config' | 'network' | 'auth' | 'content' | 'refused' | 'server';
+export type DataErrorKind = 'config' | 'network' | 'auth' | 'signedOut' | 'content' | 'refused' | 'server';
 
 const MESSAGES: Record<DataErrorKind, string> = {
   config: 'The app isn’t connected to its database. Check the Supabase settings in .env and restart.',
   network: 'Couldn’t reach the server. Check your connection and try again.',
-  auth: 'Couldn’t start a session with the server. Try again in a moment.',
+  auth: 'Your session couldn’t be confirmed. Try again in a moment, or sign in again from Settings.',
+  // Not a failure: a guest asked for something that belongs to an account. Screens show a sign-in invitation for it.
+  signedOut: 'Sign in with Google to use this. Your account keeps it safe and lets you pick it up on any device.',
   content: 'The lesson content on the server didn’t pass this app’s checks, so it wasn’t loaded.',
   refused: 'The server refused a change. Your latest answer may not have been saved.',
   server: 'The server had a problem. Try again in a moment.',

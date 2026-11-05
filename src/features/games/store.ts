@@ -23,6 +23,8 @@ export interface GamesState {
   loadGlobal: (opts?: { force?: boolean }) => Promise<void>;
   loadHall: (opts?: { force?: boolean }) => Promise<void>;
   loadMine: (opts?: { force?: boolean }) => Promise<void>;
+  /** Forget everything loaded (signing out, switching or deleting the account); loads still running are ignored. */
+  reset: () => void;
   setNickname: (name: string) => Promise<string>;
   /** Best effort: practice is logged for "your recent games"; a failure is retried once and otherwise dropped. */
   recordPractice: (r: PracticeRecord) => Promise<void>;
@@ -33,6 +35,8 @@ export const GAMES_TTL_MS = 30_000;
 
 export function createGamesStore(repo: GamesRepository, now: () => number = Date.now) {
   const inflight = new Map<string, Promise<void>>();
+  /** Bumped by reset(): a response that belongs to the previous account is dropped instead of shown. */
+  let epoch = 0;
 
   return create<GamesState>()((set, get) => {
     /** Load into a slot, keeping stale data on screen while refreshing and showing an error only when there's none. */
@@ -42,15 +46,21 @@ export function createGamesStore(repo: GamesRepository, now: () => number = Date
       const pending = inflight.get(key);
       if (pending) return pending;
       if (cur.status !== 'ready') write({ status: 'loading' });
+      const started = epoch;
       const p = fetch()
-        .then((data) => write({ status: 'ready', data, loadedAt: now() }))
+        .then((data) => {
+          if (started === epoch) write({ status: 'ready', data, loadedAt: now() });
+        })
         .catch((e: unknown) => {
+          if (started !== epoch) return;
           const d = toDataError(e);
           // A read can't lose anything, so say what failed instead of the generic "refused a change".
           const error = d.transient || d instanceof GameError ? d : new DataError(d.kind, d.detail, 'Games data isn’t available from the server right now. Try again later.');
           if (read().status !== 'ready') write({ status: 'error', error });
         })
-        .finally(() => inflight.delete(key));
+        .finally(() => {
+          if (inflight.get(key) === p) inflight.delete(key);
+        });
       inflight.set(key, p);
       return p;
     }
@@ -61,6 +71,11 @@ export function createGamesStore(repo: GamesRepository, now: () => number = Date
       global: { status: 'idle' },
       hall: { status: 'idle' },
       mine: { status: 'idle' },
+      reset: () => {
+        epoch++;
+        inflight.clear();
+        set({ overview: { status: 'idle' }, weekly: {}, global: { status: 'idle' }, hall: { status: 'idle' }, mine: { status: 'idle' } });
+      },
       loadOverview: (opts) => load('overview', () => get().overview, (overview) => set({ overview }), () => repo.overview(), opts?.force),
       loadWeekly: (competitionId = '', opts) =>
         load(

@@ -101,6 +101,8 @@ function AppStack({ reduced }: { reduced: boolean }) {
       <Stack.Screen name="report/[skill]" />
       <Stack.Screen name="challenge/[token]" />
       <Stack.Screen name="nickname" options={{ presentation: 'modal', animation: reduced ? 'fade' : 'slide_from_bottom' }} />
+      <Stack.Screen name="sign-in" options={{ presentation: 'modal', animation: reduced ? 'fade' : 'slide_from_bottom' }} />
+      <Stack.Screen name="auth-callback" options={{ animation: 'none' }} />
     </Stack>
   );
 }

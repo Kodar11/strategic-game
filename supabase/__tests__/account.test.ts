@@ -164,7 +164,7 @@ describe('delete_my_account', () => {
     assert.match(accountDeletionError({ code: 'PGRST301', message: 'JWT expired' }), /nothing was deleted/);
   });
 
-  it('a new anonymous account starts empty', async () => {
+  it('a new account starts empty', async () => {
     const fresh = uid(0xd4);
     await addUser(db, fresh);
     const p = (await as(db, fresh, (tx) => tx.query<{ p: any }>('select public.get_my_progress() as p'))).rows[0].p;

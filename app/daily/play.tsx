@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SignInRequiredScreen, useIsGuest } from '@/src/components/auth/SignInRequired';
 import { Panel } from '@/src/components/lesson/Panels';
 import type { Confidence } from '@/src/components/lesson/prediction-state';
 import { AppText } from '@/src/components/ui/AppText';
@@ -39,15 +40,17 @@ export default function DailyPlayScreen() {
   const todayConfirmed = useDaily((s) => s.todayConfirmed);
   const month = useDaily((s) => (day ? s.months[monthKey(monthOf(day))] : undefined));
   const loadMonth = useDaily((s) => s.loadMonth);
+  const guest = useIsGuest();
 
   useEffect(() => {
-    if (day) void loadMonth(monthOf(day));
+    if (day && !guest) void loadMonth(monthOf(day));
     // `param` identifies the day; `day` is a fresh object each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [param, loadMonth]);
+  }, [param, loadMonth, guest]);
 
   const leave = () => (router.canGoBack() ? router.back() : router.replace('/daily'));
 
+  if (guest) return <SignInRequiredScreen title="Daily challenge" body="Sign in with Google to take today’s challenge. Your official answer and your streak are saved to your account." />;
   if (!day) return <MessageScreen title="Not a valid date" body="This link doesn’t point to a calendar day. Open the daily challenge calendar instead." />;
   if (todayConfirmed && compareDays(day, today) > 0) return <MessageScreen title="Not released yet" body={`The challenge for ${dayLabel(day, today)} opens on that day.`} />;
   if (!month || month.status === 'loading') return <MessageScreen loading />;

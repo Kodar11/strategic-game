@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SignInRequiredScreen, useIsGuest } from '@/src/components/auth/SignInRequired';
 import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
@@ -16,6 +17,8 @@ import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
  */
 export default function NicknameScreen() {
   const { name, failed, reload } = useNickname();
+  const guest = useIsGuest();
+  if (guest) return <SignInRequiredScreen title="Choose a nickname" body="Your nickname is how other players see you on leaderboards and friend challenges. Sign in with Google to choose one." />;
   if (name === undefined) {
     return <MessageScreen loading={!failed} title="Couldn’t load your profile" body="Check your connection and try again." onRetry={reload} />;
   }

@@ -2,7 +2,7 @@ import { DataError, toDataError } from './errors.ts';
 import type { Rpc } from './repositories.ts';
 
 /**
- * Deleting the signed-in (anonymous) account. The server function `delete_my_account` takes no arguments: it deletes
+ * Deleting the signed-in account. The server function `delete_my_account` takes no arguments: it deletes
  * whoever the request's session belongs to, with everything tied to that account
  * (supabase/migrations/20261028140000_delete_account.sql). The app never deletes anything itself.
  */

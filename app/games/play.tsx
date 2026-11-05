@@ -10,6 +10,7 @@ import { ListOrdered } from '@/src/components/ui/icons';
 import { LeaveGuard } from '@/src/components/game/LeaveGuard';
 import { MatchHeader, ScoreLine } from '@/src/components/game/MatchChrome';
 import { MatchLog } from '@/src/components/game/MatchLog';
+import { SignInRequiredScreen, useIsGuest } from '@/src/components/auth/SignInRequired';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { toDataError } from '@/src/data/errors';
 import type { ChallengeView, ServerMatch } from '@/src/data/games';
@@ -43,6 +44,15 @@ type Params = { game?: string; bot?: string; difficulty?: string; opponent?: str
  */
 export default function PlayScreen() {
   const p = useLocalSearchParams<Params>();
+  const guest = useIsGuest();
+  // Competition and friend-challenge matches are scored on the server under the player's account.
+  if (guest && ((p.mode === 'competition' && p.competitionId) || (p.mode === 'challenge' && p.token)))
+    return (
+      <SignInRequiredScreen
+        title={p.mode === 'competition' ? 'Game of the Week' : 'Friend challenge'}
+        body="Ranked and challenge matches are scored on our server under your account. Sign in with Google to play — practice games work without an account."
+      />
+    );
   if (p.mode === 'competition' && p.competitionId) return <ServerLoader key={`c:${p.competitionId}:${p.n ?? ""}`} start={() => gamesRepo.startCompetitionMatch(p.competitionId!)} />;
   if (p.mode === 'challenge' && p.token) return <ServerLoader key={`t:${p.token}`} start={() => gamesRepo.startChallengeMatch(p.token!)} />;
   const mystery = p.opponent === 'mystery';
