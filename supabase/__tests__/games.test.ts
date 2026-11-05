@@ -106,7 +106,8 @@ describe('SQL engines match the TypeScript engines exactly', () => {
   }
 
   it('rule versions, match lengths and bot lists agree with game_definitions', async () => {
-    const rows = (await db.query<{ id: string; rules_version: number; rounds: number; bots: string[] }>('select * from public.game_definitions')).rows;
+    // The SQL-engine games (the 18 Arena games are checked against their engines in weekly.test.ts).
+    const rows = (await db.query<{ id: string; rules_version: number; rounds: number; bots: string[] }>(`select * from public.game_definitions where engine = 'sql'`)).rows;
     assert.equal(rows.length, GAME_IDS.length);
     for (const r of rows) {
       const e = ENGINES[r.id as keyof typeof ENGINES];
@@ -297,7 +298,7 @@ describe('Game of the Week', () => {
     assert.equal(lb.me.isMe, true);
     const serialized = JSON.stringify(lb);
     for (const id of [ALICE, BOB]) assert.equal(serialized.includes(id), false);
-    for (const e of lb.entries) assert.deepEqual(Object.keys(e).sort(), ['isMe', 'nickname', 'rank', 'score']);
+    for (const e of lb.entries) assert.deepEqual(Object.keys(e).sort(), ['attemptsUsed', 'isMe', 'nickname', 'rank', 'score', 'scoreLabel']);
   });
 
   it('refuses rounds at and after the cutoff, and nobody can move a played week', async () => {

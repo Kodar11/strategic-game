@@ -1,4 +1,4 @@
-import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONAS, PERSONA_NAME, type Persona, type Setup, draw, drawInt, resultFrom } from './core.ts';
+import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONAS, PERSONA_NAME, type Persona, type Setup, draw, drawInt, resultFrom, servedOf } from './core.ts';
 
 /**
  * The Auction House — sealed-bid, first-price auctions for lots of uncertain common value.
@@ -146,6 +146,8 @@ export function auctionBotBid(state: AuctionState, seat: number, lot: Lot, estim
 
 /** What the player sees before bidding. */
 export function auctionPrompt(s: AuctionState): { lot: Lot; estimate: number; cash: number; lotNumber: number } | null {
+  const served = servedOf(s);
+  if (served && 'prompt' in served) return served.prompt as ReturnType<typeof auctionPrompt>;
   const n = s.rounds.length;
   if (n >= s.total) return null;
   const { lot, estimates } = auctionLot(s.setup, n);

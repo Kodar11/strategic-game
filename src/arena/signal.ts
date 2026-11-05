@@ -1,4 +1,4 @@
-import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONAS, PERSONA_NAME, type Persona, type Setup, draw, drawInt, plural, resultFrom } from './core.ts';
+import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONAS, PERSONA_NAME, type Persona, type Setup, draw, drawInt, plural, resultFrom, servedOf } from './core.ts';
 
 /**
  * The Hidden Signal — ventures that are secretly Strong or Weak, a sender who knows which, and an investor who doesn't.
@@ -219,6 +219,8 @@ export function signalPrompt(s: SignalState):
   | { role: 'receive'; prior: number; signal: Signal; test: boolean | null }
   | { role: 'send'; prior: number; strong: boolean }
   | null {
+  const served = servedOf(s);
+  if (served && 'prompt' in served) return served.prompt as ReturnType<typeof signalPrompt>;
   const n = s.rounds.length;
   if (n >= s.total) return null;
   const v = venture(s.setup, n);

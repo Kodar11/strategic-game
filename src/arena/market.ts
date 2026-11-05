@@ -1,4 +1,4 @@
-import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONAS, PERSONA_NAME, type Persona, type Setup, draw, drawInt, resultFrom } from './core.ts';
+import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONAS, PERSONA_NAME, type Persona, type Setup, draw, drawInt, resultFrom, servedOf } from './core.ts';
 
 /**
  * The Market Rivals — three firms sell the same kind of product and each sets a price every round.
@@ -202,6 +202,8 @@ export function predictFirm(h: readonly MarketRound[], i: number, cond: Conditio
 }
 
 export function marketPrompt(s: MarketState): { cond: Conditions; lastPrices: number[] | null } | null {
+  const served = servedOf(s);
+  if (served && 'prompt' in served) return served.prompt as ReturnType<typeof marketPrompt>;
   const n = s.rounds.length;
   if (n >= s.total) return null;
   return { cond: conditions(s.setup, n), lastPrices: s.rounds[n - 1]?.prices ?? null };

@@ -222,7 +222,7 @@ describe('Daily challenge release and secrecy', () => {
     assert.ok(!ids.includes('future-one'), 'future challenge is not released');
     assert.ok(!ids.includes('today-two'), 'draft is not released');
     assert.equal(r.today, today);
-    assert.equal(r.timezone, 'UTC');
+    assert.equal(r.timezone, 'Asia/Kolkata');
     const direct = await as(db, ALICE, (tx) => tx.query<{ id: string }>(`select id from public.daily_challenges where id = 'future-one'`));
     assert.equal(direct.rows.length, 0, 'row level security hides it from direct reads too');
   });
@@ -302,29 +302,44 @@ describe('Official attempts', () => {
     // Changing how an answered challenge is graded needs a new version, even from the SQL editor.
     await assert.rejects(db.query(`update public.daily_challenge_keys set evaluation = '{"options": {}}' where challenge_id = 'today-one'`), /raise its version/);
     await assert.rejects(db.query(`update public.daily_challenges set challenge_date = challenge_date + 1 where id = 'today-one'`), /date can't change/);
+    // Even a text-only fix needs a new version once anyone has answered…
+    await assert.rejects(db.query(`update public.daily_challenges set intro = 'Typo fixed' where id = 'today-one'`), /raise its version/);
     const v3 = choice('today-one', today, { version: 3, title: 'Edited again' });
     v3.key.evaluation.options.same.verdict = 'misconception';
     v3.key.evaluation.options.up.verdict = 'match';
-    await publish(v3);
+    // …and a correction note: the controlled correction process, recorded in the history.
+    assert.match((await publishError(v3))!, /correction/);
+    await publish({ ...v3, correction: 'The intended answer was the upward option.' });
     const r = await rpc(ALICE, 'get_daily_challenges', { from: today, to: today });
     assert.equal(r.attempts[0].evaluation, 'correct');
     assert.equal(r.attempts[0].version, 2);
     assert.equal(r.attempts[0].result.title, 'A better title', 'the snapshot shows what applied when it was graded');
   });
 
+  it('an answered challenge stays published: the day’s competition stays as it was played', async () => {
+    await assert.rejects(db.query(`update public.daily_challenges set status = 'draft' where id = 'today-one'`), /can't be unpublished/);
+    await assert.rejects(db.query(`select content_admin.unpublish_daily_challenge('today-one')`), /official attempts/);
+  });
+
   it('grades a scenario challenge from the scenario’s own options', async () => {
-    await db.query(`update public.daily_challenges set status = 'draft' where id = 'today-one'`);
-    await publish({ id: 'scenario-today', date: today, version: 1, title: 'Split', intro: 'I', prompt: 'P', interaction: 'scenario', config: { scenario: 'l8.c.first-offer', version: 1 }, key: {} });
-    const r = await rpc(BOB, 'submit_daily_challenge', { challengeId: 'scenario-today', version: 1, answer: { option: '3', seed: 7, inputs: [3] }, confidence: 5 });
-    assert.equal(r.status, 'recorded');
-    assert.equal(r.attempt.evaluation, 'correct');
-    assert.equal(r.attempt.interaction, 'scenario');
-    assert.deepEqual(r.attempt.answer.inputs, [3]);
+    const fresh = await createDatabase();
+    try {
+      await addUser(fresh, BOB);
+      await fresh.query('select * from content_admin.publish_daily_challenge($1::jsonb)', [JSON.stringify({ id: 'scenario-today', date: today, version: 1, title: 'Split', intro: 'I', prompt: 'P', interaction: 'scenario', config: { scenario: 'l8.c.first-offer', version: 1 }, key: {} })]);
+      const r = (await pgRpc(fresh, BOB).call('submit_daily_challenge', { request: { challengeId: 'scenario-today', version: 1, answer: { option: '3', seed: 7, inputs: [3] }, confidence: 5 } })) as any;
+      assert.equal(r.status, 'recorded');
+      assert.equal(r.attempt.evaluation, 'correct');
+      assert.equal(r.attempt.interaction, 'scenario');
+      assert.deepEqual(r.attempt.answer.inputs, [3]);
+    } finally {
+      await fresh.close();
+    }
   });
 });
 
 describe('Daily challenges and lesson progress', () => {
   it('never changes lesson progress, and a progress reset leaves official attempts alone', async () => {
+    await rpc(BOB, 'submit_daily_challenge', { challengeId: 'today-one', version: 3, answer: { option: 'up' }, confidence: 3 });
     const before = await as(db, BOB, (tx) => tx.query<{ p: unknown }>('select public.get_my_progress() as p'));
     assert.deepEqual(before.rows[0].p, { completed: [], runtime: {}, learning: [], goal: null, challengeDrafts: {}, scenarioRuns: {}, scenarioDone: [], assessmentRuns: {} });
     await as(db, BOB, (tx) => tx.query('select public.apply_progress_changes($1::jsonb)', [JSON.stringify({ reset: true })]));

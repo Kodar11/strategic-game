@@ -24,3 +24,10 @@ client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 # The app sends a nonce with every sign-in; keep its check on.
 skip_nonce_check = false
+
+# Game of the Week: server-run Strategy Arena matches (docs/GAME_OF_THE_WEEK.md). The function also verifies the
+# caller with Supabase Auth itself, so it stays safe with either JWT setting.
+[functions.arena-match]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/arena-match/index.ts"

@@ -1,4 +1,4 @@
-import { type ArenaEngine, CODENAMES, type Debrief, LENGTH_ROUNDS, type Setup, clamp, draw, drawInt, resultFrom } from './core.ts';
+import { type ArenaEngine, CODENAMES, type Debrief, LENGTH_ROUNDS, type Setup, clamp, draw, drawInt, resultFrom, servedOf } from './core.ts';
 
 /**
  * The Saboteur — a crew of four runs missions; one bot crew member is secretly working against it.
@@ -174,6 +174,8 @@ export function benchChoice(s: SaboteurState, n: number): number {
 }
 
 export function saboteurPrompt(s: SaboteurState): { phase: 'mission'; mission: number; leader: number; target: number; bench: number | null; energy: number } | { phase: 'accuse' } | null {
+  const served = servedOf(s);
+  if (served && 'prompt' in served) return served.prompt as ReturnType<typeof saboteurPrompt>;
   if (s.accused !== null) return null;
   const n = s.history.length;
   if (n >= s.missions) return { phase: 'accuse' };

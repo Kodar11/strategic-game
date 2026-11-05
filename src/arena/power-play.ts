@@ -1,4 +1,4 @@
-import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, type Outcome, type Setup, draw, shuffled } from './core.ts';
+import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, type Outcome, type Setup, draw, shuffled, servedOf } from './core.ts';
 
 /**
  * The Power Play — claim a role to act, and decide when the other side's claim is a lie.
@@ -297,6 +297,8 @@ export const isOverPower = (s: PowerState) => !s.player.hand.length || !s.bot.ha
 export type PowerPrompt = { phase: 'act'; turn: number } | { phase: 'respond'; turn: number; move: PowerMove } | { phase: 'block'; turn: number };
 
 export function powerPrompt(s: PowerState): PowerPrompt | null {
+  const served = servedOf(s);
+  if (served && 'prompt' in served) return served.prompt as ReturnType<typeof powerPrompt>;
   const n = s.turns.length;
   if (s.pendingBlock) return { phase: 'block', turn: n };
   if (isOverPower(s)) return null;

@@ -204,3 +204,20 @@ export function resultFrom(entries: Standing[], unit: string, opts: { par?: numb
 }
 
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * A server-run (Game of the Week) match. The device then holds a *redacted* copy of the state — no seed, no hidden
+ * roles, cards or dice (src/competition/arena-views.ts) — so helpers that would derive the current turn from the seed
+ * can't. The server computes those values from the full state and sends them here, and the helpers return them
+ * unchanged. Practice matches never carry `served`, so on the device every helper works exactly as before.
+ */
+export interface Served {
+  /** What the game's prompt helper returns for this turn (`<game>Prompt(state)`). */
+  prompt?: unknown;
+  /** Liar's Dice: the player's own dice this round (the opponent's stay hidden). */
+  roll?: { player: number[]; bot: number[] };
+  /** Liar's Dice: the bids of the round in play, including the opponent's opening. */
+  bids?: unknown[];
+}
+
+export const servedOf = (s: object): Served | undefined => (s as { served?: Served }).served;

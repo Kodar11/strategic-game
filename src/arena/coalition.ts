@@ -1,4 +1,4 @@
-import { type ArenaEngine, CODENAMES, type Debrief, LENGTH_ROUNDS, type Setup, drawInt, resultFrom, shuffled } from './core.ts';
+import { type ArenaEngine, CODENAMES, type Debrief, LENGTH_ROUNDS, type Setup, drawInt, resultFrom, shuffled, servedOf } from './core.ts';
 
 /**
  * The Coalition — four parties, one prize per round, and a majority needed to claim it.
@@ -279,6 +279,8 @@ export type CoalitionPrompt =
   | { phase: 'watch'; round: number; proposal: Proposal };
 
 export function coalitionPrompt(s: CoalitionState): CoalitionPrompt | null {
+  const served = servedOf(s);
+  if (served && 'prompt' in served) return served.prompt as ReturnType<typeof coalitionPrompt>;
   const n = s.rounds.length;
   if (n >= s.total) return null;
   const proposer = proposerOf(s, n);

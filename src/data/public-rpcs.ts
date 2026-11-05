@@ -13,4 +13,10 @@ export const PUBLIC_RPCS: ReadonlySet<string> = new Set([
   'get_hall_of_fame',
   'get_challenge',
   'finalize_due_competitions',
+  // Daily Challenge and Game of the Week boards and history (nicknames only).
+  'get_daily_leaderboard',
+  'get_daily_history',
+  'get_competition',
+  'get_competition_history',
+  'get_champions_leaderboard',
 ]);

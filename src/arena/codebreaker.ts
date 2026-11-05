@@ -1,4 +1,4 @@
-import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, type Level, type Setup, shuffled } from './core.ts';
+import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, type Level, type Setup, shuffled, servedOf } from './core.ts';
 
 /**
  * The Codebreaker — one teammate sees which words are the targets; the other has only a one-word clue to go on.
@@ -198,6 +198,8 @@ export type CodePrompt =
   | { phase: 'clue'; round: number; board: Board };
 
 export function codePrompt(s: CodeState): CodePrompt | null {
+  const served = servedOf(s);
+  if (served && 'prompt' in served) return served.prompt as ReturnType<typeof codePrompt>;
   const n = s.rounds.length;
   if (n >= s.total) return null;
   const board = boardFor(s.setup.seed, n, s.setup.level);

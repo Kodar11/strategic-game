@@ -1,4 +1,4 @@
-import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONAS, PERSONA_NAME, type Persona, type Setup, drawInt, plural, resultFrom } from './core.ts';
+import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, PERSONAS, PERSONA_NAME, type Persona, type Setup, drawInt, plural, resultFrom, servedOf } from './core.ts';
 
 /**
  * The Ultimatum Game — a series of take-it-or-leave-it negotiations over changing pools, roles alternating.
@@ -168,6 +168,8 @@ export function ultBotOffer(setup: Setup<UltVariant>, h: readonly UltRound[], t:
 
 /** What the player faces now: the terms, and the bot's offer when it proposes. */
 export function ultPrompt(s: UltState): { terms: UltTerms; botOffer: number | null } | null {
+  const served = servedOf(s);
+  if (served && 'prompt' in served) return served.prompt as ReturnType<typeof ultPrompt>;
   const n = s.rounds.length;
   if (n >= s.total) return null;
   const terms = ultTerms(s.setup, n);

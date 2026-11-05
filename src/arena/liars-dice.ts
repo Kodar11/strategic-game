@@ -1,4 +1,4 @@
-import { type ArenaEngine, type Debrief, type MatchLength, type Setup, draw, drawInt } from './core.ts';
+import { type ArenaEngine, type Debrief, type MatchLength, type Setup, draw, drawInt, servedOf } from './core.ts';
 
 /**
  * Liar's Dice — two players, hidden dice, and bids about how many of a face are on the whole table.
@@ -56,6 +56,8 @@ export interface DiceState {
 export type DiceAction = { kind: 'bid'; q: number; f: number } | { kind: 'liar' };
 
 export function roll(s: DiceState): { player: number[]; bot: number[] } {
+  const served = servedOf(s);
+  if (served?.roll) return served.roll;
   const n = s.rounds.length;
   const { seed } = s.setup;
   return {
@@ -162,6 +164,8 @@ export function botMove(s: DiceState, own: number[], bids: Bid[], u: number, v: 
 
 /** The bids of the round in play, including the bot's opening if it opens. */
 export function liveBids(s: DiceState): Bid[] {
+  const served = servedOf(s);
+  if (served?.bids) return served.bids as Bid[];
   if (s.bids.length || opener(s) === 'player') return s.bids;
   const n = s.rounds.length;
   const m = botMove(s, roll(s).bot, [], draw(s.setup.seed, n, 300), draw(s.setup.seed, n, 301));

@@ -1,4 +1,4 @@
-import { type ArenaEngine, type Debrief, type Level, type MatchLength, type Setup, draw, shuffled } from './core.ts';
+import { type ArenaEngine, type Debrief, type Level, type MatchLength, type Setup, draw, shuffled, servedOf } from './core.ts';
 
 /**
  * The Defusal — you and a bot teammate cut wires on a bomb. Two wires are live. Each of you holds private clues.
@@ -243,6 +243,8 @@ export type DefusalAction = { kind: 'cut'; wire: number } | { kind: 'share'; clu
 export type DefusalPrompt = { phase: 'cut'; turn: number; shared: number | null } | { phase: 'share'; turn: number; options: number[] };
 
 export function defusalPrompt(s: DefusalState): DefusalPrompt | null {
+  const served = servedOf(s);
+  if (served && 'prompt' in served) return served.prompt as ReturnType<typeof defusalPrompt>;
   if (defused(s) || exploded(s)) return null;
   const n = s.turns.length;
   if (playerCuts(n)) return { phase: 'cut', turn: n + 1, shared: botShare(s, n) };

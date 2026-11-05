@@ -1,4 +1,4 @@
-import { type ArenaEngine, CODENAMES, type Debrief, LENGTH_ROUNDS, type Setup, draw, drawInt, plural, resultFrom } from './core.ts';
+import { type ArenaEngine, CODENAMES, type Debrief, LENGTH_ROUNDS, type Setup, draw, drawInt, plural, resultFrom, servedOf } from './core.ts';
 
 /**
  * The Mole — find the insider among four suspects from evidence, interrogations and everyone's accusations.
@@ -192,6 +192,8 @@ export function moleAccuses(s: MoleState, n: number, pub: [number, number]): num
 }
 
 export function molePrompt(s: MoleState): { phase: 'investigate'; round: number; clue: [number, number] } | { phase: 'accuse'; round: number } | null {
+  const served = servedOf(s);
+  if (served && 'prompt' in served) return served.prompt as ReturnType<typeof molePrompt>;
   const n = s.rounds.length;
   if (s.accused !== null) return null;
   if (n >= s.investigation) return { phase: 'accuse', round: n + 1 };

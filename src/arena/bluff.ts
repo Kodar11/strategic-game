@@ -1,4 +1,4 @@
-import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, type Setup, draw, resultFrom } from './core.ts';
+import { type ArenaEngine, type Debrief, LENGTH_ROUNDS, type Setup, draw, resultFrom, servedOf } from './core.ts';
 
 /**
  * Bluff — draw hidden tokens, push your luck, then claim what they're worth. The other side believes you or calls it.
@@ -198,6 +198,8 @@ export type BluffPrompt =
   | { role: 'bust'; round: number; tokens: Token[] };
 
 export function bluffPrompt(s: BluffState): BluffPrompt | null {
+  const served = servedOf(s);
+  if (served && 'prompt' in served) return served.prompt as ReturnType<typeof bluffPrompt>;
   const n = s.rounds.length;
   if (n >= s.total) return null;
   if (playerClaims(n)) {
@@ -210,7 +212,11 @@ export function bluffPrompt(s: BluffState): BluffPrompt | null {
 }
 
 /** The bot drew a Crack this round: nothing to judge; the player continues. */
-export const botBusted = (s: BluffState) => s.rounds.length < s.total && !playerClaims(s.rounds.length) && botTurn(s, s.rounds.length).bust;
+export function botBusted(s: BluffState): boolean {
+  const served = servedOf(s);
+  if (served && 'prompt' in served) return (served.prompt as BluffPrompt | null)?.role === 'bust';
+  return s.rounds.length < s.total && !playerClaims(s.rounds.length) && botTurn(s, s.rounds.length).bust;
+}
 
 function validate(s: BluffState, a: BluffAction): string | null {
   const n = s.rounds.length;
