@@ -84,7 +84,7 @@ export interface DailyAttempt {
 }
 
 /** One official attempt, without its answer and result: what summaries and the profile need. */
-export type DailyHistoryEntry = Omit<DailyAttempt, 'answer' | 'result'>;
+export type DailyHistoryEntry = Omit<DailyAttempt, 'answer' | 'result'> & { sourceScenario?: string | null };
 
 export interface DailyRange {
   today: Day;
@@ -158,6 +158,8 @@ const historySchema = z.object({
   basis,
   lesson: z.string().nullable(),
   submittedAt: z.number().int().nonnegative(),
+  // v2: the lesson scenario the challenge was built on (null for content written for the Daily Challenge).
+  sourceScenario: z.string().nullable().optional(),
 });
 
 export const attemptSchema = historySchema.extend({

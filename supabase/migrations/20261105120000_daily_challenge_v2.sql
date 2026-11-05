@@ -48,6 +48,13 @@ revoke all on function public.daily_timezone() from public, anon;
 grant execute on function public.daily_timezone() to authenticated;
 grant execute on function public.daily_challenge_today() to anon, authenticated;
 
+-- The top-level keys of an object whose value isn't null (optional document fields). Nested values are untouched.
+create or replace function content_admin.drop_null_keys(o jsonb) returns jsonb
+language sql immutable set search_path = '' as $$
+  select coalesce(jsonb_object_agg(k, v), '{}'::jsonb) from jsonb_each(o) as e(k, v) where v <> 'null'::jsonb
+$$;
+revoke all on function content_admin.drop_null_keys(jsonb) from public, anon, authenticated;
+
 -- ── Challenge metadata ───────────────────────────────────────────────────────
 
 alter table public.daily_challenges
@@ -403,6 +410,40 @@ end;
 $$;
 revoke all on function content_admin.unpublish_daily_challenge(text) from public, anon, authenticated;
 
+-- A stored challenge as the JSON document publish_daily_challenge takes (to copy, edit and publish again).
+create or replace function content_admin.daily_doc_of(challenge text) returns jsonb
+language sql stable set search_path = '' as $$
+  select content_admin.drop_null_keys(jsonb_build_object(
+    'id', c.id, 'date', c.challenge_date, 'version', c.version, 'status', c.status, 'title', c.title, 'intro', c.intro,
+    'prompt', c.prompt, 'instructions', c.instructions, 'interaction', c.interaction, 'config', c.config,
+    'askConfidence', c.ask_confidence, 'difficulty', c.difficulty, 'skill', c.skill_id, 'basis', c.basis, 'lesson', c.lesson_id,
+    'format', c.format, 'concept', c.concept, 'minutes', c.minutes,
+    'sourceScenario', case when c.source_scenario_id is not null then jsonb_build_object('id', c.source_scenario_id, 'version', c.source_scenario_version) end,
+    'key', content_admin.drop_null_keys(jsonb_build_object('evaluation', k.evaluation, 'modelAnswer', k.model_answer,
+      'explanation', to_jsonb(k.explanation), 'takeaway', k.takeaway))))
+  from public.daily_challenges c left join public.daily_challenge_keys k on k.challenge_id = c.id
+  where c.id = challenge
+$$;
+revoke all on function content_admin.daily_doc_of(text) from public, anon, authenticated;
+
+-- Publish a scheduled draft as it is stored: validated exactly like publish_daily_challenge, with the same date rules
+-- (it replaces an unanswered automatic pick for its date; never another manual challenge).
+create or replace function content_admin.publish_scheduled_challenge(challenge text)
+returns table (action text, id text, challenge_date date, version integer, status public.content_status)
+language plpgsql set search_path = '' as $$
+declare
+  doc jsonb := content_admin.daily_doc_of(challenge);
+  src text;
+begin
+  if doc is null then raise exception 'daily challenge % does not exist', challenge; end if;
+  if doc ->> 'status' = 'published' then raise exception 'daily challenge % is already published', challenge; end if;
+  select c.source into src from public.daily_challenges c where c.id = challenge;
+  return query select * from content_admin.publish_daily_challenge(
+    doc || jsonb_build_object('status', 'published', 'version', (doc ->> 'version')::integer + 1, '_source', src));
+end;
+$$;
+revoke all on function content_admin.publish_scheduled_challenge(text) from public, anon, authenticated;
+
 -- ── Automatic selection ──────────────────────────────────────────────────────
 
 -- The candidates for date `d`, best first, with the reasons — what ensure_daily_challenge would pick (first row).
@@ -457,12 +498,6 @@ language sql stable set search_path = '' as $$
   order by 10;
 $$;
 revoke all on function content_admin.daily_candidates(date) from public, anon, authenticated;
-
-create or replace function content_admin.drop_null_keys(o jsonb) returns jsonb
-language sql immutable set search_path = '' as $$
-  select coalesce(jsonb_object_agg(k, v), '{}'::jsonb) from jsonb_each(o) as e(k, v) where v <> 'null'::jsonb
-$$;
-revoke all on function content_admin.drop_null_keys(jsonb) from public, anon, authenticated;
 
 -- The challenge document for scenario `sid` on date `d`: the scenario's setup, rules, visual, question and options as
 -- a 'choice' challenge with a private key. Option ids are opaque letters in a per-date shuffled order, so the
@@ -698,7 +733,9 @@ begin
     'history', coalesce((select jsonb_agg(jsonb_build_object(
         'challengeId', a.challenge_id, 'date', a.challenge_date, 'version', a.content_version, 'interaction', a.interaction,
         'confidence', a.confidence, 'evaluation', a.evaluation, 'skill', a.skill_id, 'basis', a.basis, 'lesson', a.lesson_id,
-        'submittedAt', (extract(epoch from a.submitted_at) * 1000)::bigint, 'score', a.score) order by a.challenge_date)
+        'submittedAt', (extract(epoch from a.submitted_at) * 1000)::bigint, 'score', a.score,
+        -- The lesson scenario an answer was built on, so the profile doesn't count that scenario twice.
+        'sourceScenario', (select c.source_scenario_id from public.daily_challenges c where c.id = a.challenge_id)) order by a.challenge_date)
       from public.daily_challenge_attempts a where a.user_id = uid), '[]'::jsonb)
   );
 end;

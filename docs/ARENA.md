@@ -5,9 +5,12 @@ other thirteen in "The full library" below). Four of the first five share the In
 and the Opportunist; the Cooperation Game and every later game have their own four. They sit under the five classic
 games on the Games tab.
 
-The Arena is deliberately separate from `src/games/` (see [GAMES.md](GAMES.md)): those games have exact SQL ports, a
-fixed `GameId` set in Supabase and power the Game of the Week. Arena games run entirely on the device, make no
-backend calls during or after a match, and need no sign-in. Nothing in Supabase changed.
+The Arena is deliberately separate from `src/games/` (see [GAMES.md](GAMES.md)): those games have exact SQL ports.
+Arena *practice* runs entirely on the device, makes no backend calls during the match, and needs no sign-in. Since
+v2 every Arena game can also be the Game of the Week: ranked matches then run on the server — the same engines in the
+`arena-match` Edge Function, with the device holding a redacted view (no seed, no hidden information) — see
+[GAME_OF_THE_WEEK.md](GAME_OF_THE_WEEK.md). The engines gained one seam for that: prompt helpers return a server-sent
+value when the state carries `served` (`servedOf` in `src/arena/core.ts`); practice states never do.
 
 | Piece | Where |
 |---|---|

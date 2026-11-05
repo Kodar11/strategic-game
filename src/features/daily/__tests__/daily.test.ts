@@ -166,6 +166,7 @@ describe('Daily challenge evidence in the Thinking Profile', () => {
       h({ challengeId: 'scenario', interaction: 'scenario' }),
       h({ challengeId: 'no-skill', skill: null }),
       h({ challengeId: 'no-confidence', confidence: null }),
+      h({ challengeId: 'adapted', sourceScenario: 'l1.a.classic-dilemma' }),
     ] as never);
     assert.deepEqual(ev.map((e) => e.prediction), ['daily/ok']);
     assert.equal(ev[0].lesson, 'incentive-shift', 'without a lesson, the skill’s own lesson');

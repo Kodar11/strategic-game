@@ -1,6 +1,7 @@
 -- Daily Strategic Challenge: example publishing statements. Each one is a single statement — paste it into the
 -- Supabase SQL editor and run it. Re-running a statement is safe (it reports `unchanged`). See
--- docs/DAILY_CHALLENGE.md for every field. Dates are UTC calendar days; a challenge appears in the app on its date.
+-- docs/DAILY_CHALLENGE.md for every field. Dates are India-time calendar days; a challenge appears in the app at 00:00 IST
+-- on its date. The full SQL Editor workflow (preview, schedule, publish, usage, leaderboard) is in manage.sql.
 -- These three are tested against the real migrations in supabase/__tests__/daily.test.ts.
 
 -- 1 · Multiple choice with confidence, graded on the server from a private answer key.

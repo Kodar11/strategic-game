@@ -5,7 +5,8 @@ import type { DailyHistoryEntry } from './content.ts';
 /**
  * Which official Daily Challenge answers count as Thinking Profile evidence, and how. A daily answer is used only
  * when it is comparable with the learning record's first attempts:
- * - server-graded custom content (`choice` or `number`). `scenario` challenges replay a lesson scenario whose own
+ * - server-graded custom content (`choice` or `number`) written for the Daily Challenge. `scenario` challenges, and
+ *   `choice` challenges adapted from a lesson scenario (`sourceScenario`), replay a lesson scenario whose own
  *   attempts are already in the learning record, so counting them again would double-weight that scenario;
  * - tagged with one of the existing skill areas (`skill`);
  * - rated for confidence (otherwise it couldn't join the confidence comparison like every other piece of evidence).
@@ -18,6 +19,8 @@ import type { DailyHistoryEntry } from './content.ts';
 export function dailyEvidence(history: readonly DailyHistoryEntry[]): LearningAttempt[] {
   return history.flatMap((h): LearningAttempt[] => {
     if ((h.interaction !== 'choice' && h.interaction !== 'number') || !h.skill || h.confidence === null) return [];
+    // A challenge adapted from a lesson scenario replays that scenario: like `scenario` challenges, it isn't counted.
+    if (h.sourceScenario) return [];
     const skillLesson = allSkills().find((s) => s.id === h.skill)?.lesson;
     const lesson = (getLesson(h.lesson ?? undefined)?.id ?? skillLesson) as LessonId | undefined;
     if (!lesson) return [];

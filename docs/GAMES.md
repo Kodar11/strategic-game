@@ -1,7 +1,7 @@
 # Games, Game of the Week and friend challenges
 
-Five replayable strategic games against bots, a weekly competition on one of them, leaderboards, a Hall of Fame, and
-shareable friend challenges. All of it is separate from the lessons, scenarios, practice challenges and the learning
+Five replayable strategic games against bots, a weekly competition (Game of the Week — on any of all 23 games since
+v2, see [GAME_OF_THE_WEEK.md](GAME_OF_THE_WEEK.md)), leaderboards, a Hall of Fame, and shareable friend challenges. All of it is separate from the lessons, scenarios, practice challenges and the learning
 record: nothing here reads or writes lesson progress, and the Thinking Profile shows the game record as its own card.
 The on-device Strategy Arena games on the Games tab are documented in [ARENA.md](ARENA.md).
 
@@ -90,6 +90,12 @@ match or challenge whose rule version it doesn't have ("Update needed"), and the
 created under older rules.
 
 ## Game of the Week
+
+> **v2** (`…_game_of_the_week_v2.sql`): all 23 games, automatic rotation, `content_admin.schedule_game_of_the_week`,
+> locks once a week starts, a grace period, per-game scoring with tie-breaks, permanent champion records, history and
+> one scheduler. The current description is [GAME_OF_THE_WEEK.md](GAME_OF_THE_WEEK.md); the v1 notes below still hold
+> for the five classics except where that document says otherwise (`schedule_competition` is now a manual schedule
+> through the v2 path; the pg_cron job is `supabase/scheduler.sql`).
 
 - **Configuration** is a row in `game_competitions`: id, game, opponent and difficulty (the same for everyone),
   explicit `starts_at`/`ends_at`, `timezone` (`Asia/Kolkata`), `scoring_version`, `max_attempts`, `winner_bonus`,
