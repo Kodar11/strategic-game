@@ -10,6 +10,7 @@ import { dispatchAuth, useAuth } from '@/src/auth/store';
 import { type Catalog, installCatalog } from '@/src/content/catalog';
 import { installCategories } from '@/src/content/categories';
 import { monthOf } from '@/src/features/daily/dates';
+import { currentScreen, errorCode, reportError, setCommonProperties, track } from '@/src/observability/api';
 import { useProgress } from '@/src/store/progress';
 import { EMPTY_PROGRESS, type ProgressData } from '@/src/store/progress-state';
 import { accountRepository } from './account';
@@ -130,6 +131,41 @@ function resetMemory(): void {
 
 function userOf(u: { id: string; email?: string | null }): AuthUser {
   return { id: u.id, email: u.email ?? null };
+}
+
+/** Supabase created this account just now (a first sign-in) rather than signing in to an existing one. */
+function isNewAccount(u: { created_at?: string }): boolean {
+  const created = u.created_at ? Date.parse(u.created_at) : NaN;
+  return Number.isFinite(created) && Date.now() - created < 5 * 60_000;
+}
+
+/**
+ * A version stamp for the published content, sent with every event so a change in behaviour can be lined up with a
+ * content change: the sum of every lesson's and scenario's revision, which grows whenever either is revised.
+ */
+function contentRevision(c: Catalog): number {
+  const lessons = c.lessons.reduce((n, l) => n + ((l as { revision?: number }).revision ?? 0), 0);
+  const scenarios = c.scenarios.reduce((n, s) => n + ((s as { revision?: number }).revision ?? 0), 0);
+  return lessons + scenarios;
+}
+
+/** Where the current sign-in started (the screen with the button, or the Learn tab's invitation). */
+let signInSource: string | null = null;
+
+/** Called by the sign-in button just before `signInWithGoogle`, so the outcome is attributed to where it began. */
+export function noteSignInSource(source: string | null): void {
+  signInSource = source ?? currentScreen();
+  track('sign_in_started', { source: signInSource ?? undefined });
+}
+
+function signInOutcome(result: 'success' | 'cancelled' | 'failed', isNew?: boolean): void {
+  track('sign_in_finished', {
+    source: signInSource ?? currentScreen() ?? undefined,
+    result,
+    method: googleSignInMode === 'native' ? 'native' : 'browser',
+    ...(isNew === undefined ? {} : { is_new_account: isNew }),
+  });
+  signInSource = null;
 }
 
 interface AuthErrorLike {
@@ -256,13 +292,27 @@ export function startAppData(): Promise<void> {
   useAppData.setState({ status: 'loading' });
   listenForSessionChanges();
   starting = (async () => {
+    // Cold-start timings for `app_ready` (src/observability): the whole start, the catalogue and the categories.
+    const t0 = Date.now();
+    let catalogMs: number | undefined;
+    let categoriesMs: number | undefined;
     try {
       await removeLegacySession();
-      const [catalog, user] = await Promise.all([content.fetchCatalog(), confirmedUser()]);
+      const [catalog, user] = await Promise.all([
+        content.fetchCatalog().then((c) => {
+          catalogMs = Date.now() - t0;
+          return c;
+        }),
+        confirmedUser(),
+      ]);
       installCatalog(catalog);
+      setCommonProperties({ content_revision: contentRevision(catalog) });
       // Categories don't depend on progress, so they load alongside it rather than as one more round trip first.
       // loadCategories never rejects.
-      const categoriesLoaded = loadCategories(catalog);
+      const categoriesStart = Date.now();
+      const categoriesLoaded = loadCategories(catalog).then(() => {
+        categoriesMs = Date.now() - categoriesStart;
+      });
       const owner: Owner = user ? { user: user.id } : 'guest';
       const { cleared } = await reconcileOwner(AsyncStorage, owner, async () => {
         await outbox.clear();
@@ -274,10 +324,14 @@ export function startAppData(): Promise<void> {
       else await loadGuest();
       await categoriesLoaded;
       useAppData.setState({ status: 'ready' });
+      track('app_ready', { result: 'ready', total_ms: Date.now() - t0, catalog_ms: catalogMs, categories_ms: categoriesMs, signed_in: !!user, onboarded: useProgress.getState().settings.onboarded });
     } catch (e) {
       const error = toDataError(e);
       if (__DEV__) console.warn(`[data] start-up failed (${error.kind}): ${error.detail}`);
       useAppData.setState({ status: 'error', error });
+      track('app_ready', { result: 'error', error_kind: error.kind, total_ms: Date.now() - t0, catalog_ms: catalogMs });
+      // Being offline is the player's situation, not a fault: it shows in app_ready, not as an error.
+      if (error.kind !== 'network') reportError('startup_failed', error, { error_code: errorCode(error.detail) ?? error.kind });
     } finally {
       starting = null;
     }
@@ -304,32 +358,44 @@ export async function signInWithGoogle(): Promise<void> {
   dispatchAuth({ type: 'signInStarted' });
 
   let user: AuthUser;
+  let isNew: boolean;
   try {
     if (googleSignInMode === 'browser') {
       // The default everywhere: Supabase's browser OAuth flow (PKCE). Same Supabase user as the native path.
       const browser = await signInWithGoogleInBrowser(supabase());
       // null: the callback screen already finished this sign-in (completeSignInFromRedirect).
       if (!browser) return;
-      if (browser.type === 'cancelled') return dispatchAuth({ type: 'signInCancelled' });
+      if (browser.type === 'cancelled') return signInCancelled();
       user = userOf(browser.user);
+      isNew = isNewAccount(browser.user);
     } else {
       const google = await requestGoogleIdToken();
-      if (google.type === 'cancelled') return dispatchAuth({ type: 'signInCancelled' });
+      if (google.type === 'cancelled') return signInCancelled();
       const { data, error } = await supabase().auth.signInWithIdToken({ provider: 'google', token: google.idToken, nonce: google.nonce });
       if (error) throw error;
       if (!data.user) throw new Error('no user');
       user = userOf(data.user);
+      isNew = isNewAccount(data.user);
     }
   } catch (e) {
     return signInFailed(e);
   }
-  await finishSignIn(user);
+  await finishSignIn(user, isNew);
+}
+
+/** The player closed the account picker or the browser: not a failure, and never reported as one. */
+function signInCancelled(): void {
+  dispatchAuth({ type: 'signInCancelled' });
+  signInOutcome('cancelled');
 }
 
 function signInFailed(e: unknown): void {
   const f = signInFailure(e);
-  if (!f) return dispatchAuth({ type: 'signInCancelled' });
+  if (!f) return signInCancelled();
   if (__DEV__) console.warn(`[auth] sign-in failed (${f.kind}): ${f.detail}`);
+  signInOutcome('failed');
+  // No connection is the player's situation; every other kind is a setup or provider problem worth a look.
+  if (f.kind !== 'network') reportError('sign_in_failed', e, { error_code: f.kind });
   // Development builds also show the error code next to the message, so a setup problem can be identified.
   dispatchAuth({ type: 'signInFailed', message: __DEV__ && f.detail ? `${f.message} (${f.detail})` : f.message });
 }
@@ -345,19 +411,21 @@ export async function completeSignInFromRedirect(url: string): Promise<void> {
   if (useAuth.getState().status !== 'signedOut' || useAppData.getState().status !== 'ready') return;
   dispatchAuth({ type: 'signInStarted' });
   let user: AuthUser;
+  let isNew: boolean;
   try {
     const browser = await completeBrowserSignIn(supabase(), url);
-    if (!browser) return dispatchAuth({ type: 'signInCancelled' });
-    if (browser.type === 'cancelled') return dispatchAuth({ type: 'signInCancelled' });
+    if (!browser) return signInCancelled();
+    if (browser.type === 'cancelled') return signInCancelled();
     user = userOf(browser.user);
+    isNew = isNewAccount(browser.user);
   } catch (e) {
     return signInFailed(e);
   }
-  await finishSignIn(user);
+  await finishSignIn(user, isNew);
 }
 
 /** After Supabase confirmed the account: hand the guest's progress over, then load the account. */
-async function finishSignIn(user: AuthUser): Promise<void> {
+async function finishSignIn(user: AuthUser, isNew: boolean): Promise<void> {
   // Hand the guest's progress to the account.
   stopSaving();
   await guest.flush();
@@ -370,6 +438,8 @@ async function finishSignIn(user: AuthUser): Promise<void> {
   useGames.getState().reset();
   useDaily.getState().reset();
   dispatchAuth({ type: 'signedIn', user });
+  // After the identity switch (src/observability follows the auth store), so the outcome belongs to the account.
+  signInOutcome('success', isNew);
 
   try {
     await loadAccount(user.id);
@@ -435,6 +505,8 @@ export async function signOut({ force = false }: { force?: boolean } = {}): Prom
     return 'failed';
   }
   await forgetGoogleAccount();
+  // Sent while still identified as this account; becoming a guest then resets the analytics identity.
+  track('signed_out', { forced: force });
   await becomeGuest({ welcomeAgain: false });
   return 'signedOut';
 }
@@ -468,7 +540,9 @@ export async function deleteAccount(): Promise<void> {
     startSync();
     void outbox.drain();
     await arenaUploads.restore(owner);
-    dispatchAuth({ type: 'deleteFailed', message: toDataError(e).message });
+    const error = toDataError(e);
+    dispatchAuth({ type: 'deleteFailed', message: error.message });
+    if (error.kind !== 'network') reportError('delete_account_failed', error, { error_code: errorCode(error.detail) ?? error.kind });
     throw e;
   }
 
@@ -476,5 +550,8 @@ export async function deleteAccount(): Promise<void> {
   // (motion, haptics, narration) stay; the welcome shows again for whoever uses the phone next.
   await signOutQuietly().catch(() => undefined);
   await forgetGoogleAccount();
+  // The last event of this identity; becoming a guest resets it. What happens to analytics data already sent for a
+  // deleted account is documented in docs/OBSERVABILITY.md ("Account deletion").
+  track('account_deleted');
   await becomeGuest({ welcomeAgain: true });
 }

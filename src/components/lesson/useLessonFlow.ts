@@ -5,6 +5,7 @@ import type { z } from 'zod';
 import type { LessonId } from '@/src/content/lessons';
 import type { NewAttempt } from '@/src/features/learning/records';
 import { narration } from '@/src/features/audio/narration';
+import { useLessonTelemetry } from '@/src/observability';
 import { useProgress } from '@/src/store/progress';
 
 /**
@@ -44,6 +45,9 @@ export function useLessonFlow<S extends z.ZodType>(
     }
     return { step: 0, data: initial };
   });
+
+  // lesson_started / lesson_completed / lesson_exited for every lesson (src/observability/hooks.ts).
+  useLessonTelemetry(lessonId, state.step, totalSteps);
 
   const completedRef = useRef(false);
   const saveRuntime = useProgress((s) => s.saveRuntime);

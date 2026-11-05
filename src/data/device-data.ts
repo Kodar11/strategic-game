@@ -31,7 +31,13 @@ export const DEVICE_DATA = [
   { key: 'sb-<project-ref>-auth-token', scope: 'session', what: 'The Supabase session, in the OS secure store (src/auth/session-storage.ts); the old AsyncStorage copy from anonymous builds is removed at start-up' },
   { key: 'tactiqo/device-owner/v1', scope: 'device', what: 'Whose data the account-scoped items hold: guest or a user id (src/data/device-owner.ts)' },
   { key: 'tactiqo/sign-in-invite/v1', scope: 'device', what: 'Whether the “Keep your progress safe” invitation was dismissed' },
-  { key: 'strategic-game/settings', scope: 'device', what: 'Device preferences: reduced motion, haptics, narration, the intro-seen flag' },
+  { key: 'strategic-game/settings', scope: 'device', what: 'Device preferences: reduced motion, haptics, narration, the intro-seen flag, “Share usage and crash data”' },
+  // PostHog SDK files (src/observability), in the app's document directory, written by the SDK itself: the anonymous
+  // or signed-in analytics id, the opt-in state and events not sent yet. Signing out, account deletion and a revoked
+  // session reset them (`posthog.reset()` through src/observability/core.ts `setUser(null)`); nothing is written when
+  // telemetry is switched off for the build.
+  { key: '.posthog-rn.json', scope: 'device', what: 'Analytics SDK state and unsent events (reset on sign-out and deletion)' },
+  { key: '.posthog-rn-logs.json', scope: 'device', what: 'Analytics SDK log queue (logs are not used; normally empty)' },
 ] as const;
 
 /**

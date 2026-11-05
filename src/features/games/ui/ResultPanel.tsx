@@ -17,6 +17,7 @@ import { MatchReflection } from '@/src/features/reflections/ReflectionCard';
 import { haptic } from '@/src/utils/feedback';
 import { colors, radius, space } from '@/src/theme/tokens';
 import { challengeLink, inviteFailure, shareResultMessage, shareText } from '../share';
+import { track } from '@/src/observability';
 import type { MatchView } from '../useMatch';
 
 /** The shared side of a Split or Steal or Stag Hunt match. Scores and outcomes stay as the engine and server record them. */
@@ -77,7 +78,9 @@ export function ResultPanel({
     setNote(null);
     try {
       // A friend challenge from a challenge match reuses that challenge, so both compare like for like.
-      const token = view.server?.challengeToken ?? (await gamesRepo.createChallenge(view.game, view.bot, view.difficulty)).token;
+      const reused = view.server?.challengeToken;
+      const token = reused ?? (await gamesRepo.createChallenge(view.game, view.bot, view.difficulty)).token;
+      if (!reused) track('challenge_link_created', { game_id: view.game });
       const link = challengeLink(token);
       const mine = view.server?.challengeToken ? view.totals.player : null;
       const message = inviteText(view.game, view.bot, view.difficulty, mine);

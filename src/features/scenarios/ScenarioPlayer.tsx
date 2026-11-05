@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -12,6 +12,7 @@ import { Badge, Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
 import { ChevronDown, RotateCcw } from '@/src/components/ui/icons';
 import { Slider } from '@/src/components/ui/Slider';
+import { track } from '@/src/observability';
 import { useProgress } from '@/src/store/progress';
 import { colors, radius, space } from '@/src/theme/tokens';
 import { getScenario } from './index';
@@ -52,6 +53,18 @@ function Player({ spec }: { spec: ScenarioSpec }) {
   const log = state !== null && spec.play.log ? spec.play.log(state) : [];
   const chosen = spec.predict.options.find((o) => o.id === run.prediction.answer);
   const compare = useMemo(() => (phase === 'done' ? alternatives(spec, run) : null), [phase, spec, run]);
+
+  // scenario_completed: when a run reaches its result here (not when a finished run is reopened). No prediction or
+  // verdict is sent; the learning record stays in Supabase.
+  const lastPhase = useRef(phase);
+  const playedBefore = useRef(doneBefore);
+  useEffect(() => {
+    if (phase === 'done' && lastPhase.current !== 'done') {
+      track('scenario_completed', { scenario_id: spec.id, lesson_id: spec.lesson, slot: spec.slot, is_replay: playedBefore.current });
+      playedBefore.current = true;
+    }
+    lastPhase.current = phase;
+  }, [phase, spec]);
 
   return (
     <View style={{ gap: space.lg }}>

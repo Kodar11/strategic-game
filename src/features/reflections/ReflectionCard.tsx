@@ -7,6 +7,7 @@ import { AppText } from '@/src/components/ui/AppText';
 import { BookOpen, ChevronDown, Compass } from '@/src/components/ui/icons';
 import { getLesson } from '@/src/content/lessons';
 import { hasCatalog } from '@/src/content/catalog';
+import { track } from '@/src/observability';
 import type { ReflectionGame } from '@/src/reflections/registry';
 import type { Reflection } from '@/src/reflections/types';
 import { useMotionReduced } from '@/src/utils/feedback';
@@ -28,14 +29,14 @@ export function linkedLesson(id: Reflection['lesson']) {
  */
 export function MatchReflection({ game, record }: { game: ReflectionGame; record: unknown }) {
   const r = useReflection(game, record);
-  return <ReflectionCard reflection={{ id: r.id, thought: r.thought, idea: r.idea, perspective: r.perspective, question: r.question, lesson: r.lesson }} />;
+  return <ReflectionCard game={game} reflection={{ id: r.id, thought: r.thought, idea: r.idea, perspective: r.perspective, question: r.question, lesson: r.lesson }} />;
 }
 
 /**
  * "A thought to take with you": one short observation from the match, and — only when the player asks — the idea
  * behind it, another way to see it, a question to try, and (when one teaches it) a lesson. Collapsed by default.
  */
-export function ReflectionCard({ reflection }: { reflection: ReflectionView }) {
+export function ReflectionCard({ reflection, game }: { reflection: ReflectionView; game?: string }) {
   const [open, setOpen] = useState(false);
   const reduced = useMotionReduced();
   const lesson = linkedLesson(reflection.lesson);
@@ -70,7 +71,11 @@ export function ReflectionCard({ reflection }: { reflection: ReflectionView }) {
           <Part label="A question to try" text={reflection.question} />
           {lesson ? (
             <Pressable
-              onPress={() => router.push({ pathname: '/lesson/[lessonId]', params: { lessonId: lesson.id } })}
+              onPress={() => {
+                // The game → lesson loop: how often a match sends someone to the idea behind it.
+                if (game) track('reflection_link_opened', { game_id: game, lesson_id: lesson.id });
+                router.push({ pathname: '/lesson/[lessonId]', params: { lessonId: lesson.id } });
+              }}
               accessibilityRole="link"
               accessibilityLabel={`Explore this concept in a lesson: ${lesson.title}`}
               style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 44, paddingHorizontal: space.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: pressed ? colors.surfaceHigh : colors.bgRaised })}>

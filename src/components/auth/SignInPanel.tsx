@@ -6,7 +6,7 @@ import { useAuth } from '@/src/auth/store';
 import { AppText } from '@/src/components/ui/AppText';
 import { Card } from '@/src/components/ui/Card';
 import { X } from '@/src/components/ui/icons';
-import { signInWithGoogle } from '@/src/data/session';
+import { noteSignInSource, signInWithGoogle } from '@/src/data/session';
 import { LINKS } from '@/src/features/settings/about';
 import { colors, space } from '@/src/theme/tokens';
 import { GoogleButton } from './GoogleButton';
@@ -25,12 +25,15 @@ export function SignInPanel({
   onDismiss,
   legal = true,
   card = true,
+  source,
 }: {
   title?: string;
   body?: string;
   onDismiss?: () => void;
   legal?: boolean;
   card?: boolean;
+  /** Where sign-in was offered, for analytics (default: the screen on show, e.g. "settings", "daily_play"). */
+  source?: string;
 }) {
   const status = useAuth((s) => s.status);
   const error = useAuth((s) => s.error);
@@ -59,7 +62,12 @@ export function SignInPanel({
           {body}
         </AppText>
       ) : null}
-      <GoogleButton onPress={() => void signInWithGoogle()} busy={busy} disabled={!googleSignInAvailable || status !== 'signedOut'} />
+      <GoogleButton
+        onPress={() => {
+          noteSignInSource(source ?? null);
+          void signInWithGoogle();
+        }}
+        busy={busy} disabled={!googleSignInAvailable || status !== 'signedOut'} />
       {googleSignInNote ? (
         <AppText variant="caption" color={colors.textMuted}>
           {googleSignInNote}

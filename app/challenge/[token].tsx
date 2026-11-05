@@ -16,6 +16,7 @@ import { DIFFICULTY_LABEL, GAMES, personality } from '@/src/games/catalog';
 import { ENGINES } from '@/src/games/registry';
 import { GameArt } from '@/src/features/games/ui/GameArt';
 import { OpponentBadges } from '@/src/features/games/ui/parts';
+import { track } from '@/src/observability';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
 const TOKEN = /^[0-9a-f]{20}$/;
@@ -35,7 +36,10 @@ export default function ChallengeScreen() {
     () =>
       gamesRepo
         .getChallenge(token)
-        .then((c) => setState({ status: 'ready', c }))
+        .then((c) => {
+          setState({ status: 'ready', c });
+          track('challenge_link_opened', { game_id: c.game });
+        })
         .catch((e: unknown) => setState(e instanceof GameError && e.refusal === 'not_found' ? { status: 'missing' } : { status: 'error', message: toDataError(e).message })),
     [token],
   );

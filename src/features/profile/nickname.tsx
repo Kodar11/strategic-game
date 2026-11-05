@@ -5,6 +5,7 @@ import { AppText } from '@/src/components/ui/AppText';
 import { toDataError } from '@/src/data/errors';
 import { useGames } from '@/src/data/games-session';
 import { NICKNAME_MAX, NICKNAME_MESSAGES, type NicknameProblem, nicknameProblem } from '@/src/games/competition';
+import { track } from '@/src/observability';
 import { colors, fonts, radius, space } from '@/src/theme/tokens';
 
 /**
@@ -43,7 +44,10 @@ export function useNicknameForm(initial: string | null | undefined, onSaved: (na
     setSaving(true);
     setError(null);
     try {
-      onSaved(await setNickname(name));
+      const saved = await setNickname(name);
+      // That a nickname was set — never the nickname.
+      track('nickname_set');
+      onSaved(saved);
     } catch (e) {
       setError(toDataError(e).message);
     } finally {

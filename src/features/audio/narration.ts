@@ -1,5 +1,6 @@
 import { AppState, Platform } from 'react-native';
 
+import { reportError } from '@/src/observability/api';
 import { useProgress } from '@/src/store/progress';
 import { AUDIO_ASSETS } from './audio-manifest';
 import { NarrationController } from './controller';
@@ -9,7 +10,12 @@ import { createExpoBackend } from './expoBackend';
 export const narration = new NarrationController({
   createBackend: createExpoBackend,
   resolveAsset: (clip) => AUDIO_ASSETS[clip],
-  onWarn: __DEV__ ? (m) => console.warn(m) : undefined,
+  // A clip that can't play (once per clip per launch; the lesson carries on in text). Reported as a warning, at most a
+  // few times per session (src/observability/core.ts).
+  onWarn: (m) => {
+    if (__DEV__) console.warn(m);
+    reportError('audio_failed', new Error(m), { operation: 'narration' }, 'warning');
+  },
 });
 
 // The mute preference lives in the persisted progress store; mirror it here and react immediately.

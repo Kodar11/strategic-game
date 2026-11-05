@@ -20,6 +20,7 @@ import { allGoals, buildLearningExport, exportFileName } from '@/src/features/le
 import { shareJsonFile } from '@/src/features/learning/shareFile';
 import { type ShareOutcome, isShareFailure, shareOutcomeMessage } from '@/src/features/learning/shareOutcome';
 import { useNickname } from '@/src/features/profile/nickname';
+import { Sensitive } from '@/src/observability';
 import { ABOUT_TEXT, LINKS, SUPPORT_EMAIL, supportMailto, versionLabel } from '@/src/features/settings/about';
 import { appVersion, platformLabel } from '@/src/features/settings/version';
 import { useProgress } from '@/src/store/progress';
@@ -98,9 +99,11 @@ function ProfileSection() {
             )}
           </View>
           <View style={{ flex: 1, gap: 2 }}>
-            <AppText variant="bodyStrong" numberOfLines={1} color={name ? colors.text : colors.textMuted}>
-              {display}
-            </AppText>
+            <Sensitive>
+              <AppText variant="bodyStrong" numberOfLines={1} color={name ? colors.text : colors.textMuted}>
+                {display}
+              </AppText>
+            </Sensitive>
             <AppText variant="caption" color={colors.textMuted}>
               {guest ? 'Sign in to choose a nickname for leaderboards.' : 'Your nickname may appear to other players.'}
             </AppText>
@@ -184,6 +187,14 @@ function ExperienceSection() {
         />
         {Platform.OS !== 'web' ? (
           <ToggleRow title="Haptic feedback" body="A light tap on selections and milestones." value={settings.haptics} onChange={(v) => setSetting('haptics', v)} />
+        ) : null}
+        {Platform.OS !== 'web' ? (
+          <ToggleRow
+            title="Share usage and crash data"
+            body="Which lessons and games are played, how long the app takes to open, and crash reports — so we can fix problems and improve Tactiqo. Never your answers, what you type, your email or your name. Takes effect at once."
+            value={settings.shareUsageData}
+            onChange={(v) => setSetting('shareUsageData', v)}
+          />
         ) : null}
       </Card>
     </Section>
@@ -468,9 +479,12 @@ function SignedInAccount({ email }: { email: string | null }) {
           <UserRound size={18} color={colors.primaryText} />
         </View>
         <View style={{ flex: 1 }}>
-          <AppText variant="bodyStrong" numberOfLines={1} selectable>
-            {email ?? 'Google account'}
-          </AppText>
+          {/* Masked in session replay (src/observability/Sensitive.tsx). */}
+          <Sensitive>
+            <AppText variant="bodyStrong" numberOfLines={1} selectable>
+              {email ?? 'Google account'}
+            </AppText>
+          </Sensitive>
           <AppText variant="caption" color={colors.textMuted}>
             Signed in with Google
           </AppText>

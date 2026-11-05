@@ -5,8 +5,9 @@ import { AppState, Platform } from 'react-native';
 import { installCryptoPolyfill } from '@/src/auth/crypto-polyfill';
 import { sessionStorage } from '@/src/auth/session-storage';
 import { currentUserId } from '@/src/auth/store';
+import { errorCode, reportError } from '@/src/observability/api';
 import type { Database, Json } from './database.types';
-import { DataError } from './errors';
+import { DataError, toDataError } from './errors';
 import { PUBLIC_RPCS } from './public-rpcs';
 import type { Rpc } from './repositories';
 
@@ -144,7 +145,24 @@ export const supabaseRpc: Rpc = {
   async call(fn, args) {
     if (!PUBLIC_RPCS.has(fn) && !currentUserId()) throw new DataError('signedOut', `${fn} needs a signed-in user`);
     const { data, error } = await supabase().rpc(fn, (args ?? {}) as { changes: Json });
-    if (error) throw error;
+    if (error) {
+      reportRpcFailure(fn, error);
+      throw error;
+    }
     return data;
   },
 };
+
+/**
+ * Report a database call that failed in a way the app didn't expect (src/observability). Reported: a missing function
+ * or table (PGRST2xx — a deployment out of step with the app), bad data or permission errors (22/23/42), and server
+ * errors. Not reported: no connection (the player's situation), an expired session (refreshed), and the functions'
+ * own business refusals (P0xxx: "already answered", "week closed"), which screens explain to the player.
+ * Only the function name and the error code are sent — never the arguments or the response.
+ */
+function reportRpcFailure(fn: string, error: unknown): void {
+  const d = toDataError(error);
+  const code = errorCode(d.detail);
+  if (d.kind === 'network' || d.kind === 'auth' || code?.startsWith('P0')) return;
+  reportError('rpc_failed', d, { rpc: fn, error_code: code ?? d.kind }, d.kind === 'server' ? 'warning' : 'error');
+}

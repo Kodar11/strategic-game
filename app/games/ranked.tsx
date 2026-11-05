@@ -29,6 +29,7 @@ import { SignalBoard } from '@/src/features/arena/ui/SignalBoard';
 import { UltimatumGameBoard } from '@/src/features/arena/ui/UltimatumGameBoard';
 import { Panel } from '@/src/features/games/ui/parts';
 import { useRankedArenaMatch } from '@/src/features/competition/useRankedArenaMatch';
+import { useGameTelemetry } from '@/src/observability';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
 /**
@@ -48,6 +49,11 @@ export default function RankedArenaScreen() {
 function Ranked({ matchId }: { matchId: string }) {
   const m = useRankedArenaMatch(matchId);
   const v = m.view;
+  // Game of the Week, scored on the server. A match that is already over when opened (looking back) sends nothing.
+  useGameTelemetry(
+    v ? { game_id: v.game, system: 'arena', mode: 'ranked', level: v.config.level, variant: v.config.variant, length: v.config.length, attempt_number: v.attempt } : null,
+    { round: v?.played ?? 0, roundsTotal: v?.total ?? 0, finished: !!v?.over, outcome: v?.final?.score.outcome ?? null },
+  );
 
   // Once a ranked match ends, the week's standings changed.
   const over = !!v?.over;

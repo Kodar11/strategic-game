@@ -21,6 +21,7 @@ import { ENGINES, engineFor } from '@/src/games/registry';
 import { MYSTERY_NAME } from '@/src/games/rps-insight';
 import type { RpsRound } from '@/src/games/rps';
 import { type MatchView, usePracticeMatch, useServerMatch } from '@/src/features/games/useMatch';
+import { useGameTelemetry } from '@/src/observability';
 import { Board } from '@/src/features/games/ui/Board';
 import { ordinal } from '@/src/games/competition';
 import { Panel } from '@/src/features/games/ui/parts';
@@ -219,6 +220,11 @@ function ChallengeResult({ view, token }: { view: MatchView; token: string }) {
 
 function MatchLayout({ view, result }: { view: MatchView; result: React.ReactNode }) {
   const insets = useSafeAreaInsets();
+  // One match per mount: practice rematches and each server match get a new key (see the screens above).
+  useGameTelemetry(
+    { game_id: view.game, system: 'classic', mode: view.mode === 'competition' ? 'ranked' : view.mode === 'challenge' ? 'friend' : 'practice', level: view.difficulty, mystery: view.opponent === 'mystery' },
+    { round: view.rounds.length, roundsTotal: view.totalRounds, finished: view.done, outcome: view.outcome },
+  );
   const repeatable = CLASSIC_REPEAT[view.game];
   const repeat = useRepeat(repeatable ?? NO_REPEAT, {
     ctx: view.rounds,

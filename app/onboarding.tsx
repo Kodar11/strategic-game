@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { BackHandler, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,11 +15,14 @@ import { recommendedLesson } from '@/src/features/onboarding/next-step';
 import { DilemmaStage, RevealStage } from '@/src/features/onboarding/ui/DilemmaStages';
 import { WelcomeArt } from '@/src/features/onboarding/ui/WelcomeArt';
 import { WorldStage } from '@/src/features/onboarding/ui/WorldStage';
+import { track } from '@/src/observability';
 import { useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
 type Stage = 'welcome' | 'dilemma' | 'reveal' | 'world';
 const STAGES: Stage[] = ['welcome', 'dilemma', 'reveal', 'world'];
+/** Stage → the step name analytics uses (src/observability/events.ts). */
+const STEP = { welcome: 'welcome', dilemma: 'decision', reveal: 'reveal', world: 'map' } as const;
 
 /**
  * Leave the welcome: mark it done on this device, then open the recommended lesson or return to the tabs underneath.
@@ -45,14 +48,35 @@ export default function OnboardingScreen() {
   const completed = useProgress((s) => s.completed);
   const next = recommendedLesson(allLessons(), completed);
 
+  // onboarding_step / onboarding_finished: where people leave the welcome, and how it ends. Replaying the intro
+  // from Settings is marked as such so it doesn't count as a new user.
+  const replayed = useRef(useProgress.getState().settings.onboarded);
+  const firstMove = useRef<Move | null>(null);
+  useEffect(() => {
+    track('onboarding_step', { step: STEP[stage], replay: replayed.current });
+  }, [stage]);
+  const end = useCallback(
+    (lessonId?: string) => {
+      track('onboarding_finished', {
+        result: stage === 'world' ? 'completed' : 'skipped',
+        at_step: STEP[stage],
+        ...(firstMove.current ? { choice: firstMove.current } : {}),
+        next: lessonId ? 'lesson' : 'explore',
+        replay: replayed.current,
+      });
+      finish(lessonId);
+    },
+    [stage],
+  );
+
   const back = useCallback(() => {
-    if (stage === 'welcome') finish();
+    if (stage === 'welcome') end();
     else if (stage === 'dilemma') setStage('welcome');
     else if (stage === 'reveal') {
       setRound(startRound());
       setStage('dilemma');
     } else setStage('reveal');
-  }, [stage]);
+  }, [stage, end]);
 
   // Android back steps back through the stages; on the welcome it leaves, like "Skip".
   useFocusEffect(
@@ -84,7 +108,7 @@ export default function OnboardingScreen() {
               {stage === 'world' ? (
                 <View style={{ width: 44 }} />
               ) : (
-                <Pressable onPress={() => finish()} accessibilityRole="button" accessibilityLabel="Skip the introduction" hitSlop={8} style={styles.skip}>
+                <Pressable onPress={() => end()} accessibilityRole="button" accessibilityLabel="Skip the introduction" hitSlop={8} style={styles.skip}>
                   <AppText variant="small" weight="semibold" color={colors.textMuted}>
                     Skip
                   </AppText>
@@ -94,12 +118,13 @@ export default function OnboardingScreen() {
           )}
 
           {stage === 'welcome' ? (
-            <Welcome onStart={() => setStage('dilemma')} onSkip={() => finish()} />
+            <Welcome onStart={() => setStage('dilemma')} onSkip={() => end()} />
           ) : stage === 'dilemma' && round.phase === 'choosing' ? (
             <DilemmaStage
               round={round}
               onPick={(m: Move) => setRound((r) => pick(r, m))}
               onLockIn={() => {
+                if (round.phase === 'choosing' && round.pick && !firstMove.current) firstMove.current = round.pick;
                 setRound((r) => lockIn(r));
                 setStage('reveal');
               }}
@@ -107,7 +132,7 @@ export default function OnboardingScreen() {
           ) : stage === 'reveal' && round.phase === 'revealed' ? (
             <RevealStage round={round} onReplay={replay} onContinue={() => setStage('world')} />
           ) : stage === 'world' ? (
-            <WorldStage next={next} onStart={() => finish(next?.id)} onExplore={() => finish()} />
+            <WorldStage next={next} onStart={() => end(next?.id)} onExplore={() => end()} />
           ) : (
             // A stage without a matching round can't normally happen; offer a way on rather than a blank screen.
             <Button label="Start the decision" onPress={replay} />

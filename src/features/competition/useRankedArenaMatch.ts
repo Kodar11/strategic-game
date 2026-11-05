@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 import { ArenaMatchError, type ArenaMatchView } from '@/src/data/arena-competition';
 import { type DataError, toDataError } from '@/src/data/errors';
 import { arenaRepo } from '@/src/data/games-session';
+import { reportError } from '@/src/observability/api';
 
 /**
  * One ranked Arena match, run on the server. The device holds only the latest view the server sent; every action is
@@ -51,6 +52,11 @@ export function useRankedArenaMatch(matchId: string) {
         pending.current = null;
       } catch (e) {
         const d = toDataError(e);
+        // A move the server couldn't process is worth a look. Ordinary refusals (stale step, week closed, an illegal
+        // move the board should have prevented) and lost connections are part of play and aren't reported.
+        if (d instanceof ArenaMatchError ? d.refusal === 'invalid_request' : d.kind === 'server' || d.kind === 'refused' || d.kind === 'config') {
+          reportError('ranked_move_failed', d, d instanceof ArenaMatchError ? { refusal: d.refusal, operation: 'arena_move' } : { error_code: d.kind, operation: 'arena_move' });
+        }
         // Only a transient failure keeps the move pending for "Try again"; anything else was refused for good.
         if (!(d instanceof ArenaMatchError && d.refusal === 'unavailable')) pending.current = null;
         else setUnsent(true);

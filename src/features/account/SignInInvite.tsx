@@ -4,6 +4,7 @@ import { create } from 'zustand';
 
 import { useIsGuest } from '@/src/components/auth/SignInRequired';
 import { SignInPanel } from '@/src/components/auth/SignInPanel';
+import { track } from '@/src/observability';
 import { useProgress } from '@/src/store/progress';
 
 /**
@@ -28,6 +29,7 @@ function loadInvite(): Promise<void> {
 }
 
 function dismissInvite(): void {
+  track('sign_in_invite_dismissed');
   useInvite.setState({ dismissed: true });
   AsyncStorage.setItem(INVITE_KEY, 'dismissed').catch(() => undefined);
 }
@@ -48,6 +50,7 @@ export function SignInInvite() {
       title="Keep your progress safe"
       body="Sign in with Google to save your progress and access it across devices. Right now it’s saved on this device only."
       onDismiss={dismissInvite}
+      source="invite"
       legal
     />
   );

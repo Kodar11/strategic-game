@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { errorCode, reportError } from '@/src/observability/api';
 import { ArenaUploader, arenaRepository } from './arena';
 import { toDataError } from './errors';
 import { supabaseRpc } from './supabase';
@@ -15,7 +16,17 @@ export const ARENA_UPLOADS_KEY = 'tactiqo/arena-uploads/v1';
 export const arenaRepo = arenaRepository(supabaseRpc);
 
 export const arenaUploads = new ArenaUploader({
-  send: (batch) => arenaRepo.record(batch),
+  send: async (batch) => {
+    try {
+      await arenaRepo.record(batch);
+    } catch (e) {
+      // Refused for good: the uploader drops this batch (src/data/arena.ts), so the summaries are lost — worth a look.
+      // Transient failures are retried and not reported.
+      const d = toDataError(e);
+      if (!d.transient) reportError('arena_upload_failed', d, { error_code: errorCode(d.detail) ?? d.kind }, 'warning');
+      throw e;
+    }
+  },
   transient: (e) => toDataError(e).transient,
   storage: {
     load: () => AsyncStorage.getItem(ARENA_UPLOADS_KEY),

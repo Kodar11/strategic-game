@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
+import { track } from '@/src/observability/api';
+
 import { type Choices, type Position, START, ending, finished } from '@/src/stories/crossing/story';
 import { type MeridianRun, NEW_RUN } from '@/src/stories/meridian/run';
 import { EMPTY_SAVE, type StoriesSave, type StoryId, sanitizeSave } from '@/src/stories/save';
@@ -66,12 +68,14 @@ export const useStories = create<StoriesState>()((set, get) => {
         finishes: { ...s.finishes, crossing: s.finishes.crossing + 1 },
         endings: s.endings.includes(e) ? s.endings : [...s.endings, e],
       });
+      track('story_finished', { story_id: 'crossing', ending_id: e, finish_number: s.finishes.crossing + 1 });
     },
     saveMeridian: (run) => update({ meridian: { run, reflecting: false }, touched: { ...get().touched, meridian: Date.now() } }),
     reflectMeridian: () => {
       const s = get();
       if (!s.meridian || s.meridian.reflecting) return;
       update({ meridian: { ...s.meridian, reflecting: true }, finishes: { ...s.finishes, meridian: s.finishes.meridian + 1 } });
+      track('story_finished', { story_id: 'meridian', finish_number: s.finishes.meridian + 1 });
     },
     restart: (id) =>
       id === 'crossing'

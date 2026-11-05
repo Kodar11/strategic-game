@@ -20,6 +20,7 @@ import { DailyContext, type DailyDraft, DailyInteraction, DailyResultView, compl
 import { DIFFICULTY_NAME, type DailyAttempt, type DailyChallenge, type DailyResult, type DailyReveal, FORMAT_LABEL } from '@/src/features/daily/content';
 import { compareDays, dayLabel, formatDay, monthKey, monthOf, parseDay } from '@/src/features/daily/dates';
 import { newSeed } from '@/src/features/scenarios/runtime';
+import { track } from '@/src/observability';
 import { haptic } from '@/src/utils/feedback';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
@@ -145,13 +146,16 @@ function Flow({
     setError(null);
     try {
       if (mode === 'official') {
-        await submit({ challengeId: challenge.id, version: challenge.version, answer, confidence: challenge.askConfidence ? confidence : null, date: challenge.date });
+        const out = await submit({ challengeId: challenge.id, version: challenge.version, answer, confidence: challenge.askConfidence ? confidence : null, date: challenge.date });
         haptic.success();
+        // Participation only: never the answer or the confidence rating.
+        track('daily_submitted', { challenge_date: formatDay(challenge.date), official: true, format: challenge.format, result: out.status });
         // The recorded attempt (or the one already on record) now drives the result.
         setStage('result');
       } else {
         setPracticeResult(await dailyRepo.practice({ challengeId: challenge.id, version: challenge.version, answer }));
         setStage('result');
+        track('daily_submitted', { challenge_date: formatDay(challenge.date), official: false, format: challenge.format, result: 'practice' });
       }
     } catch (e) {
       const err = toDataError(e);

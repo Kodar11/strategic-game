@@ -23,6 +23,7 @@ import { cooperationRepeat } from '@/src/repeat/arena';
 import { haptic, useMotionReduced } from '@/src/utils/feedback';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 import { useArenaRecords } from '../records';
+import { useGameTelemetry } from '@/src/observability';
 import { useArenaMatch } from '../useArenaMatch';
 import { useOpponentRead } from '../useOpponentRead';
 import { CoopResults } from './CoopResults';
@@ -90,6 +91,13 @@ export function CooperationMatch({
   const read = useOpponentRead('cooperation', persona, mystery, h.length, state.total, cooperation.isOver(state));
   const name = read.revealed ? COOP_NAME[persona] : 'Your opponent';
   const over = cooperation.isOver(state);
+  // Practice matches only: a ranked match is reported by its own screen (app/games/ranked.tsx).
+  useGameTelemetry(server ? null : { game_id: 'cooperation', system: 'arena', mode: 'practice', level, variant, length, mystery }, {
+    round: h.length,
+    roundsTotal: state.total,
+    finished: !server && view === 'results',
+    outcome: result?.outcome ?? null,
+  });
 
   useEffect(() => {
     void useArenaRecords.getState().load();

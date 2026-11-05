@@ -14,13 +14,12 @@ import { APP_NAME } from '@/src/brand';
 import { FontsReadyContext } from '@/src/components/ui/AppText';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { startAppData, useAppData } from '@/src/data/session';
+import { startObservability, useScreenTracking } from '@/src/observability';
 import { useMotionReduced } from '@/src/utils/feedback';
 import { colors } from '@/src/theme/tokens';
 
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
+// Catch any errors thrown by the Layout component: Expo Router's recovery screen, plus one error report.
+export { ErrorBoundary } from '@/src/observability';
 
 // A deep link (e.g. a friend challenge) opens above the tabs, so Back always has somewhere to go.
 export const unstable_settings = { initialRouteName: '(tabs)' };
@@ -40,6 +39,8 @@ export default function RootLayout() {
 
   // Content and progress come from Supabase; nothing renders until both have loaded (or failed with a retry).
   useEffect(() => {
+    // Telemetry starts alongside, never before or instead: it can't delay or break start-up (src/observability).
+    startObservability();
     void startAppData();
   }, []);
 
@@ -74,6 +75,7 @@ export default function RootLayout() {
 }
 
 function AppStack({ reduced }: { reduced: boolean }) {
+  useScreenTracking();
   return (
     <Stack
       screenOptions={{

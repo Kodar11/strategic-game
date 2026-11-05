@@ -17,6 +17,7 @@ import { arenaEngine } from '@/src/arena/registry';
 import { randomSeed } from '@/src/games/core';
 import { useArenaRecords } from '@/src/features/arena/records';
 import { useArenaMatch } from '@/src/features/arena/useArenaMatch';
+import { useGameTelemetry } from '@/src/observability';
 import { useOpponentRead } from '@/src/features/arena/useOpponentRead';
 import { ArenaResult } from '@/src/features/arena/ui/ArenaResult';
 import { AuctionBoard } from '@/src/features/arena/ui/AuctionBoard';
@@ -112,6 +113,7 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
 
   const live = result ?? engine.result(state);
   const finished = over && !!result && read.revealed && !repeat.holding;
+  useGameTelemetry({ game_id: game, system: 'arena', mode: 'practice', level, variant, length, mystery }, { round: playedRounds, roundsTotal: total, finished, outcome: result?.outcome ?? null });
   const challenge = g.variants.find((v) => v.id === variant && v.challenge);
   const roundLabel = g.roundWord === 'lots' ? 'Lot' : g.roundWord === 'turns' ? 'Turn' : 'Round';
   const tip = !coached && !tipHidden && !over ? g.coach[Math.min(playedRounds, g.coach.length - 1)] : null;

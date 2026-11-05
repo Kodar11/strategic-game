@@ -15,6 +15,7 @@ import { getLesson, getModule } from '@/src/content/lessons';
 import { ASSESSMENT_IDS, allAssessments, type Assessment, type AssessmentItem, getAssessment, splitAssessmentTitle } from '@/src/features/assessments/content';
 import { type AssessmentRun, assessmentScore, currentAssessmentRun, finalUnlocked, isComplete, itemScore } from '@/src/features/assessments/scoring';
 import { DataTable } from '@/src/features/scenarios/visuals';
+import { track } from '@/src/observability';
 import { useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
@@ -97,6 +98,15 @@ function Runner({ a }: { a: Assessment }) {
   const run = useMemo(() => currentAssessmentRun(runs, a), [runs, a]);
   const answer = useProgress((s) => s.answerAssessment);
   const submit = useProgress((s) => s.submitAssessment);
+  // checkpoint_submitted: pass/fail and a coarse score band, never the answers or the written reflection.
+  const submitAndTrack = (x: Assessment) => {
+    submit(x.id);
+    const run = useProgress.getState().assessmentRuns[x.id];
+    if (!run?.submitted) return;
+    const s = assessmentScore(x, run.answers);
+    const pct = Math.round(s.ratio * 100);
+    track('checkpoint_submitted', { assessment_id: x.id, passed: s.passed, score_band: pct >= 80 ? '80-100' : pct >= 60 ? '60-79' : pct >= 40 ? '40-59' : '0-39', attempt_number: run.attempts });
+  };
   const retake = useProgress((s) => s.retakeAssessment);
   const setReflection = useProgress((s) => s.setAssessmentReflection);
   const toggleRubric = useProgress((s) => s.toggleAssessmentRubric);
@@ -183,7 +193,7 @@ function Runner({ a }: { a: Assessment }) {
         </Card>
       ) : (
         <View style={{ gap: space.xs }}>
-          <Button label="Submit answers" disabled={!complete} onPress={() => submit(a.id)} />
+          <Button label="Submit answers" disabled={!complete} onPress={() => submitAndTrack(a)} />
           <AppText variant="caption" color={colors.textMuted} align="center">
             {complete ? 'You can’t change answers after submitting — but you can retake.' : `${answered} of ${a.items.length} answered.`}
           </AppText>

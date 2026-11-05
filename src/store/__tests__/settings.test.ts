@@ -6,17 +6,17 @@ import { DEFAULT_SETTINGS, sanitizeSettings } from '../settings.ts';
 
 describe('Settings persistence', () => {
   it('a new install has haptics and narration on, in-app reduce motion off and onboarding still to do', () => {
-    assert.deepEqual(sanitizeSettings(undefined), { reduceMotion: false, haptics: true, narration: true, onboarded: false });
+    assert.deepEqual(sanitizeSettings(undefined), { reduceMotion: false, haptics: true, narration: true, onboarded: false, shareUsageData: true });
     assert.deepEqual(sanitizeSettings(null), DEFAULT_SETTINGS);
   });
 
   it('saved preferences survive a restart', () => {
     const saved = JSON.parse(JSON.stringify({ reduceMotion: true, haptics: false, narration: false, onboarded: true }));
-    assert.deepEqual(sanitizeSettings(saved), { reduceMotion: true, haptics: false, narration: false, onboarded: true });
+    assert.deepEqual(sanitizeSettings(saved), { reduceMotion: true, haptics: false, narration: false, onboarded: true, shareUsageData: true });
   });
 
   it('a save from before onboarding existed is treated as a returning user', () => {
-    assert.deepEqual(sanitizeSettings({ reduceMotion: true, haptics: false, narration: true }), { reduceMotion: true, haptics: false, narration: true, onboarded: true });
+    assert.deepEqual(sanitizeSettings({ reduceMotion: true, haptics: false, narration: true }), { reduceMotion: true, haptics: false, narration: true, onboarded: true, shareUsageData: true });
   });
 
   it('an explicit not-yet-onboarded save is kept, so an unfinished welcome shows again', () => {

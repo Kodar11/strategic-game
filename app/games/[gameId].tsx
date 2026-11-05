@@ -23,6 +23,7 @@ import { useSeenRules } from '@/src/features/games/seen';
 import { challengeLink, inviteFailure, shareResultMessage, shareText } from '@/src/features/games/share';
 import { GameArt } from '@/src/features/games/ui/GameArt';
 import { RelatedGameLink } from '@/src/features/games/ui/RelatedGameLink';
+import { track } from '@/src/observability';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
 const OUTCOME = { win: 'Won', loss: 'Lost', draw: 'Drew' } as const;
@@ -87,6 +88,7 @@ export default function GameScreen() {
       const bots = ENGINES[gameId].bots;
       const opponent = bot ?? bots[Math.floor(Math.random() * bots.length)];
       const c = await gamesRepo.createChallenge(gameId, opponent, difficulty);
+      track('challenge_link_created', { game_id: gameId });
       const link = challengeLink(c.token);
       const message = inviteText(gameId, opponent, difficulty, null);
       setNote(shareResultMessage(await shareText(message, link), 'invite', `${message}\n${link}`) ?? 'Each of you plays your own match on the same draws; compare when you’re both done. Play it yourself from the link too.');
