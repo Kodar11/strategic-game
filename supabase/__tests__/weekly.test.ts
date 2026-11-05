@@ -275,6 +275,7 @@ describe('server-run Arena matches in a weekly competition', () => {
         assert.equal(row.outcome, expected.outcome);
         scores.push(row.score);
         assert.equal(v.standing.attemptsUsed, attempt);
+        assert.deepEqual(((await arena(me, { op: 'get', matchId: m.id })).body as any).standing.attemptsUsed, attempt, 'reopening a finished match shows the standing');
         assert.equal(v.standing.best, Math.max(...scores));
         // A replayed final action is a duplicate, not a new move.
         const dup = await arena(me, { op: 'move', matchId: m.id, step: v.step - 1, action: row.actions[row.actions.length - 1] });
@@ -346,7 +347,8 @@ describe('lifecycle', () => {
     const after1 = (await arena(P[3], { op: 'move', matchId: m.id, step: 0, action: clientMove('liars-dice', first.state, 0) })).body as any;
     // "App restart": a fresh get returns the same view; start_match resumes the same match.
     const { standing: _s, ...expected } = after1;
-    assert.deepEqual((await arena(P[3], { op: 'get', matchId: m.id })).body, expected);
+    const { standing: _g, ...resumed } = (await arena(P[3], { op: 'get', matchId: m.id })).body as any;
+    assert.deepEqual(resumed, expected);
     assert.equal((await rpc(P[3], 'start_match', { kind: 'competition', competitionId: 'resume' })).id, m.id);
     const o = await rpc(P[3], 'get_games_overview');
     assert.ok(o.competition === null || typeof o.competition === 'object');

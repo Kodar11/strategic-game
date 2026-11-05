@@ -16,14 +16,14 @@ import { getLesson } from '@/src/content/lessons';
 import { DailyError } from '@/src/data/daily';
 import { dailyRepo, useDaily } from '@/src/data/daily-session';
 import { toDataError } from '@/src/data/errors';
-import { type DailyDraft, DailyInteraction, DailyResultView, completeAnswer, initialDraft } from '@/src/features/daily/DailyInteraction';
-import type { DailyAttempt, DailyChallenge, DailyResult, DailyReveal } from '@/src/features/daily/content';
+import { DailyContext, type DailyDraft, DailyInteraction, DailyResultView, completeAnswer, initialDraft } from '@/src/features/daily/DailyInteraction';
+import { DIFFICULTY_NAME, type DailyAttempt, type DailyChallenge, type DailyResult, type DailyReveal, FORMAT_LABEL } from '@/src/features/daily/content';
 import { compareDays, dayLabel, formatDay, monthKey, monthOf, parseDay } from '@/src/features/daily/dates';
 import { newSeed } from '@/src/features/scenarios/runtime';
 import { haptic } from '@/src/utils/feedback';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
-const DIFFICULTY = { 1: 'Warm-up', 2: 'Standard', 3: 'Tricky' } as const;
+const DIFFICULTY = DIFFICULTY_NAME;
 
 /**
  * One day's challenge. Three stages: the situation → your answer → the result and why. What it does depends on the
@@ -176,7 +176,7 @@ function Flow({
     }
   };
 
-  const lesson = getLesson(challenge?.lesson ?? attempt?.lesson ?? undefined);
+  const lesson = getLesson(challenge?.lesson ?? attempt?.result.lesson ?? attempt?.lesson ?? undefined);
   const stepLabel = stage === 'brief' ? '1 of 3 · The situation' : stage === 'answer' ? '2 of 3 · Your answer' : '3 of 3 · Result';
 
   return (
@@ -185,6 +185,8 @@ function Flow({
         <View style={{ flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' }}>
           <Badge label={stepLabel} tone="cyan" />
           {challenge ? <Badge label={DIFFICULTY[challenge.difficulty]} /> : null}
+          {challenge?.format ? <Badge label={FORMAT_LABEL[challenge.format]} /> : null}
+          {challenge?.minutes && stage === 'brief' ? <Badge label={`~${challenge.minutes} min`} /> : null}
           {attempt ? <Badge label="Official answer recorded" tone="success" /> : mode === 'practice' ? <Badge label="Practice · not recorded" tone="amber" /> : null}
         </View>
         <AppText variant="title" accessibilityRole="header">
@@ -200,6 +202,7 @@ function Flow({
         {stage === 'brief' && challenge ? (
           <View style={{ gap: space.md }}>
             <AppText variant="body">{challenge.intro}</AppText>
+            <DailyContext challenge={challenge} />
             <AppText variant="bodyStrong">{challenge.prompt}</AppText>
             {challenge.instructions ? (
               <AppText variant="small" color={colors.textMuted}>
@@ -236,6 +239,7 @@ function Flow({
         {stage === 'answer' && challenge && draft ? (
           <View style={{ gap: space.lg }}>
             {challenge.interaction === 'scenario' ? <AppText variant="small" color={colors.textMuted}>{challenge.prompt}</AppText> : null}
+            {challenge.interaction === 'choice' && challenge.config.visual ? <DailyContext challenge={{ ...challenge, config: { ...challenge.config, rules: undefined } }} /> : null}
             <DailyInteraction
               challenge={challenge}
               draft={draft}
@@ -272,7 +276,13 @@ function Flow({
                 <AppText variant="small" color={colors.textMuted}>
                   Your official answer{attempt.version !== challenge?.version ? ' (to an earlier version of this challenge)' : ''}, recorded {dayLabel(attempt.date)}.
                 </AppText>
+                <OfficialScore attempt={attempt} />
                 <DailyResultView challenge={attempt.version === challenge?.version ? challenge : null} result={attempt.result} answer={attempt.answer} confidence={attempt.confidence} />
+                {attempt.result.concept ? (
+                  <Panel tone="info" title="The concept">
+                    {attempt.result.concept}
+                  </Panel>
+                ) : null}
               </>
             ) : null}
             {lesson ? (
@@ -289,10 +299,32 @@ function Flow({
           </View>
         ) : null}
         <AppText variant="caption" color={colors.textFaint} align="center">
-          {day} · UTC calendar day
+          {day} · a day runs midnight to midnight, India time
         </AppText>
       </View>
     </ScrollView>
+  );
+}
+
+/** The official result as the leaderboard ranks it: score first, calibration second (docs/DAILY_CHALLENGE.md). */
+function OfficialScore({ attempt }: { attempt: DailyAttempt }) {
+  const scored = attempt.score !== null && attempt.score !== undefined;
+  return (
+    <Card style={{ gap: space.sm }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' }}>
+        <AppText variant="caption" color={colors.textMuted} style={{ flex: 1 }}>
+          Official result
+        </AppText>
+        {scored ? <Badge label={`Score ${attempt.score}/100`} tone={attempt.score === 100 ? 'success' : 'amber'} /> : <Badge label="Taken part · no single right answer" />}
+        {scored && attempt.calibration !== null && attempt.calibration !== undefined ? <Badge label={`Calibration ${attempt.calibration}`} tone="cyan" /> : null}
+      </View>
+      {scored ? (
+        <AppText variant="caption" color={colors.textMuted}>
+          Correctness decides the ranking; calibration — how well your confidence matched the result — breaks ties, then who answered first.
+        </AppText>
+      ) : null}
+      <Button label="Leaderboard for this day" variant="secondary" compact onPress={() => router.push({ pathname: '/daily/leaderboard', params: { date: formatDay(attempt.date) } })} style={{ alignSelf: 'flex-start' }} />
+    </Card>
   );
 }
 

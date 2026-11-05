@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import type { DailyRepository, SubmitRequest } from '../../data/daily.ts';
 import { DataError, toDataError } from '../../data/errors.ts';
 import type { DailyAttempt, DailyHistoryEntry, DailyRange } from './content.ts';
-import { type Day, type Month, formatDay, monthKey, monthOf, monthRange, utcToday } from './dates.ts';
+import { type Day, type Month, formatDay, monthKey, monthOf, monthRange, productToday } from './dates.ts';
 
 /**
  * Daily Challenge state for the screens: loaded months, the learner's attempt history and the server's "today".
@@ -14,7 +14,7 @@ import { type Day, type Month, formatDay, monthKey, monthOf, monthRange, utcToda
 export type MonthState = { status: 'loading' } | { status: 'ready'; data: DailyRange; loadedAt: number } | { status: 'error'; error: DataError };
 
 export interface DailyState {
-  /** The schedule's today (UTC), from the server once it has answered; the device's UTC date before that. */
+  /** The schedule's today (India time), from the server once it has answered; the device's guess before that. */
   today: Day;
   /** Whether `today` came from the server. */
   todayConfirmed: boolean;
@@ -36,7 +36,7 @@ export function createDailyStore(repo: DailyRepository, now: () => number = Date
   /** Bumped by reset(): a response that belongs to the previous account is dropped instead of shown. */
   let epoch = 0;
   const store = create<DailyState>()((set, get) => ({
-    today: utcToday(now()),
+    today: productToday(now()),
     todayConfirmed: false,
     months: {},
     history: null,

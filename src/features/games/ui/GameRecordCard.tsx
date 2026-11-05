@@ -1,3 +1,4 @@
+import { competitionGame } from '@/src/competition/catalog';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { ActivityIndicator, View } from 'react-native';
@@ -97,7 +98,7 @@ function Record({ data }: { data: MyGames }) {
 
       {lastWeek ? (
         <AppText variant="small" color={colors.textBody}>
-          Latest week: {GAMES[lastWeek.game].title} — {lastWeek.isWinner ? 'winner' : `${ordinal(lastWeek.rank)} of ${lastWeek.field}`}, +{lastWeek.points} points
+          Latest week: {competitionGame(lastWeek.game).title} — {lastWeek.isWinner ? 'winner' : `${ordinal(lastWeek.rank)} of ${lastWeek.field}`}, +{lastWeek.points} points
         </AppText>
       ) : null}
 

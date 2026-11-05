@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { scenarioVisualSchema } from '../../content/schema.ts';
 import { getScenario } from '../scenarios/index.ts';
 import { replay } from '../scenarios/runtime.ts';
 import type { Input, ScenarioSpec } from '../scenarios/types.ts';
@@ -25,8 +26,14 @@ const optionId = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(40);
 
 // ── Multiple choice ──────────────────────────────────────────────────────────
 
+// `rules` and `visual` give a challenge adapted from a lesson scenario its context: the rules as listed in the lesson
+// and its payoff table, game tree or table (the same visual format and renderer as the lesson scenarios).
 export const choiceConfigSchema = z
-  .strictObject({ options: z.array(z.strictObject({ id: optionId, label: z.string().min(1).max(300) })).min(2).max(6) })
+  .strictObject({
+    options: z.array(z.strictObject({ id: optionId, label: z.string().min(1).max(300) })).min(2).max(6),
+    rules: z.array(z.string().min(1).max(300)).min(1).max(8).optional(),
+    visual: scenarioVisualSchema.optional(),
+  })
   .refine((c) => new Set(c.options.map((o) => o.id)).size === c.options.length, 'option ids must be unique');
 export type ChoiceConfig = z.infer<typeof choiceConfigSchema>;
 export const choiceAnswerSchema = z.strictObject({ option: optionId });

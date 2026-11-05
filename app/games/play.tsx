@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,7 +13,7 @@ import { MatchLog } from '@/src/components/game/MatchLog';
 import { SignInRequiredScreen, useIsGuest } from '@/src/components/auth/SignInRequired';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { toDataError } from '@/src/data/errors';
-import type { ChallengeView, ServerMatch } from '@/src/data/games';
+import { type ChallengeView, type ClassicServerMatch, type ServerMatch, isClassicMatch } from '@/src/data/games';
 import { gamesRepo, useGames } from '@/src/data/games-session';
 import { DIFFICULTY_LABEL, GAMES, personality } from '@/src/games/catalog';
 import { type GameId, isDifficulty, isGameId } from '@/src/games/core';
@@ -108,10 +108,13 @@ function ServerLoader({ start }: { start: () => Promise<ServerMatch> }) {
 
   if (state.status === 'loading') return <MessageScreen loading />;
   if (state.status === 'error') return <LoadError message={state.message} onRetry={run} />;
-  if (state.match.rulesVersion !== ENGINES[state.match.game].rulesVersion) {
+  const m = state.match;
+  // A Strategy Arena Game of the Week: played through the arena-match function on its own screen.
+  if (m.engine === 'arena') return <Redirect href={{ pathname: '/games/ranked', params: { matchId: m.id } }} />;
+  if (!isClassicMatch(m) || m.rulesVersion !== ENGINES[m.game].rulesVersion) {
     return <MessageScreen title="Update needed" body="This match uses game rules that this version of the app doesn’t have. Update the app to play it." />;
   }
-  return <ServerSession match={state.match} />;
+  return <ServerSession match={m} />;
 }
 
 function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
@@ -131,7 +134,7 @@ function LoadError({ message, onRetry }: { message: string; onRetry: () => void 
   );
 }
 
-function ServerSession({ match }: { match: ServerMatch }) {
+function ServerSession({ match }: { match: ClassicServerMatch }) {
   const view = useServerMatch(match);
   const extra = view.mode === 'competition' ? <CompetitionResult view={view} /> : view.server?.challengeToken ? <ChallengeResult view={view} token={view.server.challengeToken} /> : null;
   const again =
@@ -158,16 +161,21 @@ function ServerSession({ match }: { match: ServerMatch }) {
 function CompetitionResult({ view }: { view: MatchView }) {
   const overview = useGames((s) => s.overview);
   const c = overview.status === 'ready' ? overview.data.competition : null;
-  const me = c && c.id === view.server?.competitionId ? c.me : null;
+  // The standing the server returned with the finished match; the overview's (possibly older) copy otherwise.
+  const me = view.server?.standing ?? (c && c.id === view.server?.competitionId ? c.me : null);
+  const max = me?.maxAttempts ?? c?.maxAttempts ?? 3;
   return (
     <Panel>
       <AppText variant="overline" color={colors.insight}>
-        Game of the Week
+        Game of the Week · ranked
       </AppText>
-      <AppText variant="bodyStrong">This match scored {view.totals.player}. It was recorded by the server.</AppText>
+      <AppText variant="bodyStrong">
+        This match scored {view.totals.player}
+        {me?.isBest ? ' — your best this week.' : '. It was recorded by the server.'}
+      </AppText>
       {me && me.best !== null ? (
         <AppText variant="small" color={colors.textBody}>
-          Your best this week: {me.best} — {ordinal(me.rank ?? 0)} so far. {c!.maxAttempts - me.attemptsUsed} of {c!.maxAttempts} attempts left.
+          Your best this week: {me.best} — {ordinal(me.rank ?? 0)} so far. {Math.max(0, max - me.attemptsUsed)} of {max} ranked attempts left.
         </AppText>
       ) : null}
       <Button label="Weekly leaderboard" variant="secondary" compact icon={ListOrdered} iconPosition="left" onPress={() => router.push({ pathname: '/leaderboard', params: { tab: 'weekly', competition: view.server!.competitionId! } })} />

@@ -56,6 +56,32 @@ export function completeAnswer(c: DailyChallenge, d: DailyDraft): unknown {
   return null;
 }
 
+/**
+ * The context a choice challenge adapted from a lesson scenario carries: the rules as the lesson lists them and its
+ * payoff table, game tree or table — drawn with the lessons' own renderer. Shown before and while answering; it never
+ * marks a best reply or an outcome before the answer is in.
+ */
+export function DailyContext({ challenge }: { challenge: DailyChallenge }) {
+  if (challenge.interaction !== 'choice') return null;
+  const { rules, visual } = challenge.config;
+  if (!rules?.length && !visual) return null;
+  return (
+    <View style={{ gap: space.sm }}>
+      {rules?.length ? (
+        <Card style={{ gap: 4 }}>
+          <SectionLabel color={colors.textMuted}>The rules</SectionLabel>
+          {rules.map((r, i) => (
+            <AppText key={i} variant="small" color={colors.textBody}>
+              • {r}
+            </AppText>
+          ))}
+        </Card>
+      ) : null}
+      {visual ? <ScenarioVisualView visual={visual} /> : null}
+    </View>
+  );
+}
+
 export function DailyInteraction({
   challenge,
   draft,

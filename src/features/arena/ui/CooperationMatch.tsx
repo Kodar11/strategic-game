@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { memo, useEffect, useRef, useState } from 'react';
+import { type ReactNode, memo, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 import Svg, { Line, Polyline } from 'react-native-svg';
@@ -13,7 +13,7 @@ import { Badge } from '@/src/components/ui/Card';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { ArrowLeft, BookOpen, Check, ChevronDown, Link2, Lock, Unlink } from '@/src/components/ui/icons';
 import { ARENA, LENGTH_LABEL, LEVEL_LABEL, opponentInfo } from '@/src/arena/catalog';
-import type { Level, MatchLength } from '@/src/arena/core';
+import type { Level, MatchLength, MatchResult } from '@/src/arena/core';
 import { COOP_NAME, COOP_PAYOFFS, type CoopMove, type CoopOpponent, type CoopRound, type CoopSetup, type CoopState, type CoopVariant, cooperation, coopPayoff } from '@/src/arena/cooperation';
 import { coopBriefing, coopOutcomeText, coopRelationship, coopRevealNote, opponentPatterns } from '@/src/arena/cooperation-analysis';
 import { MiniMatrix } from '@/src/features/games/ui/common';
@@ -53,6 +53,8 @@ export function CooperationMatch({
   seed,
   onPlayAgain,
   mystery = false,
+  server,
+  resultSlot,
 }: {
   persona: CoopOpponent;
   /** The personality is hidden until the end, with an optional prediction (src/arena/reads.ts). */
@@ -62,10 +64,22 @@ export function CooperationMatch({
   variant: CoopVariant;
   seed: number;
   onPlayAgain: () => void;
+  /**
+   * A ranked Game of the Week match run on the server (src/features/competition/useRankedArenaMatch.ts): the state,
+   * the action sender and the result come from there, and a round is revealed once the server has resolved it.
+   */
+  server?: { state: CoopState; act: (a: { move: CoopMove; round: number }) => void; result: MatchResult | null; busy: boolean };
+  /** Shown instead of the practice results (ranked matches have their own). */
+  resultSlot?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   const setup: CoopSetup = { persona, level, length, variant, seed };
-  const { state, act, result, newBest } = useArenaMatch(cooperation, setup);
+  const local = useArenaMatch(cooperation, setup);
+  const { state, act, result, newBest } = server ? { ...server, newBest: false } : local;
+  // Server mode: the round just committed, waiting for the server's resolution before the reveal.
+  const [awaiting, setAwaiting] = useState<number | null>(null);
+  // …and whether the server has started on it (so "idle and not arrived" means refused, not "not sent yet").
+  const [sentBusy, setSentBusy] = useState(false);
   const coached = useArenaRecords((s) => s.coached.cooperation);
   const [view, setView] = useState<View_>('decide');
   const [tipHidden, setTipHidden] = useState(false);
@@ -83,11 +97,22 @@ export function CooperationMatch({
 
   /** `quiet`: a repeated choice — no haptic for every automatic round. */
   const commit = (move: CoopMove, quiet = false) => {
-    if (view !== 'decide') return;
+    if (view !== 'decide' || awaiting !== null || server?.busy) return;
     if (!quiet) haptic.commit();
     act({ move, round: h.length });
-    setView('reveal');
+    if (server) setAwaiting(h.length);
+    else setView('reveal');
   };
+  // Server mode, adjusted while rendering (no effect round-trip): the committed round arrived → reveal it; the move
+  // was refused or failed (the server is idle and the round didn't arrive) → let the player choose again.
+  if (awaiting !== null && h.length > awaiting) {
+    setAwaiting(null);
+    setView('reveal');
+  } else if (awaiting !== null && server && !server.busy && h.length <= awaiting && sentBusy) {
+    setAwaiting(null);
+  }
+  if (awaiting !== null && server?.busy && !sentBusy) setSentBusy(true);
+  if (awaiting === null && sentBusy) setSentBusy(false);
   const next = () => {
     setView(h.length >= state.total ? 'results' : 'decide');
     scroll.current?.scrollTo({ y: 0, animated: false });
@@ -142,6 +167,8 @@ export function CooperationMatch({
 
           {view === 'results' && result && read.awaiting ? (
             <ReadPanel game="cooperation" read={read} played={h.length} />
+          ) : view === 'results' && result && resultSlot ? (
+            resultSlot
           ) : view === 'results' && result ? (
             <CoopResults state={state} result={result} newBest={newBest} onRematch={onPlayAgain} onChange={change} onLibrary={() => router.navigate('/games')} read={mystery && read.verdict ? { guess: read.guess, verdict: read.verdict } : null} />
           ) : (

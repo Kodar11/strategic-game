@@ -26,6 +26,8 @@ export interface ArenaMatchRow {
   status: 'active' | 'completed' | 'expired';
   competitionId: string;
   attempt: number;
+  /** A completed match: the player's standing in the week. */
+  standing?: unknown;
 }
 
 export interface CommitRequest {
@@ -77,7 +79,7 @@ export async function handleArenaRequest(userId: string | null, body: unknown, s
     if (!row || !isArenaId(row.game)) return fail(404, 'not_found');
     const game = row.game;
     try {
-      if (b.op === 'get') return { status: 200, body: view(row, row.actions) };
+      if (b.op === 'get') return { status: 200, body: { ...view(row, row.actions), standing: row.standing ?? null } };
 
       if (typeof b.step !== 'number' || !Number.isInteger(b.step) || b.step < 0) return fail(400, 'invalid_request');
       if (b.step < row.actions.length) return { status: 200, body: { ...view(row, row.actions), duplicate: true } };

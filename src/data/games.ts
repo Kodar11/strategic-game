@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { COMPETITION_GAME_IDS, type CompetitionGameId } from '../competition/catalog.ts';
 import type { Difficulty, GameId } from '../games/core.ts';
 import { DataError } from './errors.ts';
 import { type Rpc, type RpcName, call } from './repositories.ts';
@@ -78,6 +79,26 @@ function parse<T>(schema: z.ZodType<T>, raw: unknown, fn: string): T {
 
 const gameId = z.enum(['rps', 'two-thirds', 'split-steal', 'ultimatum', 'stag-hunt']);
 const difficulty = z.enum(['easy', 'medium', 'hard']);
+/** Any of the 23 games that can be Game of the Week (classic or Arena). */
+const anyGame = z.enum(COMPETITION_GAME_IDS as unknown as [CompetitionGameId, ...CompetitionGameId[]]);
+/** Classic difficulties plus the Arena's 'normal'. */
+const anyDifficulty = z.enum(['easy', 'medium', 'normal', 'hard']);
+const state = z.enum(['scheduled', 'active', 'finalizing', 'completed', 'cancelled']);
+const config = z.record(z.string(), z.unknown()).nullable();
+
+/** The caller's position in a competition (overview, after each ranked match). */
+const standingSchema = z.object({
+  attemptsUsed: z.number().int(),
+  maxAttempts: z.number().int().optional(),
+  activeMatchId: z.string().nullable(),
+  best: z.number().int().nullable(),
+  bestLabel: z.string().nullable().optional(),
+  bestMatchId: z.string().nullable().optional(),
+  rank: z.number().int().nullable(),
+  participants: z.number().int().optional(),
+  isBest: z.boolean().optional(),
+});
+export type Standing = z.infer<typeof standingSchema>;
 const outcome = z.enum(['win', 'loss', 'draw']);
 const phase = z.enum(['upcoming', 'active', 'closed', 'finalized']);
 const nickname = z.string().nullable();
@@ -85,10 +106,16 @@ const nickname = z.string().nullable();
 const matchSchema = z.object({
   id: z.string(),
   kind: z.enum(['competition', 'challenge']),
-  game: gameId,
+  game: anyGame,
   bot: z.string(),
-  difficulty,
+  difficulty: anyDifficulty,
   rulesVersion: z.number().int(),
+  // v2: Arena matches are played through the arena-match function (src/data/arena-competition.ts).
+  engine: z.enum(['sql', 'arena']).optional(),
+  config: config.optional(),
+  score: z.number().int().nullable().optional(),
+  scoreLabel: z.string().nullable().optional(),
+  standing: standingSchema.nullable().optional(),
   attempt: z.number().int(),
   rounds: z.array(z.record(z.string(), z.unknown())),
   totalRounds: z.number().int(),
@@ -104,12 +131,24 @@ const matchSchema = z.object({
   duplicate: z.boolean().optional(),
 });
 export type ServerMatch = z.infer<typeof matchSchema>;
+/** A server match of one of the five classic (SQL-engine) games: friend challenges, and their Game of the Week. */
+export type ClassicServerMatch = ServerMatch & { game: GameId; difficulty: Difficulty };
+export const isClassicMatch = (m: ServerMatch): m is ClassicServerMatch => m.engine !== 'arena' && ['rps', 'two-thirds', 'split-steal', 'ultimatum', 'stag-hunt'].includes(m.game) && m.difficulty !== 'normal';
 
 const competitionSchema = z.object({
   id: z.string(),
-  game: gameId,
+  game: anyGame,
   bot: z.string(),
-  difficulty,
+  difficulty: anyDifficulty,
+  // v2 fields (optional, so an older server still parses).
+  number: z.number().int().optional(),
+  engine: z.enum(['sql', 'arena']).optional(),
+  title: z.string().optional(),
+  config: config.optional(),
+  rulesVersion: z.number().int().optional(),
+  deadline: z.number().optional(),
+  state: state.optional(),
+  finalizedAt: z.number().nullable().optional(),
   startsAt: z.number(),
   endsAt: z.number(),
   timezone: z.string(),
@@ -118,29 +157,51 @@ const competitionSchema = z.object({
   winnerBonus: z.number().int(),
   phase,
   participants: z.number().int(),
-  me: z.object({ attemptsUsed: z.number().int(), activeMatchId: z.string().nullable(), best: z.number().int().nullable(), rank: z.number().int().nullable() }).nullable(),
+  me: standingSchema.nullable().optional(),
 });
 export type Competition = z.infer<typeof competitionSchema>;
 
-const winnerSchema = z.object({ nickname, score: z.number().int(), isMe: z.boolean() });
+const winnerSchema = z.object({ nickname, score: z.number().int(), scoreLabel: z.string().nullable().optional(), isMe: z.boolean(), shared: z.boolean().optional(), decidedBy: z.string().optional() });
 
 const overviewSchema = z.object({
   now: z.number(),
   competition: competitionSchema.nullable(),
-  lastWeek: z.object({ id: z.string(), game: gameId, endsAt: z.number(), participants: z.number().int().nullable(), winners: z.array(winnerSchema) }).nullable(),
+  lastWeek: z
+    .object({
+      id: z.string(),
+      number: z.number().int().optional(),
+      game: anyGame,
+      startsAt: z.number().optional(),
+      endsAt: z.number(),
+      participants: z.number().int().nullable(),
+      winners: z.array(winnerSchema),
+      mine: z.object({ rank: z.number().int(), score: z.number().int(), scoreLabel: z.string().nullable(), field: z.number().int() }).nullable().optional(),
+    })
+    .nullable(),
   nickname,
   rules: z.record(z.string(), z.number().int()),
+  next: z.object({ id: z.string(), number: z.number().int(), game: anyGame, startsAt: z.number() }).nullable().optional(),
 });
 export type GamesOverview = z.infer<typeof overviewSchema>;
 
-const weeklyEntry = z.object({ rank: z.number().int(), nickname, score: z.number().int(), points: z.number().int().optional(), isWinner: z.boolean().optional(), isMe: z.boolean() });
+const weeklyEntry = z.object({
+  rank: z.number().int(),
+  nickname,
+  score: z.number().int(),
+  scoreLabel: z.string().nullable().optional(),
+  attemptsUsed: z.number().int().nullable().optional(),
+  points: z.number().int().optional(),
+  isWinner: z.boolean().optional(),
+  isMe: z.boolean(),
+});
 const globalEntry = z.object({ rank: z.number().int(), nickname, points: z.number().int(), wins: z.number().int(), weeks: z.number().int(), isMe: z.boolean() });
 
 const weeklySchema = z.object({
   scope: z.literal('weekly'),
-  competition: z.object({ id: z.string(), game: gameId, bot: z.string(), difficulty, startsAt: z.number(), endsAt: z.number(), phase, participants: z.number().int() }).nullable(),
+  competition: competitionSchema.omit({ me: true, timezone: true, scoringVersion: true, maxAttempts: true, winnerBonus: true }).extend({ maxAttempts: z.number().int().optional() }).nullable(),
   entries: z.array(weeklyEntry),
   me: weeklyEntry.nullable(),
+  myAttempts: z.number().int().nullable().optional(),
   now: z.number().optional(),
 });
 const globalSchema = z.object({ scope: z.literal('global'), entries: z.array(globalEntry), me: globalEntry.nullable(), players: z.number().int() });
@@ -152,9 +213,11 @@ export type GlobalEntry = z.infer<typeof globalEntry>;
 const hallSchema = z.array(
   z.object({
     id: z.string(),
-    game: gameId,
+    number: z.number().int().optional(),
+    game: anyGame,
     bot: z.string(),
-    difficulty,
+    difficulty: anyDifficulty,
+    config: config.optional(),
     startsAt: z.number(),
     endsAt: z.number(),
     participants: z.number().int().nullable(),
@@ -185,7 +248,7 @@ export type ChallengeView = z.infer<typeof challengeSchema>;
 const myGamesSchema = z.object({
   nickname,
   standing: z.object({ rank: z.number().int(), points: z.number().int(), wins: z.number().int(), weeks: z.number().int(), players: z.number().int() }).nullable(),
-  weeks: z.array(z.object({ competitionId: z.string(), game: gameId, endsAt: z.number(), rank: z.number().int(), field: z.number().int(), score: z.number().int(), points: z.number().int(), isWinner: z.boolean() })),
+  weeks: z.array(z.object({ competitionId: z.string(), number: z.number().int().optional(), scoreLabel: z.string().nullable().optional(), game: anyGame, endsAt: z.number(), rank: z.number().int(), field: z.number().int(), score: z.number().int(), points: z.number().int(), isWinner: z.boolean() })),
   // opponent / prediction / insightPoints: Rock, Paper, Scissors reads (…_rps_opponent_reads.sql); absent on older servers.
   practice: z.array(
     z.object({
@@ -204,6 +267,32 @@ const myGamesSchema = z.object({
   matches: z.array(z.object({ id: z.string(), kind: z.enum(['competition', 'challenge']), game: gameId, bot: z.string(), difficulty, playerScore: z.number().int(), botScore: z.number().int(), outcome: outcome.nullable(), competitionId: z.string().nullable(), completedAt: z.number().nullable() })),
 });
 export type MyGames = z.infer<typeof myGamesSchema>;
+
+// v2: one competition in full, the history list and the all-time champions board.
+const championSchema = winnerSchema.extend({ runnerUpScore: z.number().int().nullable().optional() });
+const competitionDetailSchema = z.object({
+  competition: competitionSchema.omit({ me: true }).extend({ cancelReason: z.string().nullable().optional() }),
+  champions: z.array(championSchema),
+  entries: z.array(weeklyEntry),
+  me: weeklyEntry.nullable().optional(),
+  now: z.number(),
+});
+export type CompetitionDetail = z.infer<typeof competitionDetailSchema>;
+
+const historyItem = competitionSchema.omit({ me: true }).extend({
+  champions: z.array(z.object({ nickname, score: z.number().int(), scoreLabel: z.string().nullable().optional(), isMe: z.boolean() })),
+  mine: z.object({ rank: z.number().int(), score: z.number().int(), scoreLabel: z.string().nullable().optional(), field: z.number().int(), isWinner: z.boolean() }).nullable().optional(),
+});
+const historySchema = z.object({ items: z.array(historyItem), next: z.number().nullable() });
+export type CompetitionHistoryPage = z.infer<typeof historySchema>;
+export type CompetitionHistoryItem = z.infer<typeof historyItem>;
+
+const championsBoardSchema = z.object({
+  entries: z.array(z.object({ rank: z.number().int(), nickname, titles: z.number().int(), weeks: z.number().int(), bestRank: z.number().int(), isMe: z.boolean() })),
+  me: z.object({ titles: z.number().int(), weeks: z.number().int(), bestRank: z.number().int() }).nullable(),
+  competitions: z.number().int(),
+});
+export type ChampionsBoard = z.infer<typeof championsBoardSchema>;
 
 export interface PracticeRecord {
   id: string;
@@ -236,6 +325,10 @@ export interface GamesRepository {
   getChallenge(token: string): Promise<ChallengeView>;
   recordPractice(r: PracticeRecord): Promise<void>;
   myGames(): Promise<MyGames>;
+  competition(competitionId: string): Promise<CompetitionDetail>;
+  /** Past competitions, newest first; `before` is the `next` of the previous page. */
+  competitionHistory(before?: number | null): Promise<CompetitionHistoryPage>;
+  champions(): Promise<ChampionsBoard>;
 }
 
 export function gamesRepository(rpc: Rpc): GamesRepository {
@@ -255,5 +348,8 @@ export function gamesRepository(rpc: Rpc): GamesRepository {
       await games(rpc, 'record_practice_game', { ...r });
     },
     myGames: async () => parse(myGamesSchema, await games(rpc, 'get_my_games'), 'get_my_games'),
+    competition: async (competitionId) => parse(competitionDetailSchema, await games(rpc, 'get_competition', { competitionId }), 'get_competition'),
+    competitionHistory: async (before) => parse(historySchema, await games(rpc, 'get_competition_history', { limit: 20, ...(before ? { before } : {}) }), 'get_competition_history'),
+    champions: async () => parse(championsBoardSchema, await games(rpc, 'get_champions_leaderboard', {}), 'get_champions_leaderboard'),
   };
 }

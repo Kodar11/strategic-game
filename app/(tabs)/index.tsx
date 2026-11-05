@@ -21,6 +21,7 @@ import { allAssessments, type Assessment, getAssessment, moduleCheckpoint, split
 import { type AssessmentRun, finalUnlocked } from '@/src/features/assessments/scoring';
 import { useDaily } from '@/src/data/daily-session';
 import { formatDay, monthKey, monthOf } from '@/src/features/daily/dates';
+import { DIFFICULTY_NAME } from '@/src/features/daily/content';
 import { SignInInvite } from '@/src/features/account/SignInInvite';
 import { allScenarios } from '@/src/features/scenarios';
 import { useIsGuest } from '@/src/components/auth/SignInRequired';
@@ -221,27 +222,57 @@ function DailyRow() {
   );
 
   const data = month?.status === 'ready' && !guest ? month.data : null;
-  const answered = !!data?.attempts.get(formatDay(today));
-  const open = !answered && !!data?.entries.get(formatDay(today));
-  const status = guest ? 'One decision a day · sign in to take part' : !data ? 'One decision a day' :answered ? 'Completed today · review your answer' : open ? 'Take today’s challenge' : 'No challenge today · past ones stay open';
+  const attempt = data?.attempts.get(formatDay(today)) ?? null;
+  const entry = data?.entries.get(formatDay(today));
+  const challenge = entry?.ok ? entry.challenge : null;
+  const answered = !!attempt;
+  const open = !answered && !!challenge;
+  const status = guest ? 'One decision a day · sign in to take part' : !data ? 'One decision a day' : answered ? 'Completed today' : open ? 'Start today’s challenge' : 'No challenge today · past ones stay open';
+  const scored = attempt && attempt.score !== null && attempt.score !== undefined;
 
   return (
-    <Pressable
-      onPress={() => router.push('/daily')}
-      accessibilityRole="button"
-      accessibilityLabel={`Daily challenge. ${status}.${data ? '' : ' One short decision a day, with a calendar of past challenges.'}`}
-      style={({ pressed }) => [styles.practice, pressed && { backgroundColor: colors.surfaceHigh }]}>
-      <View style={[styles.practiceIcon, { backgroundColor: colors.insightSoft }]}>
-        <CalendarDays size={18} color={colors.insight} strokeWidth={2.2} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <AppText variant="bodyStrong">Daily challenge</AppText>
-        <AppText variant="caption" color={open ? colors.insight : answered ? colors.success : colors.textMuted}>
-          {status}
-        </AppText>
-      </View>
-      {answered ? <CircleCheck size={18} color={colors.success} strokeWidth={2.4} /> : <ArrowRight size={18} color={colors.textMuted} />}
-    </Pressable>
+    <View style={styles.dailyCard}>
+      <Pressable
+        onPress={() => router.push('/daily')}
+        accessibilityRole="button"
+        accessibilityLabel={`Daily challenge. ${challenge ? `${challenge.title}. ` : ''}${status}.${scored ? ` Your score ${attempt!.score}.` : ''}`}
+        style={({ pressed }) => [{ gap: space.sm }, pressed && { opacity: 0.85 }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+          <View style={[styles.practiceIcon, { backgroundColor: colors.insightSoft }]}>
+            <CalendarDays size={18} color={colors.insight} strokeWidth={2.2} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <AppText variant="overline" color={colors.insight}>
+              Daily challenge
+            </AppText>
+            <AppText variant="bodyStrong" numberOfLines={2}>
+              {challenge?.title ?? attempt?.result.title ?? 'One short strategic decision'}
+            </AppText>
+          </View>
+          {answered ? <CircleCheck size={20} color={colors.success} strokeWidth={2.4} /> : <ArrowRight size={18} color={colors.textMuted} />}
+        </View>
+        {challenge && !answered ? (
+          <AppText variant="small" color={colors.textBody} numberOfLines={2}>
+            {challenge.intro}
+          </AppText>
+        ) : null}
+        <View style={{ flexDirection: 'row', gap: space.xs, flexWrap: 'wrap' }}>
+          {challenge ? <Badge label={DIFFICULTY_NAME[challenge.difficulty]} /> : null}
+          {challenge ? <Badge label={`~${challenge.minutes ?? 2} min`} /> : null}
+          {scored ? <Badge label={`Score ${attempt!.score}/100`} tone={attempt!.score === 100 ? 'success' : 'amber'} /> : answered ? <Badge label="Taken part" tone="success" /> : null}
+          <AppText variant="caption" color={open ? colors.insight : answered ? colors.success : colors.textMuted} style={{ alignSelf: 'center' }}>
+            {status}
+          </AppText>
+        </View>
+      </Pressable>
+      {data ? (
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          {answered ? <Button label="Explanation" variant="secondary" compact onPress={() => router.push({ pathname: '/daily/play', params: { date: formatDay(today) } })} style={{ flex: 1 }} /> : null}
+          <Button label="Leaderboard" variant={answered ? 'secondary' : 'ghost'} compact onPress={() => router.push('/daily/leaderboard')} style={{ flex: 1 }} />
+          <Button label="Past days" variant="ghost" compact onPress={() => router.push('/daily/history')} />
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -517,6 +548,7 @@ const styles = StyleSheet.create({
   },
   final: { borderStyle: 'solid', borderColor: 'rgba(253,186,116,0.4)', padding: space.lg },
   assessmentDone: { borderStyle: 'solid', borderColor: 'rgba(74,222,128,0.35)' },
+  dailyCard: { gap: space.sm, padding: space.md, borderRadius: radius.lg, borderWidth: 1, borderColor: 'rgba(253,186,116,0.35)', backgroundColor: colors.surface },
   practiceIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: space.sm },
   card: { backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },

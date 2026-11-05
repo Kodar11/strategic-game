@@ -1,5 +1,5 @@
 import type { Confidence } from '../components/lesson/prediction-state.ts';
-import { type DailyAttempt, type DailyRange, type DailyResult, type DailyReveal, attemptSchema, parseRange, resultSchema, revealSchema } from '../features/daily/content.ts';
+import { type DailyAttempt, type DailyBoard, type DailyHistoryPage, type DailyRange, type DailyResult, type DailyReveal, attemptSchema, dailyBoardSchema, dailyHistorySchema, parseRange, resultSchema, revealSchema } from '../features/daily/content.ts';
 import { DataError } from './errors.ts';
 import { type Rpc, call } from './repositories.ts';
 
@@ -9,6 +9,8 @@ import { type Rpc, call } from './repositories.ts';
  * - submit_daily_challenge(...)        today's official answer, graded on the server; idempotent per learner and day
  * - check_daily_practice(...)          grade a practice answer without recording it (past days, or after answering)
  * - get_daily_reveal({challengeId})    model answer, explanation and takeaway (same rule as practice)
+ * - get_daily_leaderboard({date?})     the day's official ranking: score, then calibration, then earliest (nicknames only)
+ * - get_daily_history({before, limit}) past challenges with the caller's result, paginated
  *
  * These never touch lesson progress, scenario runs or the learning record.
  */
@@ -57,6 +59,10 @@ export interface DailyRepository {
   submit(req: SubmitRequest): Promise<{ status: 'recorded' | 'existing'; attempt: DailyAttempt }>;
   practice(req: Omit<SubmitRequest, 'confidence'>): Promise<DailyResult>;
   reveal(challengeId: string): Promise<DailyReveal>;
+  /** The day's official leaderboard (default today). */
+  leaderboard(date?: string): Promise<DailyBoard>;
+  /** Past challenges, newest first, `limit` at a time before `before` (YYYY-MM-DD). */
+  history(before?: string, limit?: number): Promise<DailyHistoryPage>;
 }
 
 export function dailyRepository(rpc: Rpc): DailyRepository {
@@ -80,6 +86,16 @@ export function dailyRepository(rpc: Rpc): DailyRepository {
     async reveal(challengeId) {
       const r = revealSchema.safeParse(await daily(rpc, 'get_daily_reveal', { challengeId }));
       if (!r.success) throw new DataError('server', 'get_daily_reveal returned an unexpected result');
+      return r.data;
+    },
+    async leaderboard(date) {
+      const r = dailyBoardSchema.safeParse(await daily(rpc, 'get_daily_leaderboard', date ? { date } : {}));
+      if (!r.success) throw new DataError('server', 'get_daily_leaderboard returned an unexpected result');
+      return r.data;
+    },
+    async history(before, limit = 20) {
+      const r = dailyHistorySchema.safeParse(await daily(rpc, 'get_daily_history', { ...(before ? { before } : {}), limit }));
+      if (!r.success) throw new DataError('server', 'get_daily_history returned an unexpected result');
       return r.data;
     },
   };

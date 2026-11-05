@@ -60,6 +60,19 @@ export function utcToday(now: number = Date.now()): Day {
   return fromDayNumber(Math.floor(now / MS_PER_DAY));
 }
 
+/**
+ * The product timezone of the Daily Challenge (public.competition_settings.daily_timezone on the server). India has
+ * no daylight saving, so the offset is fixed. The server's `today` always wins once it has answered; this is only the
+ * first guess before then.
+ */
+export const DAILY_TIMEZONE = 'Asia/Kolkata';
+export const DAILY_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+
+/** Today in the product timezone (India): the day turns over at 00:00 IST, 18:30 UTC. */
+export function productToday(now: number = Date.now()): Day {
+  return utcToday(now + DAILY_OFFSET_MS);
+}
+
 export function monthOf(k: Day): Month {
   return { y: k.y, m: k.m };
 }

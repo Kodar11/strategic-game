@@ -908,7 +908,9 @@ create or replace function public.arena_match_load(p_match uuid, p_user uuid) re
 language sql stable security definer set search_path = '' as $$
   select jsonb_build_object('id', m.id, 'game', m.game_id, 'config', m.config, 'seed', m.seed, 'actions', m.actions,
     'status', case when m.status = 'active' and (now() >= game_engine.deadline(c) or c.status <> 'scheduled') then 'expired' else m.status end,
-    'competitionId', m.competition_id, 'attempt', m.attempt)
+    'competitionId', m.competition_id, 'attempt', m.attempt,
+    'standing', case when m.status = 'completed' then
+      game_engine.standing_of(c, p_user) || jsonb_build_object('isBest', (game_engine.standing_of(c, p_user) ->> 'bestMatchId') = m.id::text) end)
   from public.game_matches m join public.game_competitions c on c.id = m.competition_id
   where m.id = p_match and m.user_id = p_user and m.config ? 'opponent'
 $$;

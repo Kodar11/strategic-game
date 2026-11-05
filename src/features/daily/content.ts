@@ -28,7 +28,21 @@ interface DailyBase {
   skill?: SkillArea;
   basis: EvaluationBasis;
   lesson?: string;
+  format?: DailyFormat;
+  /** Estimated minutes. */
+  minutes?: number;
+  /** 'scenario': adapted from a lesson scenario; 'manual': written for the Daily Challenge. */
+  source?: 'manual' | 'scenario';
+  /** Whether the challenge has a single right answer and so a score (false: taken part, never ranked). */
+  scored?: boolean;
+  /** The concept, once the day is past or answered. */
+  concept?: string;
+  sourceScenario?: string;
 }
+
+export type DailyFormat = 'prediction' | 'decision' | 'reasoning' | 'outcome';
+export const FORMAT_LABEL: Record<DailyFormat, string> = { prediction: 'Prediction', decision: 'Decision', reasoning: 'Reasoning', outcome: 'Outcome analysis' };
+export const DIFFICULTY_NAME: Record<1 | 2 | 3, string> = { 1: 'Easy', 2: 'Medium', 3: 'Hard' };
 
 export type DailyChallenge = DailyBase &
   ({ interaction: 'choice'; config: ChoiceConfig } | { interaction: 'number'; config: NumberConfig } | { interaction: 'scenario'; config: ScenarioConfig });
@@ -46,6 +60,10 @@ export interface DailyResult {
   takeaway: string;
   title: string;
   version: number;
+  /** After answering: what it demonstrates and where to learn more (when the content says). */
+  concept?: string;
+  lesson?: string;
+  score?: number | null;
 }
 
 export interface DailyAttempt {
@@ -61,6 +79,8 @@ export interface DailyAttempt {
   lesson: string | null;
   result: DailyResult;
   submittedAt: number;
+  score?: number | null;
+  calibration?: number | null;
 }
 
 /** One official attempt, without its answer and result: what summaries and the profile need. */
@@ -102,6 +122,14 @@ const baseSchema = z.object({
   skill: skill.optional(),
   basis,
   lesson: z.string().optional(),
+  // v2 (…_daily_challenge_v2.sql). Optional, so older servers still parse. The source details arrive only once the
+  // day is past or the caller has answered.
+  format: z.enum(['prediction', 'decision', 'reasoning', 'outcome']).optional(),
+  minutes: z.number().int().min(1).max(10).optional(),
+  source: z.enum(['manual', 'scenario']).optional(),
+  scored: z.boolean().optional(),
+  concept: z.string().optional(),
+  sourceScenario: z.string().optional(),
 });
 
 export const resultSchema = z.object({
@@ -114,6 +142,9 @@ export const resultSchema = z.object({
   takeaway: z.string().min(1),
   title: z.string(),
   version: z.number().int().positive(),
+  concept: z.string().optional(),
+  lesson: z.string().optional(),
+  score: z.number().int().nullable().optional(),
 });
 
 const historySchema = z.object({
@@ -129,7 +160,13 @@ const historySchema = z.object({
   submittedAt: z.number().int().nonnegative(),
 });
 
-export const attemptSchema = historySchema.extend({ answer: z.unknown(), result: resultSchema });
+export const attemptSchema = historySchema.extend({
+  answer: z.unknown(),
+  result: resultSchema,
+  // Official score 0–100 and calibration (v2); null when the challenge isn't scored.
+  score: z.number().int().nullable().optional(),
+  calibration: z.number().int().nullable().optional(),
+});
 
 export const revealSchema = z.object({ modelAnswer: z.string().min(1), explanation: z.array(z.string()).min(1), takeaway: z.string().min(1) });
 
@@ -182,3 +219,38 @@ export function parseRange(raw: unknown): DailyRange | null {
   });
   return { today: r.data.today, timezone: r.data.timezone, entries, attempts, history };
 }
+
+// ── Leaderboard and history (v2) ─────────────────────────────────────────────
+
+const boardEntry = z.object({ rank: z.number().int().nullable(), nickname: z.string().nullable(), score: z.number().int().nullable(), calibration: z.number().int().nullable(), isMe: z.boolean() });
+export const dailyBoardSchema = z.object({
+  date: day,
+  today: day,
+  challenge: z.object({ id: z.string(), title: z.string(), difficulty: z.number().int(), scored: z.boolean(), format: z.string().nullable().optional() }).nullable(),
+  entries: z.array(boardEntry),
+  me: boardEntry.extend({ evaluation: evaluation.optional() }).nullable(),
+  participants: z.number().int(),
+  status: z.enum(['completed', 'not_attempted', 'signed_out']).optional(),
+});
+export type DailyBoard = z.infer<typeof dailyBoardSchema>;
+
+export const dailyHistorySchema = z.object({
+  items: z.array(
+    z.object({
+      id: z.string(),
+      date: day,
+      title: z.string(),
+      concept: z.string().optional(),
+      format: z.string().optional(),
+      difficulty: z.number().int(),
+      lesson: z.string().optional(),
+      source: z.string().optional(),
+      scored: z.boolean().optional(),
+      participants: z.number().int(),
+      mine: z.object({ evaluation, score: z.number().int().nullable().optional(), rank: z.number().int().nullable().optional() }).optional(),
+    }),
+  ),
+  today: day,
+  next: z.string().nullable(),
+});
+export type DailyHistoryPage = z.infer<typeof dailyHistorySchema>;

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { gamesRepo, useGames } from '@/src/data/games-session';
-import { GameError, type ServerMatch } from '@/src/data/games';
+import { type ClassicServerMatch, GameError, type ServerMatch } from '@/src/data/games';
 import { toDataError } from '@/src/data/errors';
 import { type Difficulty, type GameId, type Outcome, type Totals, randomSeed } from '@/src/games/core';
 import { engineFor } from '@/src/games/registry';
@@ -119,8 +119,8 @@ export function usePracticeMatch(game: GameId, choice: string | null, difficulty
 }
 
 /** A server-run match (competition or challenge), starting from what start_match returned. */
-export function useServerMatch(initial: ServerMatch): MatchView {
-  const [match, setMatch] = useState(initial);
+export function useServerMatch(initial: ClassicServerMatch): MatchView {
+  const [match, setMatch] = useState<ClassicServerMatch>(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sending = useRef(false);
@@ -134,7 +134,7 @@ export function useServerMatch(initial: ServerMatch): MatchView {
       gamesRepo
         .playRound(match.id, match.rounds.length, move)
         .then((m) => {
-          setMatch(m);
+          setMatch(m as ClassicServerMatch);
           if (m.status !== 'active') {
             // Standings changed: refresh the boards next time they're shown.
             void useGames.getState().loadOverview({ force: true });
@@ -147,7 +147,7 @@ export function useServerMatch(initial: ServerMatch): MatchView {
           // Out of step (another device, a retry): show the match as the server has it.
           if (e instanceof GameError && (e.refusal === 'stale' || e.refusal === 'finished' || e.refusal === 'closed')) {
             try {
-              setMatch(await gamesRepo.getMatch(match.id));
+              setMatch((await gamesRepo.getMatch(match.id)) as ClassicServerMatch);
             } catch {
               // Keep the error on screen.
             }

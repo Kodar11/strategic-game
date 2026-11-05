@@ -36,6 +36,11 @@ export interface Database {
       record_arena_matches: { Args: { request: Json }; Returns: Json };
       get_my_arena_matches: { Args: Record<string, never>; Returns: Json };
       finalize_due_competitions: { Args: Record<string, never>; Returns: number };
+      get_daily_leaderboard: { Args: { request: Json }; Returns: Json };
+      get_daily_history: { Args: { request: Json }; Returns: Json };
+      get_competition: { Args: { request: Json }; Returns: Json };
+      get_competition_history: { Args: { request: Json }; Returns: Json };
+      get_champions_leaderboard: { Args: { request: Json }; Returns: Json };
     };
     Enums: { content_status: 'draft' | 'published' };
     CompositeTypes: Record<string, never>;

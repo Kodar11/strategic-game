@@ -44,7 +44,12 @@ export type RpcName =
   | 'get_my_games'
   | 'delete_my_account'
   | 'record_arena_matches'
-  | 'get_my_arena_matches';
+  | 'get_my_arena_matches'
+  | 'get_daily_leaderboard'
+  | 'get_daily_history'
+  | 'get_competition'
+  | 'get_competition_history'
+  | 'get_champions_leaderboard';
 
 export interface Rpc {
   /** Resolve with the function's JSON result, or throw the database / network error. */

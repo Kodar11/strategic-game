@@ -1,6 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/src/components/ui/AppText';
@@ -12,9 +12,9 @@ import { Segmented } from '@/src/components/ui/Segmented';
 import type { GlobalEntry, HallOfFameEntry, WeeklyBoard, WeeklyEntry } from '@/src/data/games';
 import { useGames } from '@/src/data/games-session';
 import type { Loadable } from '@/src/features/games/store';
-import { DIFFICULTY_LABEL, GAMES, personality } from '@/src/games/catalog';
 import { timeLeft, weekLabel } from '@/src/games/competition';
-import { GameArt } from '@/src/features/games/ui/GameArt';
+import { competitionGame, configSummary } from '@/src/competition/catalog';
+import { CompetitionArt } from '@/src/features/competition/CompetitionArt';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
 type Tab = 'weekly' | 'global' | 'hall';
@@ -123,21 +123,24 @@ function Weekly({ data }: { data: WeeklyBoard }) {
   return (
     <View style={{ gap: space.md }}>
       <View style={[styles.banner, c.phase === 'finalized' && { borderColor: colors.border, backgroundColor: colors.surface }]}>
-        <GameArt game={c.game} size={52} />
+        <CompetitionArt game={c.game} size={52} />
         <View style={{ flex: 1, gap: 2 }}>
           <AppText variant="caption" color={c.phase === 'finalized' ? colors.textMuted : colors.insight}>
-            {c.phase === 'finalized' ? 'Finished week' : 'Current competition'} · {weekLabel(c.startsAt, c.endsAt)}
+            {c.phase === 'finalized' ? 'Finished week' : 'Current competition'}
+            {c.number ? ` #${c.number}` : ''} · {weekLabel(c.startsAt, c.endsAt)}
           </AppText>
-          <AppText variant="bodyStrong">{GAMES[c.game].title}</AppText>
+          <AppText variant="bodyStrong">{competitionGame(c.game).title}</AppText>
           <AppText variant="caption" color={colors.textMuted}>
-            vs {personality(c.game, c.bot)?.name ?? c.bot} · {DIFFICULTY_LABEL[c.difficulty]} · {c.participants} player{c.participants === 1 ? '' : 's'}
+            {configSummary(c.game, c.bot, c.difficulty, c.config)} · {c.participants} player{c.participants === 1 ? '' : 's'}
           </AppText>
         </View>
         <Badge label={status} tone={c.phase === 'active' ? 'amber' : 'neutral'} />
       </View>
       <AppText variant="caption" color={colors.textMuted}>
-        Best completed match per player. Equal scores: whoever got there first ranks higher.
+        Each player’s best completed ranked match counts (up to {c.maxAttempts ?? 3} a week). {competitionGame(c.game).scoring}
+        {competitionGame(c.game).tieBreak ? ` Equal scores: ${competitionGame(c.game).tieBreak!.charAt(0).toLowerCase()}${competitionGame(c.game).tieBreak!.slice(1)} Then whoever got there first.` : ' Equal scores: whoever got there first ranks higher.'}
       </AppText>
+      {c.phase === 'finalized' ? <Button label="Final results and champion" variant="secondary" compact onPress={() => router.push({ pathname: '/competitions/[id]', params: { id: c.id } })} style={{ alignSelf: 'flex-start' }} /> : null}
       <Rows
         entries={data.entries}
         me={data.me}
@@ -188,12 +191,22 @@ function RankCell({ rank }: { rank: number }) {
 function WeeklyRow({ e }: { e: WeeklyEntry }) {
   const name = e.nickname ?? ANON;
   return (
-    <View style={[styles.row, e.isMe && styles.rowMe]} accessible accessibilityLabel={`Rank ${e.rank}: ${name}${e.isMe ? ' (you)' : ''}, score ${e.score}${e.isWinner ? ', winner' : ''}${e.points !== undefined ? `, ${e.points} points` : ''}.`}>
+    <View
+      style={[styles.row, e.rank === 1 && styles.rowLeader, e.isMe && styles.rowMe]}
+      accessible
+      accessibilityLabel={`Rank ${e.rank}: ${name}${e.isMe ? ' (you)' : ''}, best ${e.scoreLabel ?? e.score}${e.attemptsUsed ? `, ${e.attemptsUsed} ranked attempts used` : ''}${e.isWinner ? ', winner' : ''}${e.points !== undefined ? `, ${e.points} points` : ''}.`}>
       <RankCell rank={e.rank} />
-      <AppText variant="small" weight={e.isMe ? 'semibold' : 'regular'} style={{ flex: 1 }} numberOfLines={1}>
-        {name}
-        {e.isMe ? ' (you)' : ''}
-      </AppText>
+      <View style={{ flex: 1 }}>
+        <AppText variant="small" weight={e.isMe ? 'semibold' : 'regular'} numberOfLines={1}>
+          {name}
+          {e.isMe ? ' (you)' : ''}
+        </AppText>
+        {e.scoreLabel || e.attemptsUsed ? (
+          <AppText variant="caption" color={colors.textMuted} numberOfLines={1}>
+            {[e.scoreLabel, e.attemptsUsed ? `${e.attemptsUsed} ranked ${e.attemptsUsed === 1 ? "attempt" : "attempts"}` : null].filter(Boolean).join(" · ")}
+          </AppText>
+        ) : null}
+      </View>
       {e.isWinner ? <Crown size={16} color={colors.insight} /> : null}
       {e.points !== undefined ? (
         <AppText variant="caption" color={colors.textMuted} tabular>
@@ -236,11 +249,17 @@ function Hall({ entries }: { entries: HallOfFameEntry[] }) {
       {entries.map((h) => {
         const names = h.winners.map((w) => `${w.nickname ?? ANON}${w.isMe ? ' (you)' : ''}`).join(' & ');
         return (
-          <View key={h.id} style={styles.hall} accessible accessibilityLabel={`${weekLabel(h.startsAt, h.endsAt)}, ${GAMES[h.game].title}. ${h.winners.length ? `Winner ${names} with ${h.winners[0].score}` : 'No entries'}. ${h.participants ?? 0} players.`}>
-            <GameArt game={h.game} size={48} />
+          <Pressable
+            key={h.id}
+            onPress={() => router.push({ pathname: '/competitions/[id]', params: { id: h.id } })}
+            style={({ pressed }) => [styles.hall, pressed && { backgroundColor: colors.surfaceHigh }]}
+            accessibilityRole="button"
+            accessibilityLabel={`${weekLabel(h.startsAt, h.endsAt)}, ${competitionGame(h.game).title}. ${h.winners.length ? `${h.winners.length > 1 ? 'Shared title' : 'Winner'} ${names} with ${h.winners[0].scoreLabel ?? h.winners[0].score}` : 'No entries'}. ${h.participants ?? 0} players. Open the final results.`}>
+            <CompetitionArt game={h.game} size={48} />
             <View style={{ flex: 1, gap: 2 }}>
               <AppText variant="caption" color={colors.textMuted}>
-                {weekLabel(h.startsAt, h.endsAt)} · {GAMES[h.game].title}
+                {h.number ? `#${h.number} · ` : ''}
+                {weekLabel(h.startsAt, h.endsAt)} · {competitionGame(h.game).title}
               </AppText>
               {h.winners.length ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -255,11 +274,11 @@ function Hall({ entries }: { entries: HallOfFameEntry[] }) {
                 </AppText>
               )}
               <AppText variant="caption" color={colors.textMuted}>
-                {h.winners.length ? `Winning score ${h.winners[0].score}` : ''}
-                {h.runnerUpScore !== null ? ` · runner-up ${h.runnerUpScore}` : ''} · {h.participants ?? 0} player{h.participants === 1 ? '' : 's'} · vs {personality(h.game, h.bot)?.name ?? h.bot}
+                {h.winners.length ? `Winning score ${h.winners[0].scoreLabel ?? h.winners[0].score}` : ''}
+                {h.runnerUpScore !== null ? ` · runner-up ${h.runnerUpScore}` : ''} · {h.participants ?? 0} player{h.participants === 1 ? '' : 's'} · {configSummary(h.game, h.bot, h.difficulty, h.config)}
               </AppText>
             </View>
-          </View>
+          </Pressable>
         );
       })}
     </View>
@@ -272,5 +291,6 @@ const styles = StyleSheet.create({
   banner: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(253,186,116,0.35)', backgroundColor: colors.bgRaised },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 48, paddingHorizontal: space.sm, paddingVertical: space.xs, borderRadius: radius.md, backgroundColor: colors.surface },
   rowMe: { borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  rowLeader: { borderWidth: 1, borderColor: 'rgba(253,186,116,0.45)' },
   hall: { flexDirection: 'row', gap: space.md, padding: space.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
 });

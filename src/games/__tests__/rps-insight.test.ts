@@ -213,6 +213,9 @@ describe('opponent history', () => {
       weekly: no,
       global: no,
       hallOfFame: no,
+      competition: no,
+      competitionHistory: no,
+      champions: no,
       createChallenge: no,
       getChallenge: no,
       recordPractice: async (r) => {
