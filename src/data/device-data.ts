@@ -21,7 +21,21 @@ import { GUEST_PROGRESS_KEY } from './guest-progress';
  *   intro" flag is reset separately after deletion so the next player gets the welcome.
  */
 export const DEVICE_DATA = [
-  { key: 'strategic-game/outbox', scope: 'account', what: 'Progress changes waiting to be sent to the server (owner-scoped)' },
+  { key: 'strategic-game/outbox', scope: 'account', what: 'Legacy: progress changes waiting to be sent, from builds before the local database; moved into it once at start-up, then removed' },
+  // ── The local database (src/data/local): SQLite `tactiqo.db` on Android / iOS; the same data as the four
+  // key-value items below on web (and on a phone where SQLite can't be opened). Every row carries its owner's user id.
+  // - sync_queue (progress operations, practice games): an explicit sign-out (after the player confirmed losing
+  //   anything unsent) and account deletion remove the owner's rows. A session that ends by itself (revoked, expired)
+  //   keeps them, scoped to that user and never shown or sent for anyone else, so their work reaches the server if
+  //   they sign in again; rows left 90 days are purged.
+  // - progress_snapshots, game_history: account data — removed with the account's data in every case, and at start-up
+  //   for anyone but the current owner.
+  // - content_cache: published content (not personal) — kept.
+  { key: 'tactiqo.db', scope: 'account', what: 'Local database: queued writes, progress snapshot and practice-game history per user id; the published content cache' },
+  { key: 'tactiqo/local-queue/v1', scope: 'account', what: 'Web / fallback: writes waiting for the server, one entry per operation, per user id' },
+  { key: 'tactiqo/local-snapshots/v1', scope: 'account', what: 'Web / fallback: each account’s last known progress on this device' },
+  { key: 'tactiqo/local-games/v1', scope: 'account', what: 'Web / fallback: practice games finished on this device, per user id' },
+  { key: 'tactiqo/local-content/v1/', scope: 'device', what: 'Web / fallback: the published content cache, one key per document (`catalog`, `categories`); not personal' },
   { key: ARENA_UPLOADS_KEY, scope: 'account', what: 'Arena match summaries waiting to be sent to the server (owner-scoped)' },
   { key: 'tactiqo/guest-progress/v1', scope: 'account', what: 'A guest’s lesson progress (handed to the account on sign-in)' },
   { key: ARENA_RECORDS_KEY, scope: 'account', what: 'Arena records: results per game and opponent, recent matches, reads, last setup, coach tips seen' },

@@ -27,6 +27,7 @@ export type RpcName =
   | 'get_lesson_categories'
   | 'get_my_progress'
   | 'apply_progress_changes'
+  | 'apply_progress_ops'
   | 'get_daily_challenges'
   | 'submit_daily_challenge'
   | 'check_daily_practice'
@@ -59,6 +60,8 @@ export interface Rpc {
 export interface ContentRepository {
   /** The published catalog, validated and joined with this app's engines. Throws a DataError otherwise. */
   fetchCatalog(): Promise<Catalog>;
+  /** The published content document as the server sent it, unvalidated (for the local content cache). */
+  fetchDocument(): Promise<unknown>;
 }
 
 export interface ProgressRepository {
@@ -66,6 +69,11 @@ export interface ProgressRepository {
   load(): Promise<ProgressData>;
   /** Apply one batch in one transaction. Idempotent. */
   apply(changes: ProgressChanges): Promise<{ skipped: number }>;
+  /**
+   * Apply queued operations in order, in one transaction, each at most once: the server remembers the ids it applied
+   * (apply_progress_ops). A server without the function yet answers with PGRST202 (see session.ts's fallback).
+   */
+  applyOps(ops: readonly { id: string; changes: ProgressChanges }[]): Promise<{ applied: string[]; duplicates: string[]; skipped: number }>;
 }
 
 export async function call(rpc: Rpc, fn: RpcName, args?: Record<string, unknown>): Promise<unknown> {
@@ -84,12 +92,15 @@ export function contentRepository(rpc: Rpc): ContentRepository {
       if (!built.ok) throw new DataError('content', built.problems.join('\n'));
       return built.catalog;
     },
+    fetchDocument: () => call(rpc, 'get_published_content'),
   };
 }
 
 export interface CategoryRepository {
   /** Categories checked against the installed lessons. Throws a DataError when the document is malformed. */
   fetchCategories(lessons: readonly LessonMeta[]): Promise<{ index: CategoryIndex; warnings: string[] }>;
+  /** The categories document as the server sent it, unvalidated (for the local content cache). */
+  fetchDocument(): Promise<unknown>;
 }
 
 export function categoryRepository(rpc: Rpc): CategoryRepository {
@@ -99,10 +110,12 @@ export function categoryRepository(rpc: Rpc): CategoryRepository {
       if (!built.ok) throw new DataError('content', built.problems.join('\n'));
       return { index: built.index, warnings: built.warnings };
     },
+    fetchDocument: () => call(rpc, 'get_lesson_categories'),
   };
 }
 
-const applyResult =z.object({ ok: z.literal(true), skipped: z.number().int().nonnegative() });
+const applyResult = z.object({ ok: z.literal(true), skipped: z.number().int().nonnegative() });
+const applyOpsResult = z.object({ ok: z.literal(true), applied: z.array(z.string()), duplicates: z.array(z.string()), skipped: z.number().int().nonnegative() });
 
 export function progressRepository(rpc: Rpc): ProgressRepository {
   return {
@@ -116,6 +129,12 @@ export function progressRepository(rpc: Rpc): ProgressRepository {
       const r = applyResult.safeParse(raw);
       if (!r.success) throw new DataError('server', 'apply_progress_changes returned an unexpected result');
       return { skipped: r.data.skipped };
+    },
+    async applyOps(ops) {
+      const raw = await call(rpc, 'apply_progress_ops', { ops });
+      const r = applyOpsResult.safeParse(raw);
+      if (!r.success) throw new DataError('server', 'apply_progress_ops returned an unexpected result');
+      return r.data;
     },
   };
 }

@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 import { useAuth } from '@/src/auth/store';
 import { useSyncStatus } from '@/src/data/session';
+import { isOffline } from '@/src/data/sync/connectivity';
 import { useProgress } from '@/src/store/progress';
 import type { UsageConsent } from '@/src/store/settings';
 import { resolveConfig } from './config';
@@ -110,7 +111,8 @@ function followSync(): void {
     if (s.state === 'retrying' && retryingSince === null) {
       retryingSince = Date.now();
       stuckTimer = setTimeout(() => {
-        if (useSyncStatus.getState().state === 'retrying') {
+        // Retrying while the device is offline is the player's situation, not a fault.
+        if (useSyncStatus.getState().state === 'retrying' && !isOffline()) {
           telemetry.reportError('sync_failed', new Error('Progress sync has been retrying for 5 minutes'), { sync_phase: 'stuck', stuck_minutes: 5 }, 'warning');
         }
       }, STUCK_MS);

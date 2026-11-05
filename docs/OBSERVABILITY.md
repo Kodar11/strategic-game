@@ -122,7 +122,7 @@ Full definitions, triggers and property types are in `src/observability/events.t
 | Stories | `story_started`, `story_finished` | Story screen open; ending reached (stories store) |
 | Social | `challenge_link_created`, `challenge_link_opened`, `nickname_set` | Challenge create, link open, nickname save |
 | Account | `sign_in_started`, `sign_in_finished`, `sign_in_invite_dismissed`, `signed_out`, `account_deleted` | `SignInPanel`, `src/data/session.ts`, invite, Settings toggle |
-| Performance | `app_ready` | Cold start finished: `total_ms`, `catalog_ms`, `categories_ms`, result |
+| Performance | `app_ready` | Cold start finished: `total_ms`, `catalog_ms`, `categories_ms`, result, `content_source` (cache / network / bundled), `session_verified` |
 | Billing (reserved) | `paywall_viewed`, `plan_selected`, `checkout_started`, `checkout_result`, `purchase_restored` | **Refused until billing exists.** Revenue must come from RevenueCat's server integration, not the app |
 | SDK | `Application Installed/Updated/Opened/Became Active/Backgrounded`, `$screen`, `$exception` | Lifecycle, the screen allow-list, errors |
 
@@ -161,7 +161,8 @@ Full definitions, triggers and property types are in `src/observability/events.t
 | Kind | Reported when | Not reported |
 |---|---|---|
 | `startup_failed` | The start-up error screen, except for no connection | Offline start (that's `app_ready` with `result: error`) |
-| `sync_failed` | Progress sync refused for good, or retrying for over 5 minutes | Ordinary retries |
+| `sync_failed` | Progress sync refused for good, or retrying for over 5 minutes while online; a practice game refused (`sync_phase: practice_refused`) | Ordinary retries, and retries while offline |
+| `local_db_failed` | The on-device SQLite database could not be opened or migrated (the app falls back to key-value storage) | — |
 | `rpc_failed` | Missing function or table (PGRST2xx), bad data or permission (22/23/42), server 5xx | Network, expired session, the functions' own refusals (P0xxx) |
 | `arena_upload_failed` | The server refused an Arena summary batch (it is dropped) | Transient failures |
 | `sign_in_failed` | Any sign-in failure except no connection | Cancelling (it's `sign_in_finished` with `result: cancelled`) |

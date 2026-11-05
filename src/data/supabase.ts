@@ -10,6 +10,7 @@ import type { Database, Json } from './database.types';
 import { DataError, toDataError } from './errors';
 import { PUBLIC_RPCS } from './public-rpcs';
 import type { Rpc } from './repositories';
+import { noteBackend } from './sync/connectivity';
 
 /**
  * The one Supabase client. It uses only the project URL and the publishable (anon) key — values meant to ship in the
@@ -52,7 +53,16 @@ const fetchWithTimeout: typeof fetch = (input, init) => {
   if (outer?.aborted) controller.abort();
   else outer?.addEventListener('abort', () => controller.abort());
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+  return fetch(input, { ...init, signal: controller.signal })
+    .then(
+      // Any HTTP answer, even an error status, proves the server is reachable; no answer at all says it isn't.
+      (res) => (noteBackend(true), res),
+      (e: unknown) => {
+        if (!outer?.aborted) noteBackend(false);
+        throw e;
+      },
+    )
+    .finally(() => clearTimeout(timer));
 };
 
 let client: SupabaseClient<Database> | null = null;
@@ -132,6 +142,23 @@ export function storageKeyFor(projectUrl: string): string {
 }
 
 /**
+ * The user the saved session belongs to, read from secure storage without any network request — or null when there is
+ * no saved session. Only an identity hint for working offline (src/data/session.ts checks it against the device-owner
+ * marker): it is not a fresh authentication, and the server still validates every request's token.
+ */
+export async function storedSessionUser(): Promise<{ id: string; email: string | null } | null> {
+  if (!url || isServer) return null;
+  try {
+    const raw = await sessionStorage.getItem(storageKeyFor(url));
+    const s = raw ? (JSON.parse(raw) as { user?: { id?: unknown; email?: unknown } }) : null;
+    const id = s?.user?.id;
+    return typeof id === 'string' && id ? { id, email: typeof s?.user?.email === 'string' ? s.user.email : null } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Builds before Google sign-in kept an anonymous session in AsyncStorage. It is never used again; remove it so no
  * token outlives the model it belonged to.
  */
@@ -144,6 +171,8 @@ export async function removeLegacySession(): Promise<void> {
 export const supabaseRpc: Rpc = {
   async call(fn, args) {
     if (!PUBLIC_RPCS.has(fn) && !currentUserId()) throw new DataError('signedOut', `${fn} needs a signed-in user`);
+    // supabase-js returns a fetch failure as an error object rather than throwing; the fetch wrapper above has already
+    // recorded that the server didn't answer.
     const { data, error } = await supabase().rpc(fn, (args ?? {}) as { changes: Json });
     if (error) {
       reportRpcFailure(fn, error);

@@ -7,24 +7,33 @@ import { browserSignInRunning, completeBrowserSignIn, signInWithGoogleInBrowser 
 import { forgetGoogleAccount, googleSignInMode, requestGoogleIdToken } from '@/src/auth/google';
 import type { AuthUser } from '@/src/auth/state';
 import { dispatchAuth, useAuth } from '@/src/auth/store';
+import { buildCatalog } from '@/src/content/build';
+import { bundledContent } from '@/src/content/bundled';
 import { type Catalog, installCatalog } from '@/src/content/catalog';
-import { installCategories } from '@/src/content/categories';
+import { type CategoryIndex, buildCategoryIndex, installCategories } from '@/src/content/categories';
 import { monthOf } from '@/src/features/daily/dates';
 import { currentScreen, errorCode, flushTelemetry, reportError, setCommonProperties, track } from '@/src/observability/api';
 import { useProgress } from '@/src/store/progress';
-import { EMPTY_PROGRESS, type ProgressData } from '@/src/store/progress-state';
+import { EMPTY_PROGRESS, type ProgressData, sanitizeProgress } from '@/src/store/progress-state';
 import { accountRepository } from './account';
 import { arenaUploads } from './arena-session';
-import { diffProgress } from './changes';
+import { type ContentSource, type DocumentSource, loadStartupDocument, refreshDocument } from './content-cache';
+import { applyProgressChanges, diffProgress, mergeChanges } from './changes';
 import { useDaily } from './daily-session';
 import { clearAccountDeviceData } from './device-data';
-import { type Owner, reconcileOwner, setOwner } from './device-owner';
+import { DEVICE_OWNER_KEY, type Owner, ownerValue, reconcileOwner, setOwner } from './device-owner';
 import { DataError, toDataError } from './errors';
-import { useGames } from './games-session';
+import { practiceUploads, useGames } from './games-session';
 import { guestProgressStore } from './guest-progress';
+import { localStore } from './local/database';
+import type { LocalStore } from './local/local-store';
 import { Outbox, type OutboxStatus } from './outbox';
 import { categoryRepository, contentRepository, progressRepository } from './repositories';
-import { endLocalSession, removeLegacySession, subscribeAuth, supabase, supabaseRpc } from './supabase';
+import { startConnectivity } from './sync/connectivity';
+import { operationId } from './sync/ids';
+import { localOutboxStore } from './sync/outbox-store';
+import { classifySyncError, retryDelay } from './sync/retry-policy';
+import { endLocalSession, removeLegacySession, storedSessionUser, subscribeAuth, supabase, supabaseRpc } from './supabase';
 
 /**
  * The app's connection to its data and to the player's identity.
@@ -55,20 +64,57 @@ const categories = categoryRepository(supabaseRpc);
 const account = accountRepository(supabaseRpc);
 const guest = guestProgressStore(AsyncStorage);
 
+/** False once the server has said it doesn't have apply_progress_ops yet (a deployment behind the app). */
+let opsSupported = true;
+
 export const outbox = new Outbox({
-  send: async (changes) => {
-    await progress.apply(changes);
+  // Each operation exactly once (apply_progress_ops). Against a server without that function, the operations are
+  // merged and sent through apply_progress_changes, as before — still idempotent for everything but a resent reset.
+  sendOps: async (ops) => {
+    if (opsSupported) {
+      try {
+        await progress.applyOps(ops);
+        return;
+      } catch (e) {
+        if (!/PGRST202/.test(toDataError(e).detail)) throw e;
+        opsSupported = false;
+      }
+    }
+    await progress.apply(ops.map((o) => o.changes).reduce(mergeChanges));
   },
   classify: (e) => {
-    const d = toDataError(e);
-    return { kind: d.transient ? 'transient' : 'permanent', message: d.message };
+    const f = classifySyncError(e);
+    return { kind: f.retry ? 'transient' : 'permanent', message: f.message };
   },
-  storage: {
-    load: () => AsyncStorage.getItem(OUTBOX_KEY),
-    save: (v) => (v === null ? AsyncStorage.removeItem(OUTBOX_KEY) : AsyncStorage.setItem(OUTBOX_KEY, v)),
-  },
+  // One row per operation in the local database (src/data/local), scoped to the signed-in user.
+  store: localOutboxStore(localStore),
+  retryDelay,
+  newId: operationId,
   onStatus: (s) => useSyncStatus.setState(s),
 });
+
+/**
+ * Builds before the local database kept the outbox as one AsyncStorage document. Moved once into the database (same
+ * owner, an id per batch), then removed; nothing in it is lost or reassigned.
+ */
+async function migrateLegacyOutbox(local: LocalStore): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(OUTBOX_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw) as { owner?: unknown; queue?: unknown; entries?: unknown };
+    if (typeof saved.owner === 'string') {
+      const batches = Array.isArray(saved.entries)
+        ? (saved.entries as { id?: unknown; changes?: unknown }[]).map((e) => ({ id: typeof e.id === 'string' ? e.id : operationId(), changes: e.changes }))
+        : Array.isArray(saved.queue)
+          ? (saved.queue as unknown[]).map((changes) => ({ id: operationId(), changes }))
+          : [];
+      for (const b of batches) if (b.changes && typeof b.changes === 'object') await local.enqueue(saved.owner, { id: b.id, kind: 'progress', payload: b.changes });
+    }
+    await AsyncStorage.removeItem(OUTBOX_KEY);
+  } catch {
+    // Left in place: tried again next start.
+  }
+}
 
 const EMPTY_DATA: ProgressData = progressOf(EMPTY_PROGRESS);
 
@@ -81,23 +127,65 @@ function progressOf(s: ProgressData): ProgressData {
 
 let unsubscribe: (() => void) | null = null;
 
+/** Set while the store is loaded from the server or the device: that update is not a change to write back. */
+let applyingLoaded = false;
+
+/** The signed-in user's progress as last seen on this device, saved a moment after changes (and when backgrounded). */
+let snapshotTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function saveSnapshotNow(owner: string, opts?: { serverLoaded?: boolean }): Promise<void> {
+  if (snapshotTimer) clearTimeout(snapshotTimer);
+  snapshotTimer = null;
+  if (useAuth.getState().user?.id !== owner || !useProgress.getState().hydrated) return;
+  const data = progressOf(useProgress.getState());
+  await (await localStore()).saveSnapshot(owner, data, opts).catch(() => undefined);
+}
+
+function scheduleSnapshot(owner: string): void {
+  if (snapshotTimer) clearTimeout(snapshotTimer);
+  snapshotTimer = setTimeout(() => void saveSnapshotNow(owner), 800);
+}
+
 function stopSaving(): void {
   unsubscribe?.();
   unsubscribe = null;
+  if (snapshotTimer) clearTimeout(snapshotTimer);
+  snapshotTimer = null;
 }
 
-/** Signed in: every store change goes to the outbox. */
-function startSync(): void {
+/**
+ * Show `base` (the server's copy, or the device's snapshot) with every change still queued on this device applied on
+ * top, so work that hasn't synced yet never disappears from the screen. Not diffed back into the queue.
+ */
+function hydrateWithPending(base: ProgressData): void {
+  const merged = outbox.entries.reduce((d, e) => applyProgressChanges(d, e.changes), base);
+  applyingLoaded = true;
+  try {
+    useProgress.getState().hydrate(merged);
+  } finally {
+    applyingLoaded = false;
+  }
+}
+
+/**
+ * Signed in: every store change is queued as an operation (saved in the local database before anything is sent) and
+ * the device snapshot follows. The screen has already changed: nothing here waits for the network.
+ */
+function startSync(owner: string): void {
   stopSaving();
   const offStore = useProgress.subscribe((next, prev) => {
-    // The update that loads progress from the server is not a change to write back.
-    if (!next.hydrated || !prev.hydrated) return;
+    if (!next.hydrated || !prev.hydrated || applyingLoaded) return;
     void outbox.enqueue(diffProgress(progressOf(prev), progressOf(next), next.resets !== prev.resets));
+    scheduleSnapshot(owner);
   });
-  // Send what's pending before the app is backgrounded (it may not come back). Drained a microtask later, so changes
-  // other 'change' listeners save at this moment (an open lesson's latest step) are in the queue first.
+  // Send what's pending before the app is backgrounded (it may not come back), and save the snapshot. Run a microtask
+  // later, so changes other 'change' listeners save at this moment (an open lesson's latest step) are in first.
   const offApp = AppState.addEventListener('change', (state) => {
-    if (state !== 'active') queueMicrotask(() => void outbox.drain());
+    if (state !== 'active')
+      queueMicrotask(() => {
+        void saveSnapshotNow(owner);
+        void outbox.drain();
+      });
   });
   unsubscribe = () => {
     offStore();
@@ -237,43 +325,178 @@ function listenForSessionChanges(): void {
 async function sessionEnded(): Promise<void> {
   if (useAuth.getState().status === 'signedOut') return;
   if (__DEV__) console.warn('[auth] the session ended on the server; continuing as a guest');
+  const previous = useAuth.getState().user?.id ?? null;
   stopSaving();
   outbox.stop();
   arenaUploads.stop();
-  await becomeGuest({ welcomeAgain: false });
+  practiceUploads.stop();
+  // Not the player's choice: work still queued for them stays on the device, under their id only, and goes to the
+  // server if they sign in again. Nobody else ever sees or sends it.
+  await becomeGuest({ welcomeAgain: false, previous, keepPending: true });
 }
 
 // ── Loading ────────────────────────────────────────────────────────────────────────────────────────────────────
 
+/** The published catalog: cached, else the server (briefly), else bundled — see src/data/content-cache.ts. */
+const catalogSource: DocumentSource<Catalog> = {
+  key: 'catalog',
+  fetch: () => content.fetchDocument(),
+  bundled: bundledContent,
+  validate: (doc) => {
+    const built = buildCatalog(doc);
+    return built.ok ? built.catalog : null;
+  },
+  revision: (doc) => {
+    const d = (doc ?? {}) as { lessons?: { revision?: unknown }[]; scenarios?: { revision?: unknown }[] };
+    const sum = (xs: { revision?: unknown }[] | undefined) => (Array.isArray(xs) ? xs.reduce((n, x) => n + (typeof x?.revision === 'number' ? x.revision : 0), 0) : 0);
+    return sum(d.lessons) + sum(d.scenarios);
+  },
+};
+
+const categoriesSource = (catalog: Catalog): DocumentSource<CategoryIndex> => ({
+  key: 'categories',
+  fetch: () => categories.fetchDocument(),
+  validate: (doc) => {
+    const built = buildCategoryIndex(doc, catalog.lessons);
+    if (built.ok && __DEV__ && built.warnings.length) console.warn(`[data] categories: ${built.warnings.join('; ')}`);
+    return built.ok ? built.index : null;
+  },
+});
+
 /**
- * Lesson categories are a browsing aid, not something a lesson depends on: if they can't be loaded or don't check
- * out, the app starts anyway and the lesson list shows no category filter.
+ * Lesson categories are a browsing aid, not something a lesson depends on: cached like the catalog, and if there is
+ * no usable copy the app starts anyway and the lesson list shows no category filter.
  */
-async function loadCategories(catalog: Catalog): Promise<void> {
+async function loadCategories(local: LocalStore, catalog: Catalog): Promise<void> {
   try {
-    const { index, warnings } = await categories.fetchCategories(catalog.lessons);
-    if (__DEV__ && warnings.length) console.warn(`[data] categories: ${warnings.join('; ')}`);
-    installCategories(index);
+    installCategories((await loadStartupDocument(local, categoriesSource(catalog), { networkBudgetMs: 4000 })).value);
   } catch (e) {
     if (__DEV__) console.warn(`[data] categories not loaded: ${toDataError(e).detail}`);
     installCategories(null);
   }
 }
 
-/** The signed-in player's progress from the server, after sending whatever was still queued for them. */
+let lastContentRefresh = 0;
+
+/**
+ * Download newer content in the background (at most every 30 minutes). Stored once validated, and installed at the
+ * next start, so nobody's open lesson changes underneath them.
+ */
+function refreshContent(catalog: Catalog): void {
+  if (Date.now() - lastContentRefresh < 30 * 60_000) return;
+  lastContentRefresh = Date.now();
+  void (async () => {
+    const local = await localStore();
+    const c = await refreshDocument(local, catalogSource);
+    const k = await refreshDocument(local, categoriesSource(catalog));
+    if (__DEV__ && (c === 'invalid' || k === 'invalid')) console.warn(`[content] refresh: catalog ${c}, categories ${k}`);
+  })();
+}
+
+/** Whether the server has confirmed the current session since start-up (false while it was only read from storage). */
+let sessionVerified = false;
+
+/**
+ * The signed-in player's progress, local first. With a snapshot on this device the screen shows it at once — plus
+ * every change still queued — and the server's copy is reconciled in the background (`refreshAccount`). On a device
+ * that has never loaded this account, the server is needed once: queued changes go first, then its copy loads.
+ */
 async function loadAccount(userId: string): Promise<void> {
   stopSaving();
-  // Changes saved before the last shutdown go first, so the progress loaded next includes them.
   await outbox.restore(userId);
-  // Arena summaries waiting from earlier sessions are sent in the background; they never block start-up.
+  // Arena summaries and practice games waiting from earlier sessions are sent in the background.
   await arenaUploads.restore(userId);
-  if (!(await outbox.drain())) throw new DataError('network', 'pending progress changes could not be sent');
-  const saved = await progress.load();
-  useProgress.getState().hydrate(saved);
-  startSync();
+  void practiceUploads.restore(userId);
+  const local = await localStore();
+  const snapshot = await local.loadSnapshot(userId).catch(() => null);
+  if (snapshot) {
+    hydrateWithPending(sanitizeProgress(snapshot.payload));
+    startSync(userId);
+    if (sessionVerified) void refreshAccount(userId);
+  } else {
+    if (!(await outbox.drain())) throw new DataError('network', 'this device has no copy of the progress yet, and the server could not be reached');
+    hydrateWithPending(await progress.load());
+    startSync(userId);
+    await saveSnapshotNow(userId, { serverLoaded: true });
+  }
   // Not awaited: the Daily Challenge history (for the calendar and the profile) loads in the background, and a
   // failure here only means the profile shows lesson evidence alone until the calendar is opened.
   void useDaily.getState().loadMonth(monthOf(useDaily.getState().today));
+}
+
+let refreshing: Promise<void> | null = null;
+let lastRefresh = 0;
+
+/**
+ * Bring this device up to date with the server: send what is queued, then read the server's copy (which now includes
+ * it, and anything done on other devices) and show it with whatever was queued meanwhile applied on top. Completions
+ * and attempts only ever add; nothing done here is lost. Sends are held during the read, so no change can leave the
+ * queue between the read and the result being shown. Never throws; does nothing offline.
+ */
+function refreshAccount(userId: string): Promise<void> {
+  refreshing ??= (async () => {
+    try {
+      if (!(await outbox.drain())) return;
+      outbox.pause();
+      try {
+        const saved = await progress.load();
+        if (useAuth.getState().user?.id !== userId || outbox.currentOwner !== userId) return;
+        hydrateWithPending(saved);
+      } finally {
+        outbox.resume();
+      }
+      lastRefresh = Date.now();
+      await saveSnapshotNow(userId, { serverLoaded: true });
+    } catch (e) {
+      if (__DEV__) console.warn(`[data] background refresh failed: ${toDataError(e).detail}`);
+    }
+  })().finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+}
+
+/**
+ * Started offline from the saved session: ask the server now. A definite "no" (revoked, deleted elsewhere) ends the
+ * session as it would at start-up; no answer leaves everything as it is for the next chance.
+ */
+async function verifySession(userId: string): Promise<void> {
+  let user: AuthUser | null;
+  try {
+    user = await confirmedUser();
+  } catch {
+    return;
+  }
+  if (useAuth.getState().user?.id !== userId) return;
+  if (!user || user.id !== userId) {
+    await sessionEnded();
+    return;
+  }
+  sessionVerified = true;
+  void refreshAccount(userId);
+}
+
+/** The network came back, or the app came to the foreground: a chance to sync. Each worker guards itself. */
+function syncOpportunity(): void {
+  if (useAppData.getState().status === 'error') return;
+  const auth = useAuth.getState();
+  const id = auth.status === 'signedIn' ? auth.user?.id : null;
+  if (id) {
+    outbox.retryNow();
+    practiceUploads.retryNow();
+    void arenaUploads.drain();
+    if (!sessionVerified) void verifySession(id);
+    else if (Date.now() - lastRefresh > 60_000) void refreshAccount(id);
+  }
+  if (installedCatalog) refreshContent(installedCatalog);
+}
+
+let installedCatalog: Catalog | null = null;
+let contentSource: ContentSource | null = null;
+
+/** Where start-up's content came from (cache, network or bundled), for diagnosis screens. */
+export function startupContentSource(): ContentSource | null {
+  return contentSource;
 }
 
 async function loadGuest(): Promise<void> {
@@ -281,6 +504,26 @@ async function loadGuest(): Promise<void> {
   const saved = await guest.load();
   useProgress.getState().hydrate(saved ?? EMPTY_DATA);
   startGuestSave();
+}
+
+/**
+ * Who is signed in, for start-up. Online, the server confirms it (`confirmedUser`). With no answer from the server,
+ * the saved session is used as it is — only when this device already holds that same account's data (the owner
+ * marker), so being offline can never hand one person's data to another. That is not a fresh authentication: it is
+ * marked unverified, every request still carries the token for the server to check, and the next connection asks the
+ * server again (`verifySession`).
+ */
+async function resolveUser(): Promise<{ user: AuthUser | null; verified: boolean }> {
+  try {
+    return { user: await confirmedUser(), verified: true };
+  } catch (e) {
+    if (toDataError(e).kind !== 'network') throw e;
+    const stored = await storedSessionUser();
+    if (!stored) return { user: null, verified: false };
+    const marker = await AsyncStorage.getItem(DEVICE_OWNER_KEY).catch(() => null);
+    if (marker === ownerValue({ user: stored.id })) return { user: { id: stored.id, email: stored.email }, verified: false };
+    throw e;
+  }
 }
 
 let starting: Promise<void> | null = null;
@@ -291,6 +534,7 @@ export function startAppData(): Promise<void> {
   if (starting) return starting;
   useAppData.setState({ status: 'loading' });
   listenForSessionChanges();
+  startConnectivity(syncOpportunity);
   starting = (async () => {
     // Cold-start timings for `app_ready` (src/observability): the whole start, the catalogue and the categories.
     const t0 = Date.now();
@@ -298,25 +542,36 @@ export function startAppData(): Promise<void> {
     let categoriesMs: number | undefined;
     try {
       await removeLegacySession();
-      const [catalog, user] = await Promise.all([
-        content.fetchCatalog().then((c) => {
+      const local = await localStore();
+      await migrateLegacyOutbox(local);
+      // Failed operations are kept 30 days for diagnosis; operations of an account that never came back, 90 days.
+      void local.purge(Date.now() - 30 * 86_400_000, Date.now() - 90 * 86_400_000).catch(() => undefined);
+      const [loaded, identity] = await Promise.all([
+        loadStartupDocument(local, catalogSource).then((c) => {
           catalogMs = Date.now() - t0;
           return c;
         }),
-        confirmedUser(),
+        resolveUser(),
       ]);
+      const catalog = loaded.value;
+      const { user } = identity;
+      sessionVerified = identity.verified;
       installCatalog(catalog);
+      installedCatalog = catalog;
+      contentSource = loaded.source;
       setCommonProperties({ content_revision: contentRevision(catalog) });
       // Categories don't depend on progress, so they load alongside it rather than as one more round trip first.
       // loadCategories never rejects.
       const categoriesStart = Date.now();
-      const categoriesLoaded = loadCategories(catalog).then(() => {
+      const categoriesLoaded = loadCategories(local, catalog).then(() => {
         categoriesMs = Date.now() - categoriesStart;
       });
       const owner: Owner = user ? { user: user.id } : 'guest';
       const { cleared } = await reconcileOwner(AsyncStorage, owner, async () => {
+        // Anyone else's snapshot and history go; their queued writes stay, scoped to them (never shown or sent here).
         await outbox.clear();
         await clearAccountDeviceData();
+        await local.clearOthers(user?.id ?? null).catch(() => undefined);
       });
       if (__DEV__ && cleared) console.info('[data] device data belonged to someone else and was cleared');
       dispatchAuth({ type: 'restored', user });
@@ -324,7 +579,19 @@ export function startAppData(): Promise<void> {
       else await loadGuest();
       await categoriesLoaded;
       useAppData.setState({ status: 'ready' });
-      track('app_ready', { result: 'ready', total_ms: Date.now() - t0, catalog_ms: catalogMs, categories_ms: categoriesMs, signed_in: !!user, onboarded: useProgress.getState().settings.onboarded });
+      track('app_ready', {
+        result: 'ready',
+        total_ms: Date.now() - t0,
+        catalog_ms: catalogMs,
+        categories_ms: categoriesMs,
+        signed_in: !!user,
+        onboarded: useProgress.getState().settings.onboarded,
+        content_source: loaded.source,
+        session_verified: identity.verified,
+      });
+      // In the background: newer content (installed next start) and, for an unverified session, the server's answer.
+      if (loaded.source !== 'network') refreshContent(catalog);
+      if (user && !identity.verified) void verifySession(user.id);
     } catch (e) {
       const error = toDataError(e);
       if (__DEV__) console.warn(`[data] start-up failed (${error.kind}): ${error.detail}`);
@@ -432,6 +699,8 @@ async function finishSignIn(user: AuthUser, isNew: boolean): Promise<void> {
   const carried = useProgress.getState().hydrated ? progressOf(useProgress.getState()) : null;
   await outbox.restore(user.id);
   if (carried) await outbox.enqueue(diffProgress(EMPTY_DATA, carried));
+  // Supabase has just verified this sign-in.
+  sessionVerified = true;
   await setOwner(AsyncStorage, { user: user.id });
   await guest.clear();
   // Boards and the calendar were loaded as a guest (no nickname, no attempts): load them again as this player.
@@ -458,8 +727,17 @@ export function clearAuthError(): void {
 // ── Signing out ────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** Back to a guest with nothing from the previous account, in memory or on the device. */
-async function becomeGuest({ welcomeAgain }: { welcomeAgain: boolean }): Promise<void> {
-  await outbox.clear();
+async function becomeGuest({ welcomeAgain, previous, keepPending = false }: { welcomeAgain: boolean; previous: string | null; keepPending?: boolean }): Promise<void> {
+  sessionVerified = false;
+  if (keepPending) {
+    outbox.detach();
+    practiceUploads.detach();
+  } else {
+    await outbox.clear();
+    await practiceUploads.clear();
+  }
+  // The account's snapshot and game history leave the device; its queued writes too, unless kept (see sessionEnded).
+  if (previous) await (await localStore()).clearUser(previous, { queue: !keepPending }).catch(() => undefined);
   await clearAccountDeviceData();
   resetMemory();
   await setOwner(AsyncStorage, 'guest');
@@ -486,28 +764,30 @@ export async function signOut({ force = false }: { force?: boolean } = {}): Prom
   dispatchAuth({ type: 'signOutStarted' });
   stopSaving();
   if (!force) {
-    const sent = (await outbox.drain()) && (await arenaUploads.drain());
+    const sent = (await outbox.drain()) && (await arenaUploads.drain()) && (await practiceUploads.drain());
     if (!sent) {
-      startSync();
+      startSync(owner);
       dispatchAuth({ type: 'signOutFailed', message: UNSAVED_MESSAGE });
       return 'unsaved';
     }
   }
   outbox.stop();
   arenaUploads.stop();
+  practiceUploads.stop();
   try {
     await signOutQuietly();
   } catch (e) {
     if (__DEV__) console.warn(`[auth] sign-out failed: ${toDataError(e).detail}`);
-    startSync();
+    startSync(owner);
     void arenaUploads.restore(owner);
+    void practiceUploads.restore(owner);
     dispatchAuth({ type: 'signOutFailed', message: 'Couldn’t sign out. Please try again.' });
     return 'failed';
   }
   await forgetGoogleAccount();
   // Sent while still identified as this account; becoming a guest then resets the analytics identity.
   track('signed_out', { forced: force });
-  await becomeGuest({ welcomeAgain: false });
+  await becomeGuest({ welcomeAgain: false, previous: owner });
   return 'signedOut';
 }
 
@@ -534,15 +814,17 @@ export async function deleteAccount(): Promise<void> {
   stopSaving();
   outbox.stop();
   arenaUploads.stop();
+  practiceUploads.stop();
   // Analytics already captured for this account (if the player shares them) go out BEFORE the server queues the
   // PostHog deletion, so that deletion covers them (docs/ACCOUNT_DELETION.md). Bounded; never blocks deletion.
   await flushTelemetry(3000);
   try {
     await account.deleteMyAccount();
   } catch (e) {
-    startSync();
+    startSync(owner);
     void outbox.drain();
     await arenaUploads.restore(owner);
+    void practiceUploads.restore(owner);
     const error = toDataError(e);
     dispatchAuth({ type: 'deleteFailed', message: error.message });
     if (error.kind !== 'network') reportError('delete_account_failed', error, { error_code: errorCode(error.detail) ?? error.kind });
@@ -553,7 +835,7 @@ export async function deleteAccount(): Promise<void> {
   // (motion, haptics, narration) stay; the welcome shows again for whoever uses the phone next.
   await signOutQuietly().catch(() => undefined);
   await forgetGoogleAccount();
-  await becomeGuest({ welcomeAgain: true });
+  await becomeGuest({ welcomeAgain: true, previous: owner });
   // Only now, as an anonymous guest event: sent under the deleted id it could re-create the PostHog person the server
   // has just queued for deletion. The server deletes that person, their events and recordings (posthog-deletion).
   track('account_deleted');

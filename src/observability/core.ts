@@ -35,6 +35,7 @@ export interface TelemetryClient {
 export type ErrorKind =
   | 'startup_failed'
   | 'sync_failed'
+  | 'local_db_failed'
   | 'arena_upload_failed'
   | 'rpc_failed'
   | 'sign_in_failed'

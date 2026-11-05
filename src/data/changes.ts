@@ -86,6 +86,37 @@ export function diffProgress(prevState: ProgressData, next: ProgressData, reset 
 
 const union = <T>(a: readonly T[] = [], b: readonly T[] = []): T[] => [...a, ...b.filter((x) => !a.includes(x))];
 
+/**
+ * `data` with `changes` applied — the same rules `apply_progress_changes` uses on the server: attempts and completions
+ * are insert-if-absent, in-progress records are replaced (upsert, then delete), a reset clears everything but the goal.
+ * Used to rebuild what the learner sees from a snapshot or the server's copy plus the writes still queued on this
+ * device, so local work never disappears while it waits to sync. Applying a batch twice changes nothing; applying a
+ * queue's batches in order gives the state they were diffed to.
+ */
+export function applyProgressChanges(data: ProgressData, c: ProgressChanges): ProgressData {
+  let next: ProgressData = c.reset
+    ? { completed: [], runtime: {}, learning: [], goal: data.goal, challengeDrafts: {}, scenarioRuns: {}, scenarioDone: [], assessmentRuns: {} }
+    : data;
+  if (c.goal) next = { ...next, goal: c.goal.value };
+  if (c.attempts?.length) {
+    const known = new Set(next.learning.map((a) => a.id));
+    const added = c.attempts.filter((a) => !known.has(a.id) && (known.add(a.id), true));
+    if (added.length) next = { ...next, learning: [...next.learning, ...added] };
+  }
+  if (c.lessonsCompleted?.length) next = { ...next, completed: union(next.completed, c.lessonsCompleted) };
+  if (c.runtimeUpsert?.length || c.runtimeDelete?.length) {
+    const runtime = { ...next.runtime };
+    for (const u of c.runtimeUpsert ?? []) runtime[u.lesson] = u.runtime;
+    for (const l of c.runtimeDelete ?? []) delete runtime[l];
+    next = { ...next, runtime };
+  }
+  if (c.scenarioRuns?.length) next = { ...next, scenarioRuns: { ...next.scenarioRuns, ...Object.fromEntries(c.scenarioRuns.map((x) => [x.scenario, x.run])) } };
+  if (c.scenariosDone?.length) next = { ...next, scenarioDone: union(next.scenarioDone, c.scenariosDone) };
+  if (c.challengeDrafts?.length) next = { ...next, challengeDrafts: { ...next.challengeDrafts, ...Object.fromEntries(c.challengeDrafts.map((x) => [x.challenge, x.draft])) } };
+  if (c.assessmentRuns?.length) next = { ...next, assessmentRuns: { ...next.assessmentRuns, ...Object.fromEntries(c.assessmentRuns.map((x) => [x.assessment, x.run])) } };
+  return next;
+}
+
 function byKey<T, K extends string>(a: readonly T[] = [], b: readonly T[] = [], key: (x: T) => K): T[] {
   const m = new Map<K, T>();
   for (const x of [...a, ...b]) {

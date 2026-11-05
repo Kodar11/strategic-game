@@ -166,7 +166,7 @@ export const EVENTS = {
   app_ready: {
     trigger: 'Cold start finished: content and progress loaded (ready) or the start-up error screen shown (error).',
     privacy: 'performance',
-    props: { total_ms: 'int', catalog_ms: 'int', categories_ms: 'int', result: ['ready', 'error'], error_kind: 'id', signed_in: 'bool', onboarded: 'bool' },
+    props: { total_ms: 'int', catalog_ms: 'int', categories_ms: 'int', result: ['ready', 'error'], error_kind: 'id', signed_in: 'bool', onboarded: 'bool', content_source: ['cache', 'network', 'bundled'], session_verified: 'bool' },
   },
 
   // ── Billing: reserved. Defined so the schema is reviewed now; never sent until billing exists. Purchases,

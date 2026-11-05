@@ -13,6 +13,7 @@ import 'react-native-reanimated';
 import { APP_NAME } from '@/src/brand';
 import { FontsReadyContext } from '@/src/components/ui/AppText';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
+import { SyncIndicator } from '@/src/components/ui/SyncIndicator';
 import { startAppData, useAppData } from '@/src/data/session';
 import { startObservability, useScreenTracking } from '@/src/observability';
 import { useMotionReduced } from '@/src/utils/feedback';
@@ -37,7 +38,8 @@ export default function RootLayout() {
   const ready = loaded || !!error;
   const data = useAppData();
 
-  // Content and progress come from Supabase; nothing renders until both have loaded (or failed with a retry).
+  // Content and progress load from the device first (src/data/session.ts), so this is quick even offline. Only a
+  // device that has never had the content or this account's progress needs the server once (or shows a retry).
   useEffect(() => {
     // Telemetry starts alongside, never before or instead: it can't delay or break start-up (src/observability).
     startObservability();
@@ -60,12 +62,21 @@ export default function RootLayout() {
           <title>{APP_NAME}</title>
         </Head>
         {data.status === 'ready' ? (
-          <AppStack reduced={reduced} />
+          <>
+            <AppStack reduced={reduced} />
+            <SyncIndicator />
+          </>
         ) : (
           <MessageScreen
             loading={data.status === 'loading'}
-            title="Couldn’t load the lessons"
-            body={data.status === 'error' ? data.error.message : undefined}
+            title={data.status === 'error' && data.error.kind === 'network' ? 'Connect once to get started' : 'Couldn’t load the lessons'}
+            body={
+              data.status === 'error'
+                ? data.error.kind === 'network'
+                  ? 'This device doesn’t have your progress yet, so it needs the internet once. After that, lessons, scenarios and games work offline.'
+                  : data.error.message
+                : undefined
+            }
             onRetry={() => void startAppData()}
           />
         )}

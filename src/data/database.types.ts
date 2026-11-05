@@ -16,6 +16,7 @@ export interface Database {
       get_lesson_categories: { Args: Record<string, never>; Returns: Json };
       get_my_progress: { Args: Record<string, never>; Returns: Json };
       apply_progress_changes: { Args: { changes: Json }; Returns: Json };
+      apply_progress_ops: { Args: { ops: Json }; Returns: Json };
       get_daily_challenges: { Args: { request: Json }; Returns: Json };
       submit_daily_challenge: { Args: { request: Json }; Returns: Json };
       check_daily_practice: { Args: { request: Json }; Returns: Json };
