@@ -27,13 +27,10 @@
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.3",
     "expo-web-browser": "~57.0.3",
-    "i18next": "^26.5.3",
     "lucide-react-native": "^1.59.0",
-    "nativewind": "^4.2.7",
     "posthog-react-native": "^4.85.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-i18next": "^17.1.0",
     "react-native": "0.86.3",
     "react-native-nitro-google-signin": "2.3.1",
     "react-native-nitro-modules": "0.37.2",
@@ -54,7 +51,6 @@
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
     "mpg123-decoder": "^1.0.3",
-    "tailwindcss": "~3.4.17",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -73,6 +69,7 @@
     "tts:curriculum": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/curriculum-clips.mjs",
     "content:seed-sql": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env scripts/content/tools.ts seed-sql",
     "content:validate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env scripts/content/tools.ts validate",
+    "licenses": "node scripts/generate-licenses.mjs",
     "content:pull": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env scripts/content/tools.ts pull"
   },
   "private": true

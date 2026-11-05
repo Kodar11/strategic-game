@@ -40,6 +40,11 @@ const rpcError = async (user: string | null, fn: string, request?: unknown) => {
     return (e as Error).message;
   }
 };
+/** set_nickname returns its refusals as data ({ refused: 'games:nickname_…' }) so the attempt is recorded; null when saved. */
+const nicknameRefusal = async (user: string, nickname: string): Promise<string | null> => {
+  const r = await rpc(user, 'set_nickname', { nickname });
+  return typeof r?.refused === 'string' ? r.refused : null;
+};
 const one = async <T = any>(sql: string, params: unknown[] = []) => (await db.query<T>(sql, params)).rows[0];
 
 /** Legal moves for a prompt, for scripted players. */
@@ -449,12 +454,14 @@ describe('nicknames', () => {
       ['Strategic Game', 'reserved'],
       ['a.-_', 'reserved'],
     ] as const) {
-      assert.match((await rpcError(BOB, 'set_nickname', { nickname: name }))!, new RegExp(`games:nickname_${reason}`), name);
+      assert.match((await nicknameRefusal(BOB, name))!, new RegExp(`games:nickname_${reason}`), name);
     }
   });
 
   it('is unique after normalization, and renaming propagates to leaderboards', async () => {
-    assert.match((await rpcError(BOB, 'set_nickname', { nickname: 'ada_lovelace' }))!, /games:nickname_taken/);
+    // The ten refusals above used up Bob's hourly attempts (nickname rate limit); start this test with a fresh hour.
+    await db.query('delete from game_engine.nickname_attempts where user_id = $1', [BOB]);
+    assert.match((await nicknameRefusal(BOB, 'ada_lovelace'))!, /games:nickname_taken/);
     assert.deepEqual(await rpc(BOB, 'set_nickname', { nickname: '  Bob the Builder ' }), { nickname: 'Bob the Builder' });
     assert.deepEqual(await rpc(BOB, 'set_nickname', { nickname: 'Bob B' }), { nickname: 'Bob B' });
     const lb = await rpc(ALICE, 'get_leaderboard', { scope: 'weekly', competitionId: 'live' });
@@ -601,6 +608,13 @@ describe('gamesRepository (src/data/games.ts) parses every server response', () 
     await assert.rejects(repo.startCompetitionMatch('live'), (e: unknown) => e instanceof GameError && e.refusal === 'no_attempts');
     await assert.rejects(repo.getChallenge('0'.repeat(20)), (e: unknown) => e instanceof GameError && e.refusal === 'not_found');
     await assert.rejects(repo.setNickname('x'), (e: unknown) => e instanceof GameError && e.refusal === 'nickname_length');
+    // The rate limit reads the same way, with its own message.
+    await db.query(`insert into game_engine.nickname_attempts (user_id, outcome) select $1, 'refused' from generate_series(1, 10)`, [ALICE]);
+    await assert.rejects(
+      repo.setNickname('Fresh Name'),
+      (e: unknown) => e instanceof GameError && e.refusal === 'nickname_rate_limited' && /changed your nickname a lot/.test(e.message),
+    );
+    await db.query('delete from game_engine.nickname_attempts where user_id = $1', [ALICE]);
   });
 });
 

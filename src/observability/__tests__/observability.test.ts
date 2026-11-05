@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
-import { DEFAULT_HOST, resolveConfig } from '../config.ts';
+import { DEFAULT_HOST, SESSION_REPLAY_SAMPLE_RATE, resolveConfig } from '../config.ts';
 import { SAME_ERROR_LIMIT, SESSION_ERROR_LIMIT, Telemetry, type TelemetryClient, errorCode, normalizeError } from '../core.ts';
 import { EVENTS, type EventName, SCREENS, isSendable } from '../events.ts';
 import { BANNED_KEYS, ERROR_CONTEXT, cleanProps, isBannedKey, scrubMessage } from '../privacy.ts';
@@ -29,6 +29,7 @@ function fakeClient(opts: { throwOn?: string } = {}) {
     addExceptionStep: rec('step'),
     identify: rec('identify'),
     reset: rec('reset'),
+    flush: async () => void calls.push(['flush']),
     optIn: rec('optIn'),
     optOut: rec('optOut'),
     register: rec('register'),
@@ -37,9 +38,11 @@ function fakeClient(opts: { throwOn?: string } = {}) {
   return { client, calls, named };
 }
 
+/** An engine as start.ts leaves it for a player who chose "Share": consent granted, then the SDK installed. */
 function onTelemetry() {
   const warnings: string[] = [];
   const t = new Telemetry((m) => warnings.push(m));
+  t.setConsent(true);
   const f = fakeClient();
   t.install(f.client);
   f.calls.length = 0;
@@ -67,7 +70,7 @@ describe('event catalogue', () => {
 
   it('is a deliberate list: adding or removing an event changes this snapshot', () => {
     assert.deepEqual(Object.keys(EVENTS).sort(), [
-      'account_deleted', 'analytics_opted_out', 'app_ready', 'challenge_link_created', 'challenge_link_opened', 'checkout_result',
+      'account_deleted', 'app_ready', 'challenge_link_created', 'challenge_link_opened', 'checkout_result',
       'checkout_started', 'checkpoint_submitted', 'daily_submitted', 'game_exited', 'game_finished', 'game_started', 'lesson_completed',
       'lesson_exited', 'lesson_started', 'nickname_set', 'onboarding_finished', 'onboarding_step', 'paywall_viewed', 'plan_selected',
       'purchase_restored', 'reflection_link_opened', 'scenario_completed', 'sign_in_finished', 'sign_in_invite_dismissed',
@@ -140,16 +143,26 @@ describe('configuration', () => {
     assert.equal(resolveConfig({ ...base, host: 'https://eu.i.posthog.com/path?x' }).enabled, false);
   });
 
-  it('defaults to the EU host, development environment and clamps the replay rate', () => {
-    const c = resolveConfig({ ...base, host: undefined, environment: undefined, replaySampleRate: '7' });
+  it('defaults to the EU host and development environment', () => {
+    const c = resolveConfig({ ...base, host: undefined, environment: undefined });
     assert.ok(c.enabled);
     if (c.enabled) {
       assert.equal(c.host, DEFAULT_HOST);
       assert.equal(c.environment, 'development');
-      assert.equal(c.replaySampleRate, 1);
     }
-    const bad = resolveConfig({ ...base, environment: 'staging', replaySampleRate: 'abc' });
-    assert.ok(bad.enabled && bad.environment === 'development' && bad.replaySampleRate === 0);
+    const bad = resolveConfig({ ...base, environment: 'staging' });
+    assert.ok(bad.enabled && bad.environment === 'development');
+  });
+
+  it('session replay stays off in code, whatever the environment asks for', () => {
+    assert.equal(SESSION_REPLAY_SAMPLE_RATE, 0);
+    for (const rate of ['1', '0.5', '7', 'abc', undefined]) {
+      const c = resolveConfig({ ...base, replaySampleRate: rate });
+      assert.ok(c.enabled && c.replaySampleRate === 0, String(rate));
+    }
+    const sdk = readFileSync(join(import.meta.dirname, '..', 'posthog.ts'), 'utf8');
+    assert.match(sdk, /enableSessionReplay: config\.replaySampleRate > 0/);
+    assert.doesNotMatch(sdk, /sessionReplayConfig/);
   });
 });
 
@@ -204,8 +217,9 @@ describe('telemetry engine', () => {
     assert.ok(warnings.some((w) => w.includes('nickname')));
   });
 
-  it('buffers before the SDK is ready and replays; drops the buffer if telemetry turns out to be off', () => {
+  it('after consent, buffers until the SDK is ready and replays; drops the buffer if telemetry turns out to be off', () => {
     const t = new Telemetry();
+    t.setConsent(true);
     t.track('app_ready', { result: 'ready', total_ms: 900 });
     t.screen({ screen: 'learn', props: {}, key: 'learn' });
     const f = fakeClient();
@@ -214,6 +228,7 @@ describe('telemetry engine', () => {
     assert.equal(f.named('screen').length, 1);
 
     const off = new Telemetry();
+    off.setConsent(true);
     off.track('app_ready', { result: 'ready' });
     off.disable('switched_off');
     off.track('lesson_started', { lesson_id: 'x' });
@@ -238,6 +253,7 @@ describe('telemetry engine', () => {
   it('never lets an SDK failure reach the app', () => {
     const warnings: string[] = [];
     const t = new Telemetry((m) => warnings.push(m));
+    t.setConsent(true);
     const f = fakeClient({ throwOn: 'capture' });
     t.install(f.client);
     assert.doesNotThrow(() => t.track('nickname_set'));
@@ -326,33 +342,115 @@ describe('identity and consent', () => {
     assert.deepEqual(f.named('identify'), [['identify', ALICE]]);
   });
 
-  it('opting out sends one last event, then nothing; the choice survives a sign-out reset', () => {
+  it('turning consent off stops collection at once — no farewell event — and clears the SDK’s on-device identity', () => {
+    const { t, calls, named } = onTelemetry();
+    t.setUser(ALICE);
+    calls.length = 0;
+    t.setConsent(false);
+    assert.deepEqual(calls.map((c) => c[0]), ['optOut', 'reset', 'optOut'], 'reset() forgets the opt-out, so it is applied again');
+    t.track('lesson_started', { lesson_id: 'x' });
+    t.reportError('rpc_failed', new Error('x'));
+    t.screen({ screen: 'learn', props: {}, key: 'learn' });
+    assert.equal(named('capture').length, 0);
+    assert.equal(named('captureException').length, 0);
+    assert.equal(named('screen').length, 0);
+  });
+
+  it('turning it back on takes effect at once and re-identifies the signed-in player', () => {
     const { t, calls, named } = onTelemetry();
     t.setUser(ALICE);
     t.setConsent(false);
-    assert.deepEqual(named('capture').map((c) => c[1]), ['analytics_opted_out']);
-    assert.equal(named('optOut').length, 1);
-    t.track('lesson_started', { lesson_id: 'x' });
-    t.reportError('rpc_failed', new Error('x'));
-    assert.equal(named('capture').length, 1);
-    assert.equal(named('captureException').length, 0);
     calls.length = 0;
-    t.setUser(null);
-    assert.deepEqual(calls.map((c) => c[0]), ['reset', 'optOut', 'register'], 'reset() forgets the opt-out, so it is applied again');
     t.setConsent(true);
-    assert.equal(named('optIn').length, 1);
+    assert.deepEqual(calls.map((c) => c[0]), ['optIn', 'register', 'identify']);
+    assert.equal(named('identify')[0][1], ALICE);
     t.track('lesson_started', { lesson_id: 'x' });
     assert.equal(named('capture').length, 1);
   });
 
-  it('an opted-out player is opted out from install, and nothing buffered is sent', () => {
-    const t = new Telemetry();
+  it('a denial survives sign-out and account switching (reset() re-applies the opt-out)', () => {
+    const { t, calls, named } = onTelemetry();
+    t.setUser(ALICE);
     t.setConsent(false);
+    calls.length = 0;
+    t.setUser(BOB);
+    assert.deepEqual(calls.map((c) => c[0]), ['reset', 'optOut', 'register', 'identify']);
+    calls.length = 0;
+    t.setUser(null);
+    assert.deepEqual(calls.map((c) => c[0]), ['reset', 'optOut', 'register']);
+    t.track('lesson_started', { lesson_id: 'x' });
+    assert.equal(named('capture').length, 0);
+    assert.equal(t.consented, false);
+  });
+
+  it('a grant survives sign-out and account switching too', () => {
+    const { t, named } = onTelemetry();
+    t.setUser(ALICE);
+    t.setUser(BOB);
+    t.setUser(null);
+    assert.equal(t.consented, true);
+    assert.equal(named('optOut').length, 0);
+    t.track('lesson_started', { lesson_id: 'x' });
+    assert.equal(named('capture').length, 1);
+  });
+});
+
+describe('consent before the SDK exists', () => {
+  it('consent is not granted by default', () => {
+    assert.equal(new Telemetry().consented, false);
+  });
+
+  it('without consent nothing is buffered, so nothing from before the choice is sent after it', () => {
+    const t = new Telemetry();
     t.track('app_ready', { result: 'ready' });
+    t.screen({ screen: 'learn', props: {}, key: 'learn' });
+    t.reportError('rpc_failed', new Error('x'));
+    t.setUser(ALICE);
+    t.setConsent(true);
     const f = fakeClient();
     t.install(f.client);
-    assert.equal(f.named('optOut').length, 1);
     assert.equal(f.named('capture').length, 0);
+    assert.equal(f.named('screen').length, 0);
+    assert.equal(f.named('captureException').length, 0);
+    // Identity is applied (it is not an event); later events are sent.
+    assert.deepEqual(f.named('identify'), [['identify', ALICE]]);
+    t.track('lesson_started', { lesson_id: 'x' });
+    assert.equal(f.named('capture').length, 1);
+  });
+
+  it('a denial before the SDK exists drops what was buffered', () => {
+    const t = new Telemetry();
+    t.setConsent(true);
+    t.track('app_ready', { result: 'ready' });
+    t.setConsent(false);
+    const f = fakeClient();
+    t.install(f.client);
+    assert.equal(f.named('capture').length, 0);
+    assert.equal(f.named('optOut').length, 1);
+  });
+
+  it('start-up creates the SDK only for a granted consent (no SDK, id or file before that)', () => {
+    const start = readFileSync(join(import.meta.dirname, '..', 'start.ts'), 'utf8');
+    // The only construction site is install(), which apply() calls only when consent is granted.
+    assert.equal(start.match(/createPostHogClient\(/g)?.length, 1);
+    assert.match(start, /const granted = consent === 'granted';\s+telemetry\.setConsent\(granted\);\s+if \(granted\) install\(\);/);
+  });
+
+  it('flush waits for the SDK but never longer than its limit, and never throws', async () => {
+    const { t, named } = onTelemetry();
+    await t.flush(50);
+    assert.equal(named('flush').length, 1);
+    const slow = new Telemetry();
+    slow.setConsent(true);
+    slow.install({ ...fakeClient().client, flush: () => new Promise<void>(() => undefined) });
+    const began = Date.now();
+    await slow.flush(30);
+    assert.ok(Date.now() - began < 1000);
+    const broken = new Telemetry();
+    broken.setConsent(true);
+    broken.install({ ...fakeClient().client, flush: () => Promise.reject(new Error('down')) });
+    await assert.doesNotReject(broken.flush(30));
+    await assert.doesNotReject(new Telemetry().flush());
   });
 });
 

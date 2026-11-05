@@ -161,8 +161,8 @@ Settler (win-stay lose-shift), Calculator (the deliberately elaborate one), and 
 
 ## Verification status
 
-- `npx tsc --noEmit`: clean for all app code (the pre-existing errors in the Deno edge function
-  `supabase/functions/text-to-speech` are unrelated).
+- `npx tsc --noEmit`: clean for all app code (the errors that were in the unused Deno template
+  `supabase/functions/text-to-speech` went away when it was deleted on 2026-11-06).
 - `npx expo lint`: clean.
 - `npm test`: all story tests pass. The 10 failures in `supabase/__tests__/daily.test.ts` were failing before this work.
 - Web preview (375 × 812): both stories played start to finish, including resume from the library, replay, the

@@ -40,6 +40,8 @@ const ROUTES: Readonly<Record<string, RouteSpec>> = {
   'competitions/[id]': { screen: 'competition' },
   'story/[storyId]': { screen: 'story', params: { storyId: 'story_id' } },
   settings: { screen: 'settings' },
+  about: { screen: 'about' },
+  licenses: { screen: 'licenses' },
   report: { screen: 'profile_report' },
   'report/[skill]': { screen: 'profile_area' },
   'report/history': { screen: 'profile_history' },

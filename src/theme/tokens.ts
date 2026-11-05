@@ -22,7 +22,8 @@ export const colors = {
   borderStrong: 'rgba(148, 163, 184, 0.32)',
   text: '#F1F5F9',
   textBody: palette.light,
-  textMuted: palette.slate,
+  /** Secondary text. #9AA9BD (was slate #94A3B8): ≥ 4.5:1 on every surface and tinted panel it sits on (contrast.test.ts). */
+  textMuted: '#9AA9BD',
   /** Dimmest text. #8494AA: 6.1:1 on bg, 5.7:1 on bgRaised, 4.7:1 on surface (WCAG AA); 4.0:1 on surfaceHigh — keep it off surfaceHigh for small text. Was #64748B (3.1–3.9:1). */
   textFaint: '#8494AA',
   slateDot: '#64748B',
@@ -39,10 +40,17 @@ export const colors = {
   accentSoft: 'rgba(34, 211, 238, 0.12)',
   success: '#4ADE80',
   successSoft: 'rgba(74, 222, 128, 0.12)',
-  danger: '#F87171',
+  /** Errors and destructive actions. #F97878 (was #F87171): ≥ 4.5:1 on surfaceHigh and dangerSoft too. */
+  danger: '#F97878',
   dangerSoft: 'rgba(248, 113, 113, 0.12)',
   overlay: 'rgba(8, 18, 32, 0.82)',
 } as const;
+
+/**
+ * The largest system font scale text follows (AppText, inputs). Scaling is never turned off: 1.6× covers the large
+ * accessibility sizes while keeping a line from outgrowing the phone width.
+ */
+export const MAX_FONT_SCALE = 1.6;
 
 export const space = { xxs: 2, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32, huge: 48 } as const;
 

@@ -84,20 +84,29 @@ export function weekLabel(startsAt: number, endsAt: number): string {
 export const NICKNAME_MIN = 3;
 export const NICKNAME_MAX = 20;
 /** Names that could pass for the app or its staff. Checked against the normalized key. */
-export const RESERVED_NICKNAMES = ['admin', 'administrator', 'moderator', 'mod', 'official', 'support', 'staff', 'system', 'strategic', 'strategicgame', 'anonymous', 'anonymousplayer', 'null', 'undefined'];
+export const RESERVED_NICKNAMES = ['admin', 'administrator', 'moderator', 'mod', 'official', 'support', 'staff', 'system', 'strategic', 'strategicgame', 'anonymous', 'anonymousplayer', 'null', 'undefined', 'you', 'opponent', 'bot'];
+/** The brand is refused anywhere in a name. The server also catches look-alike digits and staff words. */
+const BRAND = 'tactiqo';
 
 /** The uniqueness key: lower case, with spaces, underscores, hyphens and dots removed ("Ada Lovelace" = "ada_lovelace"). */
 export const nicknameKey = (name: string) => name.toLowerCase().replace(/[\s_.-]/g, '');
 
 export type NicknameProblem = 'length' | 'characters' | 'reserved';
 
-/** Same rules as public.set_nickname: 3–20 characters; letters, digits, single spaces, _ . -; starts with a letter or digit. */
+/** Like the server's btrim: only spaces are padding; a tab or newline is a bad character. */
+export const trimNickname = (raw: string) => raw.replace(/^ +| +$/g, '');
+
+/**
+ * Same rules as public.set_nickname: 3–20 characters; letters, digits, single spaces, _ . -; starts with a letter or
+ * digit. This is quick feedback only — the server is the authority, also refuses offensive names (a list deliberately
+ * not shipped in the app) and rate-limits changes. ASCII-only on purpose: look-alike Unicode letters can't get in.
+ */
 export function nicknameProblem(raw: string): NicknameProblem | null {
-  const name = raw.trim();
+  const name = trimNickname(raw);
   if (name.length < NICKNAME_MIN || name.length > NICKNAME_MAX) return 'length';
   if (!/^[A-Za-z0-9][A-Za-z0-9 _.-]*$/.test(name) || name.includes('  ')) return 'characters';
   const key = nicknameKey(name);
-  if (key.length < NICKNAME_MIN || RESERVED_NICKNAMES.includes(key)) return 'reserved';
+  if (key.length < NICKNAME_MIN || RESERVED_NICKNAMES.includes(key) || key.includes(BRAND)) return 'reserved';
   return null;
 }
 

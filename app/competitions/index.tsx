@@ -4,7 +4,8 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
-import { ArrowRight, Crown } from '@/src/components/ui/icons';
+import { EmptyState } from '@/src/components/ui/EmptyState';
+import { ArrowRight, Crown, Trophy } from '@/src/components/ui/icons';
 import { Segmented } from '@/src/components/ui/Segmented';
 import { competitionGame } from '@/src/competition/catalog';
 import { gamesRepo } from '@/src/data/games-session';
@@ -51,7 +52,7 @@ function Weeks() {
       <ActivityIndicator color={colors.primary} style={{ marginTop: space.xl }} accessibilityLabel="Loading" />
     );
   }
-  if (!items.length) return <AppText color={colors.textMuted}>No finished weeks yet. Each week’s results and champion are kept here for good.</AppText>;
+  if (!items.length) return <EmptyState icon={Trophy} text="No finished weeks yet. Each week’s results are kept here." />;
   return (
     <View style={{ gap: space.sm }}>
       {items.map((c) => {
@@ -135,7 +136,7 @@ function Champions() {
               </View>
             ))
           ) : (
-            <AppText color={colors.textMuted}>No champions yet.</AppText>
+            <EmptyState icon={Crown} text="No champions yet." />
           )}
         </View>
       )}

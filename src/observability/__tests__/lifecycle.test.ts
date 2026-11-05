@@ -146,12 +146,15 @@ describe('a scripted first session through the engine', () => {
       addExceptionStep: () => undefined,
       identify: rec('identify'),
       reset: rec('reset'),
+      flush: async () => undefined,
       optIn: () => undefined,
       optOut: () => undefined,
       register: () => undefined,
     };
     const t = new Telemetry();
     const emit: Emit = (name, props) => t.track(name, props);
+    // A player who already chose "Share" on an earlier launch (consent is applied before anything is tracked).
+    t.setConsent(true);
     t.setUser(null);
     t.track('app_ready', { result: 'ready', total_ms: 2400, signed_in: false, onboarded: false });
     t.install(client);

@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { type ReactNode, useState } from 'react';
-import { ActivityIndicator, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,7 +9,7 @@ import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
-import { Bug, ChartNoAxesColumn, ChevronRight, Download, ExternalLink, FileText, Info, LogOut, Mail, Pencil, RotateCcw, Shield, Sparkles, Trash, UserRound, X } from '@/src/components/ui/icons';
+import { ChartNoAxesColumn, ChevronRight, CircleHelp, Download, LogOut, Pencil, RotateCcw, Sparkles, Trash, UserRound, X } from '@/src/components/ui/icons';
 import { useAuth } from '@/src/auth/store';
 import { SignInPanel } from '@/src/components/auth/SignInPanel';
 import { allLessons } from '@/src/content/lessons';
@@ -21,16 +20,17 @@ import { shareJsonFile } from '@/src/features/learning/shareFile';
 import { type ShareOutcome, isShareFailure, shareOutcomeMessage } from '@/src/features/learning/shareOutcome';
 import { useNickname } from '@/src/features/profile/nickname';
 import { Sensitive } from '@/src/observability';
-import { ABOUT_TEXT, LINKS, SUPPORT_EMAIL, supportMailto, versionLabel } from '@/src/features/settings/about';
-import { appVersion, platformLabel } from '@/src/features/settings/version';
+import { LINKS, versionLabel } from '@/src/features/settings/about';
+import { openPage } from '@/src/features/settings/ui';
+import { appVersion } from '@/src/features/settings/version';
 import { useProgress } from '@/src/store/progress';
 import { useMotionReduced } from '@/src/utils/feedback';
-import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
+import { MAX_CONTENT_WIDTH, colors, fonts, radius, space } from '@/src/theme/tokens';
 
 /**
  * One place for everything you can change, in a fixed order: who you are (nickname, goal), how the app behaves
- * (narration, motion, haptics), your learning data (export, reset), a way to your progress, about and support (legal
- * pages, contact, version) and the account. Opened from the gear on every tab.
+ * (narration, motion, haptics, analytics), your learning data (export, reset), a way to your progress, About & support
+ * (its own screen: help, contact, legal pages, licences, version) and the account. Opened from the gear on every tab.
  */
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -190,10 +190,10 @@ function ExperienceSection() {
         ) : null}
         {Platform.OS !== 'web' ? (
           <ToggleRow
-            title="Share usage and crash data"
-            body="Which lessons and games are played, how long the app takes to open, and crash reports — so we can fix problems and improve Tactiqo. Never your answers, what you type, your email or your name. Takes effect at once."
-            value={settings.shareUsageData}
-            onChange={(v) => setSetting('shareUsageData', v)}
+            title="Share anonymous usage and diagnostic data"
+            body="Helps us fix crashes and improve Tactiqo. Never your answers, reflections or anything you type."
+            value={settings.usageConsent === 'granted'}
+            onChange={(v) => setSetting('usageConsent', v ? 'granted' : 'denied')}
           />
         ) : null}
       </Card>
@@ -369,62 +369,27 @@ function ProgressSection() {
 
 // ── About and support ───────────────────────────────────────────────────────
 
-/** Opens a page of the Tactiqo website in the in-app browser; falls back to the system browser. */
-function openPage(url: string) {
-  WebBrowser.openBrowserAsync(url).catch(() => Linking.openURL(url).catch(() => undefined));
-}
-
-function LinkRow({ icon: Icon, title, body, onPress, external = true }: { icon: typeof Info; title: string; body?: string; onPress: () => void; external?: boolean }) {
-  return (
-    <Pressable onPress={onPress} accessibilityRole="link" accessibilityLabel={body ? `${title}. ${body}` : title} style={({ pressed }) => [styles.linkRow, pressed && { backgroundColor: colors.surfaceHigh }]}>
-      <Icon size={18} color={colors.primaryText} />
-      <View style={{ flex: 1, gap: 2 }}>
-        <AppText variant="bodyStrong">{title}</AppText>
-        {body ? (
-          <AppText variant="small" color={colors.textMuted}>
-            {body}
-          </AppText>
-        ) : null}
-      </View>
-      {external ? <ExternalLink size={16} color={colors.textMuted} /> : <ChevronRight size={18} color={colors.textMuted} />}
-    </Pressable>
-  );
-}
-
-/**
- * Who makes the app and how to reach them: the website's legal pages (checked to exist, src/features/settings/about.ts),
- * email support with the version filled in, and the running version and build.
- */
+/** One entry for help, contact, legal pages, licences and the version (app/about.tsx). */
 function AboutSection() {
   const v = appVersion();
-  const [note, setNote] = useState<string | null>(null);
-  const mail = (kind: 'problem' | 'feedback') => {
-    Linking.openURL(supportMailto(kind, v, platformLabel())).catch(() => setNote(`No email app opened. Write to ${SUPPORT_EMAIL}.`));
-  };
   return (
-    <Section label="About and support">
-      <Card style={{ gap: space.xs }}>
-        <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'flex-start', paddingBottom: space.sm }}>
-          <Info size={18} color={colors.insight} style={{ marginTop: 2 }} />
-          <AppText variant="small" color={colors.textBody} style={{ flex: 1 }}>
-            {ABOUT_TEXT}
+    <Section label="About & support">
+      <Pressable
+        onPress={() => router.push('/about')}
+        accessibilityRole="button"
+        accessibilityLabel={`About & support. Help, contact, privacy, terms and licences. Version ${versionLabel(v)}`}
+        style={({ pressed }) => [styles.navRow, pressed && { backgroundColor: colors.surfaceHigh }]}>
+        <View style={styles.navIcon}>
+          <CircleHelp size={18} color={colors.primaryText} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <AppText variant="bodyStrong">About & support</AppText>
+          <AppText variant="small" color={colors.textMuted}>
+            Help, contact, privacy, terms and licences.
           </AppText>
         </View>
-        <LinkRow icon={Mail} title="Report a problem" body="Opens an email with your app version filled in." onPress={() => mail('problem')} external={false} />
-        <LinkRow icon={Mail} title="Send feedback" onPress={() => mail('feedback')} external={false} />
-        <LinkRow icon={Bug} title="Support" body="Help and how to reach us." onPress={() => openPage(LINKS.support)} />
-        <LinkRow icon={Shield} title="Privacy Policy" onPress={() => openPage(LINKS.privacy)} />
-        <LinkRow icon={FileText} title="Terms & Conditions" onPress={() => openPage(LINKS.terms)} />
-        <LinkRow icon={Info} title="About Tactiqo" onPress={() => openPage(LINKS.about)} />
-        {note ? (
-          <AppText variant="small" color={colors.textMuted} selectable accessibilityLiveRegion="polite">
-            {note}
-          </AppText>
-        ) : null}
-        <AppText variant="caption" color={colors.textMuted} style={{ paddingTop: space.sm }} selectable accessibilityLabel={`App version ${versionLabel(v)}`}>
-          Version {versionLabel(v)}
-        </AppText>
-      </Card>
+        <ChevronRight size={20} color={colors.textMuted} />
+      </Pressable>
     </Section>
   );
 }
@@ -459,7 +424,7 @@ function AccountSection() {
             </View>
           </View>
           <AppText variant="small" color={colors.textBody}>
-            Sign in with Google to keep your progress safe and pick it up on any device. An account also lets you take the Daily Challenge, play Game of the Week, choose a nickname and challenge friends.
+            Sign in with Google to keep your progress and use it on any device. An account also unlocks the Daily Challenge, Game of the Week, a nickname and friend challenges.
           </AppText>
           <SignInPanel card={false} />
         </Card>
@@ -491,7 +456,7 @@ function SignedInAccount({ email }: { email: string | null }) {
         </View>
       </View>
       <AppText variant="small" color={colors.textMuted}>
-        Your learning progress, answers, Daily Challenge history, nickname and game results are saved to your account. Story progress, detailed Arena tallies and your preferences stay on this device.
+        Lessons, answers, Daily Challenge history, your nickname and game results are saved to your account. Story progress, detailed Arena records and preferences stay on this phone.
       </AppText>
       <Button label="Sign out" variant="secondary" compact icon={LogOut} iconPosition="left" disabled={status !== 'signedIn'} onPress={() => setDialog('signOut')} />
       <Pressable
@@ -573,11 +538,24 @@ function SignOutDialog({ open, onClose }: { open: boolean; onClose: () => void }
         Sign out?
       </AppText>
       <AppText variant="small" color={colors.textBody}>
-        Your account and everything saved to it stay safe. Sign in with Google again to pick up where you left off.
+        Signing out doesn’t delete your account. Sign in with Google again to pick up where you left off.
       </AppText>
-      <AppText variant="small" color={colors.textBody}>
-        This device forgets the account: story progress and Arena records kept only here are removed. Signing out doesn’t delete your account.
-      </AppText>
+      <View style={{ gap: 2 }}>
+        <AppText variant="small" color={colors.textBody} style={{ fontFamily: fonts.semibold }}>
+          Kept on your account
+        </AppText>
+        <AppText variant="small" color={colors.textBody}>
+          Lessons and answers, Daily Challenge history, Game of the Week and game results, your nickname.
+        </AppText>
+      </View>
+      <View style={{ gap: 2 }}>
+        <AppText variant="small" color={colors.textBody} style={{ fontFamily: fonts.semibold }}>
+          Removed from this phone
+        </AppText>
+        <AppText variant="small" color={colors.textBody}>
+          Story progress and detailed Arena records. They’re only stored on this phone and can’t be restored.
+        </AppText>
+      </View>
       {unsaved ? (
         <AppText variant="small" color={colors.insight} accessibilityLiveRegion="assertive">
           {UNSAVED_MESSAGE}
@@ -631,13 +609,16 @@ function DeleteDialog({ open, onClose }: { open: boolean; onClose: () => void })
         Delete your account?
       </AppText>
       <AppText variant="small" color={colors.textBody}>
-        Your Tactiqo account and associated personal data will be permanently deleted. This action cannot be undone.
+        Your Tactiqo account and its data are deleted permanently. This can’t be undone.
       </AppText>
       <AppText variant="small" color={colors.textBody}>
-        That includes lesson progress and answers, Daily Challenge history, your nickname, practice and Arena match results, Game of the Week results and friend challenges you created. This device also forgets the account; your motion, haptics and narration preferences stay.
+        That’s lessons and answers, Daily Challenge history, your nickname, game and Arena results, Game of the Week results and friend challenges you created. This phone forgets the account too; your app preferences stay.
+      </AppText>
+      <AppText variant="small" color={colors.textBody}>
+        Usage and crash data linked to your account is deleted by a background process, which can take a few days.
       </AppText>
       <AppText variant="caption" color={colors.textMuted}>
-        Only want to leave this device? Cancel and sign out instead — that keeps your account. Want a copy first? Cancel and use Export data.
+        Only want to leave this phone? Sign out instead. Want a copy first? Use Export data.
       </AppText>
       {error ? (
         <AppText variant="small" color={colors.danger} accessibilityLiveRegion="assertive">
@@ -649,12 +630,12 @@ function DeleteDialog({ open, onClose }: { open: boolean; onClose: () => void })
           onPress={() => void confirm()}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel={busy ? 'Deleting account' : 'Delete Account'}
+          accessibilityLabel={busy ? 'Deleting account' : 'Delete account'}
           accessibilityState={{ disabled: busy, busy }}
           style={({ pressed }) => [styles.dangerSolid, (pressed || busy) && { opacity: 0.8 }]}>
           {busy ? <ActivityIndicator color="#fff" size="small" /> : null}
           <AppText variant="bodyStrong" color="#fff" style={{ flexShrink: 1 }}>
-            {busy ? 'Deleting…' : 'Delete Account'}
+            {busy ? 'Deleting…' : 'Delete account'}
           </AppText>
         </Pressable>
         <Button label="Cancel" variant="secondary" compact disabled={busy} onPress={close} />
@@ -670,7 +651,6 @@ const styles = StyleSheet.create({
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 48 },
   avatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primary },
   divider: { height: 1, backgroundColor: colors.border },
-  linkRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 48, paddingVertical: space.sm, paddingHorizontal: space.xs, borderRadius: radius.md },
   navRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -37,9 +37,21 @@ export function seedDocument(): unknown {
   return JSON.parse(readFileSync(join(ROOT, 'seed', 'content.json'), 'utf8'));
 }
 
-export async function createDatabase({ seed = true }: { seed?: boolean } = {}): Promise<PGlite> {
+/**
+ * Hosted Supabase's default privileges: every new table and function in `public` is granted to anon, authenticated
+ * and service_role. Off by default here (the existing suites were written against the plain shim); a test that must
+ * prove a revoke really holds on Supabase turns it on.
+ */
+const SUPABASE_DEFAULT_PRIVILEGES = `
+  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+  alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+  alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+`;
+
+export async function createDatabase({ seed = true, supabaseDefaults = false }: { seed?: boolean; supabaseDefaults?: boolean } = {}): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(SUPABASE_SHIM);
+  if (supabaseDefaults) await db.exec(SUPABASE_DEFAULT_PRIVILEGES);
   for (const file of migrationFiles()) {
     try {
       await db.exec(readFileSync(file, 'utf8'));

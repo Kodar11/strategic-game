@@ -660,9 +660,11 @@ function Counter({
 
 const styles = StyleSheet.create({
   levelBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    // Grows with the system text size instead of clipping the number.
+    minWidth: 40,
+    minHeight: 40,
+    paddingHorizontal: space.xs,
+    borderRadius: radius.pill,
     backgroundColor: colors.accentSoft,
     borderWidth: 1,
     borderColor: 'rgba(34,211,238,0.35)',

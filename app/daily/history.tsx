@@ -5,7 +5,8 @@ import { useIsGuest } from '@/src/components/auth/SignInRequired';
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Card';
-import { ArrowRight } from '@/src/components/ui/icons';
+import { EmptyState } from '@/src/components/ui/EmptyState';
+import { ArrowRight, CalendarDays } from '@/src/components/ui/icons';
 import { dailyRepo } from '@/src/data/daily-session';
 import { DIFFICULTY_NAME } from '@/src/features/daily/content';
 import { dayLabel, formatDay } from '@/src/features/daily/dates';
@@ -40,7 +41,7 @@ export default function DailyHistoryScreen() {
           <ActivityIndicator color={colors.primary} style={{ marginTop: space.xl }} accessibilityLabel="Loading" />
         )
       ) : !items.length ? (
-        <AppText color={colors.textMuted}>No past challenges yet. Each day’s challenge stays here for review and practice.</AppText>
+        <EmptyState icon={CalendarDays} text="No past challenges yet. Each day’s challenge stays here for review." />
       ) : (
         <View style={{ gap: space.sm }}>
           {items.map((c) => {

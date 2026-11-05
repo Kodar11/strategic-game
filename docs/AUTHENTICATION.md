@@ -2,13 +2,16 @@
 
 Tactiqo has one way to sign in: **Continue with Google**. It works for new and returning players alike. Signing in is optional. A guest can do the onboarding, lessons, practice games, Arena and Stories without an account.
 
-There are no anonymous Supabase users, no email/password and no email OTP.
+There are no anonymous Supabase users, no email/password, no email sign-up, no password reset, no magic links and no email OTP. `src/auth/__tests__/google-only.test.ts` reads the source and `supabase/config.toml` and fails if any of these come back (a forbidden Supabase Auth call, a password field, "check your email" copy, a sign-up/reset route, or anonymous/email sign-ups switched on locally).
+
+The email address Google provides stays in Supabase Auth (`auth.users.email`) and is shown only to its owner in Settings. It is never copied into `player_profiles`, leaderboards or analytics.
 
 ## Status at a glance
 
 | Area | Status |
 |---|---|
-| Code: native Google sign-in → `signInWithIdToken` (nonce) | Implemented, **not verified on a device** (no Android SDK on the build machine) |
+| Code: browser Google sign-in (PKCE, default) → `exchangeCodeForSession` | Implemented, **not verified on a device** (no Android SDK on the build machine) |
+| Code: native Google sign-in (opt-in) → `signInWithIdToken` (nonce) | Implemented, **not verified on a device** |
 | Code: guest mode, progress hand-over on sign-in | Implemented. Unit-tested; guest mode checked in the web preview |
 | Code: secure session storage, refresh lifecycle, auth state | Implemented. Storage adapter unit-tested; not verified on a device |
 | Code: sign-out, account switching, device-data cleanup | Implemented and unit-tested (owner marker, outbox race) |
@@ -189,7 +192,7 @@ In-memory caches: the progress store is emptied, and the games and Daily stores 
 - **Secrets:** the app ships only the Supabase URL, the publishable key and the Google Web client id, all public by design. The client refuses a service-role key. No Google client secret or service-role key exists in the repository.
 - **Tokens:** never logged or put in app state. Dev logs carry only error codes.
 - **Nonce:** always sent. `skip_nonce_check = false` in local config. Never disable it on the hosted project.
-- ⚠️ **Pre-existing, unrelated to auth:** `supabase/functions/text-to-speech` is the Supabase "Hello" template with `verify_jwt = false`. It does nothing sensitive today, but don't deploy it as is.
+- **Removed (2026-11-06):** the unused `supabase/functions/text-to-speech` "Hello" template is deleted from the repository. The copy still deployed on the hosted project must be deleted by hand: `npx supabase functions delete text-to-speech` (docs/PRE_LAUNCH_SPRINT.md).
 - ⚠️ **Dashboard settings decide part of the attack surface.** If anonymous sign-ins or email sign-ups stay enabled on the hosted project, anyone with the public key can create an `authenticated` user through the Auth API without Google. Data stays isolated per user, but it should be turned off (below).
 
 ## External configuration still required

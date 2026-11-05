@@ -10,7 +10,7 @@ import { dispatchAuth, useAuth } from '@/src/auth/store';
 import { type Catalog, installCatalog } from '@/src/content/catalog';
 import { installCategories } from '@/src/content/categories';
 import { monthOf } from '@/src/features/daily/dates';
-import { currentScreen, errorCode, reportError, setCommonProperties, track } from '@/src/observability/api';
+import { currentScreen, errorCode, flushTelemetry, reportError, setCommonProperties, track } from '@/src/observability/api';
 import { useProgress } from '@/src/store/progress';
 import { EMPTY_PROGRESS, type ProgressData } from '@/src/store/progress-state';
 import { accountRepository } from './account';
@@ -534,6 +534,9 @@ export async function deleteAccount(): Promise<void> {
   stopSaving();
   outbox.stop();
   arenaUploads.stop();
+  // Analytics already captured for this account (if the player shares them) go out BEFORE the server queues the
+  // PostHog deletion, so that deletion covers them (docs/ACCOUNT_DELETION.md). Bounded; never blocks deletion.
+  await flushTelemetry(3000);
   try {
     await account.deleteMyAccount();
   } catch (e) {
@@ -550,8 +553,8 @@ export async function deleteAccount(): Promise<void> {
   // (motion, haptics, narration) stay; the welcome shows again for whoever uses the phone next.
   await signOutQuietly().catch(() => undefined);
   await forgetGoogleAccount();
-  // The last event of this identity; becoming a guest resets it. What happens to analytics data already sent for a
-  // deleted account is documented in docs/OBSERVABILITY.md ("Account deletion").
-  track('account_deleted');
   await becomeGuest({ welcomeAgain: true });
+  // Only now, as an anonymous guest event: sent under the deleted id it could re-create the PostHog person the server
+  // has just queued for deletion. The server deletes that person, their events and recordings (posthog-deletion).
+  track('account_deleted');
 }

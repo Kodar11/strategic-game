@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 import { Text, type TextProps, type TextStyle } from 'react-native';
 
-import { colors, fonts, type FontWeightName, type TypeVariant, type } from '@/src/theme/tokens';
+import { MAX_FONT_SCALE, colors, fonts, type FontWeightName, type TypeVariant, type } from '@/src/theme/tokens';
 
 /** Whether the Inter font family loaded; falls back to the system font if not. */
 export const FontsReadyContext = createContext(false);
@@ -21,13 +21,15 @@ export interface AppTextProps extends TextProps {
   tabular?: boolean;
 }
 
-export function AppText({ variant = 'body', color, weight, align, tabular, style, ...rest }: AppTextProps) {
+export function AppText({ variant = 'body', color, weight, align, tabular, style, maxFontSizeMultiplier = MAX_FONT_SCALE, ...rest }: AppTextProps) {
   const fontsReady = useContext(FontsReadyContext);
   const t = type[variant];
   const w = weight ?? t.weight;
   return (
     <Text
       {...rest}
+      // Follows the system text size, up to 1.6× — enough for large accessibility sizes without breaking layouts.
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
       style={[
         {
           color: color ?? (variant === 'body' || variant === 'small' ? colors.textBody : colors.text),

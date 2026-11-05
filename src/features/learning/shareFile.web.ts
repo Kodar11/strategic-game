@@ -4,6 +4,9 @@ import type { ShareOutcome } from './shareOutcome';
  * Web: expo-file-system has no web implementation and expo-sharing can't share local files there, so the browser
  * downloads the JSON instead. The browser doesn't tell us whether the file was kept, so neither do we.
  */
+/** Web keeps no export file (the browser downloads it), so there is nothing to clear. */
+export function clearExportFiles(): void {}
+
 export async function shareJsonFile(json: string, fileName: string): Promise<ShareOutcome> {
   if (typeof document === 'undefined' || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
     return { kind: 'unavailable' };

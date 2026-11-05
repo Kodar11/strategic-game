@@ -10,5 +10,9 @@ export const reportError: typeof telemetry.reportError = (kind, error, context, 
 export const currentScreen = (): string | null => telemetry.currentScreen;
 /** Properties sent with every event (e.g. the content revision once the catalogue is loaded). */
 export const setCommonProperties: typeof telemetry.setSuperProps = (props) => telemetry.setSuperProps(props);
+/** Sends events already queued on the device (bounded wait, never throws). Used before an account deletion. */
+export const flushTelemetry = (timeoutMs?: number): Promise<void> => telemetry.flush(timeoutMs);
+/** Whether this build can collect analytics at all (native, switched on, valid key) — decides if consent is asked. */
+export const analyticsAvailable = (): boolean => telemetry.available;
 
 export { errorCode } from './core.ts';

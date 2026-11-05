@@ -190,7 +190,7 @@ export default function ReportScreen() {
           />
 
           <AppText variant="caption" color={colors.textMuted} align="center">
-            Worked out on your device from your saved answers{daily ? ' and daily challenges' : ''}. It describes what you did — not who you are.
+            Based on your saved answers{daily ? ' and daily challenges' : ''}. It describes what you did — not who you are.
           </AppText>
         </View>
       </ScrollView>

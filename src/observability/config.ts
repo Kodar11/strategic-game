@@ -10,7 +10,12 @@
  * - Web is off: the web build is a preview of the app, and the website will have its own setup.
  * - The key must be a project (public, `phc_`) key. A personal API key (`phx_`) can read and delete data and must
  *   never be in an app; seeing one switches telemetry off.
+ * - Session replay is OFF in code (`SESSION_REPLAY_SAMPLE_RATE = 0`), whatever the environment says and whatever the
+ *   player's analytics choice. Turning it on needs a separate privacy and safety decision and a code change here.
  */
+
+/** Session replay sampling. Deliberately a constant, not configuration: see the note above. */
+export const SESSION_REPLAY_SAMPLE_RATE = 0;
 
 export type Environment = 'development' | 'preview' | 'production';
 
@@ -20,7 +25,8 @@ export interface ConfigInput {
   apiKey: string | undefined;
   host: string | undefined;
   environment: string | undefined;
-  replaySampleRate: string | undefined;
+  /** Ignored: session replay stays off in code (SESSION_REPLAY_SAMPLE_RATE). Kept so old callers still type-check. */
+  replaySampleRate?: string | undefined;
   gitSha: string | null | undefined;
 }
 
@@ -30,8 +36,8 @@ export type ResolvedConfig =
       apiKey: string;
       host: string;
       environment: Environment;
-      /** 0 = session replay off (the default everywhere until approved). */
-      replaySampleRate: number;
+      /** Always 0: session replay is off in code (SESSION_REPLAY_SAMPLE_RATE). */
+      replaySampleRate: typeof SESSION_REPLAY_SAMPLE_RATE;
       gitSha: string | null;
     }
   | { enabled: false; reason: 'web' | 'switched_off' | 'no_key' | 'personal_key' | 'bad_host'; environment: Environment };
@@ -51,8 +57,6 @@ export function resolveConfig(input: ConfigInput): ResolvedConfig {
   if (apiKey.startsWith('phx_')) return { enabled: false, reason: 'personal_key', environment };
   const host = (input.host?.trim() || DEFAULT_HOST).replace(/\/+$/, '');
   if (!/^https:\/\/[a-z0-9.-]+$/i.test(host)) return { enabled: false, reason: 'bad_host', environment };
-  const rate = Number(input.replaySampleRate);
-  const replaySampleRate = Number.isFinite(rate) ? Math.min(1, Math.max(0, rate)) : 0;
   const gitSha = input.gitSha && /^[0-9a-f]{7,40}$/i.test(input.gitSha) ? input.gitSha.slice(0, 12) : null;
-  return { enabled: true, apiKey, host, environment, replaySampleRate, gitSha };
+  return { enabled: true, apiKey, host, environment, replaySampleRate: SESSION_REPLAY_SAMPLE_RATE, gitSha };
 }

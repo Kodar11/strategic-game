@@ -17,7 +17,7 @@ import { type AssessmentRun, assessmentScore, currentAssessmentRun, finalUnlocke
 import { DataTable } from '@/src/features/scenarios/visuals';
 import { track } from '@/src/observability';
 import { useProgress } from '@/src/store/progress';
-import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
+import { MAX_CONTENT_WIDTH, MAX_FONT_SCALE, colors, radius, space } from '@/src/theme/tokens';
 
 // Static web export renders every page the app can show; content (loaded at run time) decides what each page holds.
 export function generateStaticParams() {
@@ -145,6 +145,7 @@ function Runner({ a }: { a: Assessment }) {
           <SectionLabel>Your recommendation (not scored)</SectionLabel>
           <AppText variant="bodyStrong">{a.reflection.prompt}</AppText>
           <TextInput
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
             value={run.reflection}
             onChangeText={(t) => setReflection(a.id, t)}
             editable={!run.submitted}

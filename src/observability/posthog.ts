@@ -17,12 +17,11 @@ import { isBannedKey } from './privacy';
  *   rage-click events: none is used yet, and each would spend event budget.
  * - Errors: uncaught JS exceptions, unhandled promise rejections, native crashes and Android NDK crashes. Console
  *   capture is off: render errors are reported once by the route error boundary (ErrorBoundary.tsx).
- * - Session replay only when a sample rate above 0 is configured (EXPO_PUBLIC_POSTHOG_REPLAY_SAMPLE_RATE; 0 by
- *   default), with every text input and image masked and console/network capture off.
+ * - Session replay off, always (config.ts SESSION_REPLAY_SAMPLE_RATE): not part of the analytics consent.
+ * - Constructed only after the player chose "Share" (start.ts), so the SDK writes no id or file before that.
  * - `before_send` removes any banned property name the SDK or a future call might add (privacy.ts).
  */
 export function createPostHogClient(config: Extract<ResolvedConfig, { enabled: true }>, consent: boolean): TelemetryClient | null {
-  const replay = config.replaySampleRate > 0;
   const ph = new PostHog(config.apiKey, {
     host: config.host,
     persistence: 'file',
@@ -46,20 +45,8 @@ export function createPostHogClient(config: Extract<ResolvedConfig, { enabled: t
         androidNdkCrashes: true,
       },
     },
-    enableSessionReplay: replay,
-    sessionReplayConfig: replay
-      ? {
-          sampleRate: config.replaySampleRate,
-          maskAllTextInputs: true,
-          maskAllImages: true,
-          maskAllSandboxedViews: true,
-          captureLog: false,
-          captureNetworkTelemetry: false,
-          captureTouches: true,
-          screenshotColorMode: 'RGB_565',
-          throttleDelayMs: 1000,
-        }
-      : undefined,
+    // Never on: see config.ts. A future replay decision must change this line and SESSION_REPLAY_SAMPLE_RATE together.
+    enableSessionReplay: config.replaySampleRate > 0,
     before_send: (event) => {
       if (!event?.properties) return event;
       for (const k of Object.keys(event.properties)) if (!k.startsWith('$') && isBannedKey(k)) delete event.properties[k];
@@ -74,6 +61,7 @@ export function createPostHogClient(config: Extract<ResolvedConfig, { enabled: t
     addExceptionStep: (message, properties) => ph.addExceptionStep(message, properties),
     identify: (id) => ph.identify(id),
     reset: () => ph.reset(),
+    flush: () => ph.flush(),
     optIn: () => void ph.optIn(),
     optOut: () => void ph.optOut(),
     register: (properties) => void ph.register(properties),

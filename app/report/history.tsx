@@ -7,7 +7,8 @@ import { confidenceLabel } from '@/src/components/lesson/prediction-state';
 import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button } from '@/src/components/ui/Button';
-import { ChevronDown } from '@/src/components/ui/icons';
+import { EmptyState } from '@/src/components/ui/EmptyState';
+import { ChevronDown, ListOrdered } from '@/src/components/ui/icons';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { Segmented } from '@/src/components/ui/Segmented';
 import { getLesson } from '@/src/content/lessons';
@@ -60,11 +61,12 @@ export default function AnswerHistoryScreen() {
           </View>
         }
         ListEmptyComponent={
-          <View style={[styles.column, { gap: space.md }]}>
-            <AppText variant="small" color={colors.textMuted}>
-              {rows.length ? 'No answers in this group.' : 'No answers yet. Your predictions in lessons and challenges will be listed here.'}
-            </AppText>
-            {rows.length ? null : <Button label="Back to profile" variant="secondary" onPress={() => (router.canGoBack() ? router.back() : router.replace('/profile'))} />}
+          <View style={styles.column}>
+            <EmptyState
+              icon={ListOrdered}
+              text={rows.length ? 'No answers in this group.' : 'No answers yet. Your lesson and challenge predictions will appear here.'}
+              action={rows.length ? undefined : { label: 'Back to profile', onPress: () => (router.canGoBack() ? router.back() : router.replace('/profile')) }}
+            />
           </View>
         }
         renderItem={({ item }) => <Row row={item} open={open === item.id} onToggle={() => setOpen((v) => (v === item.id ? null : item.id))} />}

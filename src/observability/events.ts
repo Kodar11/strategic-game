@@ -159,12 +159,8 @@ export const EVENTS = {
   },
   sign_in_invite_dismissed: { trigger: '“Not now” on the Learn tab’s sign-in invitation.', privacy: 'account', props: {} },
   signed_out: { trigger: 'The player signs out (forced: they chose to drop unsent changes).', privacy: 'account', props: { forced: 'bool' } },
-  account_deleted: { trigger: 'The server confirmed the account deletion; sent just before the identity is reset.', privacy: 'account', props: {} },
-  analytics_opted_out: {
-    trigger: 'The player turns off “Share usage and crash data”; the last event sent before collection stops.',
-    privacy: 'account',
-    props: {},
-  },
+  // Sent AFTER the identity is reset, as an anonymous event, so it can't re-create the deleted account's PostHog person.
+  account_deleted: { trigger: 'The server confirmed the account deletion; sent anonymously once the identity is reset.', privacy: 'account', props: {} },
 
   // ── Performance ─────────────────────────────────────────────────────────────────────────────────────────────────
   app_ready: {
@@ -222,6 +218,8 @@ export const SCREENS = [
   'competition',
   'story',
   'settings',
+  'about',
+  'licenses',
   'profile_report',
   'profile_area',
   'profile_history',

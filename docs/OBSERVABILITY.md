@@ -55,7 +55,6 @@ data layer ── track(), reportError()                                        
 | `EXPO_PUBLIC_POSTHOG_ENABLED` | EAS env per environment, `.env` locally | Must be exactly `true`, or nothing is sent. **The release gate.** |
 | `EXPO_PUBLIC_POSTHOG_API_KEY` | EAS env, `.env` | The *project* key (`phc_…`), public by design. A personal key (`phx_…`) switches telemetry off |
 | `EXPO_PUBLIC_POSTHOG_HOST` | EAS env, `.env` | `https://eu.i.posthog.com` (default) or the US host |
-| `EXPO_PUBLIC_POSTHOG_REPLAY_SAMPLE_RATE` | EAS env | 0–1; `0`/unset means session replay is off (the default) |
 | `POSTHOG_CLI_API_KEY`, `POSTHOG_CLI_PROJECT_ID`, `POSTHOG_CLI_HOST` | **EAS secret** only | Source-map and native-symbol upload during builds. Never `EXPO_PUBLIC_`, never committed |
 
 **Environment.** It comes from the EAS build profile (`app.config.js` → `extra.observability.environment`):
@@ -122,7 +121,7 @@ Full definitions, triggers and property types are in `src/observability/events.t
 | Daily | `daily_submitted` | Official or practice answer checked (`official`, `result`) |
 | Stories | `story_started`, `story_finished` | Story screen open; ending reached (stories store) |
 | Social | `challenge_link_created`, `challenge_link_opened`, `nickname_set` | Challenge create, link open, nickname save |
-| Account | `sign_in_started`, `sign_in_finished`, `sign_in_invite_dismissed`, `signed_out`, `account_deleted`, `analytics_opted_out` | `SignInPanel`, `src/data/session.ts`, invite, Settings toggle |
+| Account | `sign_in_started`, `sign_in_finished`, `sign_in_invite_dismissed`, `signed_out`, `account_deleted` | `SignInPanel`, `src/data/session.ts`, invite, Settings toggle |
 | Performance | `app_ready` | Cold start finished: `total_ms`, `catalog_ms`, `categories_ms`, result |
 | Billing (reserved) | `paywall_viewed`, `plan_selected`, `checkout_started`, `checkout_result`, `purchase_restored` | **Refused until billing exists.** Revenue must come from RevenueCat's server integration, not the app |
 | SDK | `Application Installed/Updated/Opened/Became Active/Backgrounded`, `$screen`, `$exception` | Lifecycle, the screen allow-list, errors |
@@ -192,6 +191,23 @@ The app's `rpc_failed` and `ranked_move_failed` carry the RPC or operation name,
 
 ## 6. Identity, consent and account deletion
 
+### Consent (explicit opt-in, default off)
+
+The player's choice is `usageConsent: 'unset' | 'granted' | 'denied'` in device settings (`src/store/settings.ts`). Only `granted` allows collection.
+
+| Situation | What happens |
+|---|---|
+| New install | `unset`. The PostHog SDK is **not created** (`start.ts`): no events, no anonymous id, no files. Calls to `track` / `screen` / `reportError` are dropped, not buffered, so nothing from before the choice is sent later |
+| After the welcome | One card on Learn (`UsageConsentCard`): "Help improve Tactiqo" with **Share** and **Not now**, same style, nothing preselected, no modal. Shown only on a native build where telemetry is switched on. Either answer hides it for good |
+| Share (card or Settings) | `granted` → the SDK is created at once, consent applied, a signed-in player identified |
+| Not now, or the Settings switch off | `denied` → `optOut()` and `reset()` at once (on-device id and properties cleared; opt-out re-applied). No farewell event. Events already queued while consent was on may still be delivered |
+| Sign-out, account switch, account deletion | The choice is a device preference and stays as it is; `reset()` re-applies the opt-out |
+| Old installs | The old boolean `shareUsageData` defaulted to `true`, so a stored `true` is **not** consent → `unset` (asked again). A stored `false` was an explicit switch-off → `denied` |
+
+Settings → Experience: **Share anonymous usage and diagnostic data** — "Helps us fix crashes and improve Tactiqo. Never your answers, reflections or anything you type." The switch shows `usageConsent === 'granted'`.
+
+### Identity
+
 | Situation | What happens (`core.ts` `setUser`, driven by the auth store in `start.ts`) |
 |---|---|
 | Guest | Anonymous PostHog id; no person profile (`personProfiles: identified_only`) |
@@ -199,60 +215,42 @@ The app's `rpc_failed` and `ranked_move_failed` carry the RPC or operation name,
 | App opens with a session | `identify` only after `getUser()` confirmed it (`restored`) |
 | Sign-out, revoked session | `signed_out` (sign-out only) → `reset()` → new anonymous id |
 | Switch account | `reset()` before `identify(next)` |
-| Account deletion | `account_deleted` → `reset()` |
-| "Share usage and crash data" off | `analytics_opted_out`, then `optOut()`: nothing more is sent, including errors. Stored in device settings (`shareUsageData`), so it survives sign-out. Re-applied after every `reset()`, which would otherwise clear it. Applied before the SDK sends anything at start-up (`defaultOptIn`) |
+| Account deletion | queued events flushed (≤ 3 s) **before** the deletion request → the server deletes the account and queues the PostHog deletion → `reset()` → `account_deleted` sent as an **anonymous** event, so it can't re-create the deleted person |
 
-### Account deletion: what is and isn't done
+### Account deletion of PostHog data (option B, implemented)
 
-- **Done:**
-  - Deletion resets the device's analytics identity.
-  - PostHog never receives an email, name or nickname; the only link to a person is the Supabase UUID.
-  - Deleting the account deletes that UUID's `auth.users` row, so no one can map the PostHog person back to a Google account (except database backups, within Supabase's backup retention).
-- **Not done:** PostHog's own person and events for that UUID are **not deleted**. Deleting them needs PostHog's admin API with a personal API key, which must never be in the app.
+`delete_my_account()` queues a row in `public.account_deletions` in the same transaction as the account deletion. The `posthog-deletion` Edge Function, run every 15 minutes by pg_cron, deletes the PostHog person **with their events and recordings**, then later confirms the person is gone. Design, retries, retention and deployment: **docs/ACCOUNT_DELETION.md**.
 
-**Decision needed before production** (legal and privacy review):
-
-- **(A) Pseudonymous retention.** State in the privacy policy that usage and crash data are pseudonymous, kept for N months (set PostHog's retention to match), and not linked to the person after account deletion. No code.
-- **(B) Server-side deletion.** A Supabase Edge Function, called with the user's JWT just before `delete_my_account`, deletes the PostHog person (`/api/projects/:id/persons/` with a secret stored in Supabase). On failure, it writes the UUID to a small `analytics_deletion_queue` table (a new migration) that a pg_cron job retries. The account deletion itself never waits on PostHog.
-
-Until then, **don't claim in the policy or Data Safety that deletion removes analytics data.**
+What it does not guarantee: PostHog deletes events and recordings asynchronously, on its own schedule, after accepting the request. "Done" in the queue means PostHog no longer has a person for that id. Events sent with no identity (a guest's, or the anonymous `account_deleted`) aren't linked to any account and aren't deleted by this process.
 
 ## 7. Session replay
 
-- **Built in, off.** `EXPO_PUBLIC_POSTHOG_REPLAY_SAMPLE_RATE` defaults to 0. The option is read once at start-up, so turning it off needs no remote flag.
-- **Settings:** all text inputs and all images masked, sandboxed views masked, console logs and network telemetry not captured, RGB_565 screenshots, a 1 s throttle.
-- **Masked with `<Sensitive>`:** the account email and the player's nickname in Settings.
+- **Off in code.** `SESSION_REPLAY_SAMPLE_RATE = 0` in `config.ts`. No environment variable can change it, and analytics consent doesn't turn it on. Enabling it needs a separate privacy and safety decision and a code change (the old `EXPO_PUBLIC_POSTHOG_REPLAY_SAMPLE_RATE` variable is no longer read).
+- **Masked with `<Sensitive>`** (kept for the future): the account email and the player's nickname in Settings.
 
-**Before raising the rate above 0**, all of these must pass:
+**Before any future replay decision**, all of these must pass:
 
-1. **Check on a device** whether `maskAllTextInputs` masks plain text as well as inputs. The SDK's comment says "all text and text input fields".
-2. **If it doesn't, wrap other players' nicknames in `<Sensitive>`** in:
-   - `app/leaderboard.tsx` (rows and Hall of Fame)
-   - `app/daily/leaderboard.tsx`
-   - `app/competitions/index.tsx`
-   - `app/competitions/[id].tsx`
-   - `app/(tabs)/games.tsx` (last week's champion)
-   - `src/features/games/ui/GameRecordCard.tsx`
+1. **Check on a device** whether masking covers plain text as well as inputs.
+2. **If it doesn't, wrap other players' nicknames in `<Sensitive>`** (leaderboards, daily leaderboard, competitions, last week's champion, `GameRecordCard`).
 3. **Record one session on a low-end Android phone:** frame drops, memory, battery.
-4. **Update the policy** to mention recordings.
-5. **Then start at 0.1** in production.
+4. **Update the policy** to mention recordings, and ask for consent to recordings separately.
 
 ## 8. Privacy policy and Play Data Safety (to do before switching production on)
 
 The current website policy says the app has "no advertising, analytics or crash-reporting SDKs" and describes anonymous accounts. Both are wrong once this ships. Text to adapt (not legal advice):
 
-> **Usage and diagnostics.** If "Share usage and crash data" is on (Settings → Experience), the app sends pseudonymous usage events to PostHog (our analytics provider, hosted in the [EU/US]): which screens, lessons, scenarios, games and stories you open and finish, how long they take, sign-in outcomes, how long the app takes to start, and crash and error reports (the error, the app version, your device model and OS version, and the screens and actions just before it). Events are linked to a random analytics id, and, if you are signed in, to your account's internal id — never your name, email, nickname, answers or anything you type. You can turn this off at any time in Settings; it stops at once. We keep this data for [N] months. [Deletion: A or B above.]
+> **Usage and diagnostics.** Only if you choose "Share" (asked once; Settings → Experience → "Share anonymous usage and diagnostic data"), the app sends pseudonymous usage events to PostHog (our analytics provider, hosted in the [EU/US]): which screens, lessons, scenarios, games and stories you open and finish, how long they take, sign-in outcomes, how long the app takes to start, and crash and error reports (the error, the app version, your device model and OS version, and the screens and actions just before it). Events are linked to a random analytics id, and, if you are signed in, to your account's internal id — never your name, email, nickname, answers or anything you type. It is off until you choose Share, and you can turn it off at any time in Settings; it stops at once. We keep this data for [N] months. When you delete your account, your PostHog person, events and recordings are deleted by a background process, normally within a few days.
 
 **Play Data Safety:**
 
 | Category | Item | Collected | Shared | Purpose | Optional |
 |---|---|---|---|---|---|
-| App activity | App interactions | Yes | No (PostHog is a service provider) | Analytics, app functionality | Yes (the toggle) |
+| App activity | App interactions | Yes | No (PostHog is a service provider) | Analytics, app functionality | Yes (opt-in) |
 | App info and performance | Crash logs, Diagnostics | Yes | No | Analytics (diagnostics) | Yes |
 | Device or other IDs | The analytics id, plus the account id when signed in | Yes | No | Analytics | Yes |
 
 - Encrypted in transit: yes.
-- Deletion: describe exactly what decision A or B does.
+- Deletion: users can request deletion (in-app Delete account, or the website page); analytics data linked to the account is deleted by the queue in docs/ACCOUNT_DELETION.md.
 - Re-check the Play definitions when filling the form.
 
 ## 9. Release gate
@@ -260,8 +258,8 @@ The current website policy says the app has "no advertising, analytics or crash-
 Production collection stays off (`EXPO_PUBLIC_POSTHOG_ENABLED` unset for `production`) until:
 
 1. The privacy policy is updated (§8) and the Data Safety form matches.
-2. The deletion decision (A or B) is made, and the policy says what it does.
-3. The **consent default** is confirmed. The code defaults "Share usage and crash data" to **on**, with a disclosed opt-out (`DEFAULT_SETTINGS.shareUsageData` in `src/store/settings.ts`). If the legal review requires opt-in, change that one default to `false`.
+2. The PostHog deletion worker is deployed and its secrets are set (docs/ACCOUNT_DELETION.md), and the policy says what it does.
+3. Consent default: decided — explicit opt-in, default off (§6).
 4. The device checks in §10 pass on a preview build, including readable stack traces.
 
 ## 10. Device verification (preview APK; not yet done)
@@ -277,8 +275,10 @@ Use this as a checklist:
 - [ ] Sign in: `identify` with the UUID, `sign_in_finished` success, `is_new_account` correct.
 - [ ] Sign out: a new anonymous id.
 - [ ] Switching accounts: the second account has no first-account events.
-- [ ] Turn the toggle off: no further events or exceptions. Sign out and in: still off.
-- [ ] Delete account: `account_deleted`, then a new anonymous id.
+- [ ] Fresh install: no PostHog request and no `.posthog-rn.json` until "Share" is chosen on the Learn card.
+- [ ] "Not now": the card disappears for good; still no PostHog request.
+- [ ] Turn the switch off: no further events or exceptions. Sign out and in: still off.
+- [ ] Delete account: events flushed, then a new anonymous id and an anonymous `account_deleted`; the queue row reaches `done` (docs/ACCOUNT_DELETION.md).
 - [ ] Background and foreground: lifecycle events; no duplicate screens.
 - [ ] A failed RPC (e.g. against a project without the v2 migrations): one `rpc_failed` with `rpc` and `PGRST202`.
 - [ ] Before any replay: the §7 checks.
@@ -314,11 +314,11 @@ Filter every insight on `environment = production` and exclude the "Team" cohort
 | No SDK calls outside the layer | **PASS** | Architecture test |
 | Disabled mode and web | **PASS** | Config tests; web export builds without the SDK and starts with no errors and no PostHog requests (static web build, 360 px) |
 | Event hooks in lessons, scenarios, checkpoints, games (all modes), daily, stories, social, auth, start-up | **PARTIAL** | Wired, typechecked and lifecycle-tested; never observed arriving in PostHog (no project or device) |
-| Identity and consent rules | **PARTIAL** | Unit-tested, including consent surviving `reset()`; not exercised with real Google sign-in |
+| Identity and consent rules (opt-in, default off) | **PARTIAL** | Unit-tested: no SDK or buffer before consent, grant and deny take effect at once, survive sign-out and switching, old saves migrate; not exercised on a device |
 | JS, render, native and NDK crash capture | **BLOCKED** | Configured; needs the PostHog project plus a preview build on a device |
 | Source maps and native symbols | **BLOCKED** | `metro.config.js` and the conditional plugin are in place, and prebuild config evaluation passes; needs `POSTHOG_CLI_*` secrets and a build |
-| Session replay | **NOT IMPLEMENTED (off)** | Code ready at 0%; the §7 checks are pending |
-| Account deletion of PostHog data | **BLOCKED** (decision) | §6, A or B |
+| Session replay | **OFF in code** | `SESSION_REPLAY_SAMPLE_RATE = 0`, tested |
+| Account deletion of PostHog data | **PARTIALLY DONE** | Queue, worker and schedule implemented and tested against PGlite and a fake PostHog API; not deployed; needs secrets (docs/ACCOUNT_DELETION.md) |
 | Privacy policy and Data Safety | **BLOCKED** (owner) | §8 text drafted; the website is not changed |
 | Dashboards and alerts | **NOT IMPLEMENTED** | No project access; definitions in §11 |
 | Website analytics, billing events | **NOT IMPLEMENTED** | Phase 2 / future, by design |

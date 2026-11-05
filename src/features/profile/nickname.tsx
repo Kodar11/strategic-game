@@ -4,9 +4,9 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import { AppText } from '@/src/components/ui/AppText';
 import { toDataError } from '@/src/data/errors';
 import { useGames } from '@/src/data/games-session';
-import { NICKNAME_MAX, NICKNAME_MESSAGES, type NicknameProblem, nicknameProblem } from '@/src/games/competition';
+import { NICKNAME_MAX, NICKNAME_MESSAGES, type NicknameProblem, nicknameProblem, trimNickname } from '@/src/games/competition';
 import { track } from '@/src/observability';
-import { colors, fonts, radius, space } from '@/src/theme/tokens';
+import { MAX_FONT_SCALE, colors, fonts, radius, space } from '@/src/theme/tokens';
 
 /**
  * The public nickname (leaderboards, Hall of Fame, challenges). It lives on the server with the games record, which
@@ -39,7 +39,7 @@ export function useNicknameForm(initial: string | null | undefined, onSaved: (na
     if (saving) return;
     setTouched(true);
     if (problem) return;
-    const name = value.trim();
+    const name = trimNickname(value);
     if (name === initial) return onSaved(name);
     setSaving(true);
     setError(null);
@@ -72,6 +72,7 @@ export function NicknameInput({ form, autoFocus }: { form: NicknameFormState; au
   return (
     <View style={{ gap: space.sm }}>
       <TextInput
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
         value={form.value}
         onChangeText={form.change}
         onBlur={() => form.setTouched(true)}

@@ -28,7 +28,8 @@ export type GameRefusal =
   | 'nickname_characters'
   | 'nickname_reserved'
   | 'nickname_not_allowed'
-  | 'nickname_taken';
+  | 'nickname_taken'
+  | 'nickname_rate_limited';
 
 const REFUSAL_MESSAGES: Record<GameRefusal, string> = {
   auth: 'Couldn’t confirm your session. Restart the app and try again.',
@@ -48,6 +49,7 @@ const REFUSAL_MESSAGES: Record<GameRefusal, string> = {
   nickname_reserved: 'That name is reserved — it could be mistaken for Tactiqo or its staff. Try another.',
   nickname_not_allowed: 'That name isn’t allowed on public boards. Try another.',
   nickname_taken: 'Someone already uses that name. Try another.',
+  nickname_rate_limited: 'You’ve changed your nickname a lot recently. Try again later.',
 };
 
 export class GameError extends DataError {
@@ -102,6 +104,8 @@ export type Standing = z.infer<typeof standingSchema>;
 const outcome = z.enum(['win', 'loss', 'draw']);
 const phase = z.enum(['upcoming', 'active', 'closed', 'finalized']);
 const nickname = z.string().nullable();
+/** set_nickname: the saved name, or a refusal returned as data (see setNickname below). */
+const nicknameResult = z.union([z.object({ nickname: z.string() }), z.object({ refused: z.string() })]);
 
 const matchSchema = z.object({
   id: z.string(),
@@ -334,7 +338,15 @@ export interface GamesRepository {
 export function gamesRepository(rpc: Rpc): GamesRepository {
   return {
     overview: async () => parse(overviewSchema, await games(rpc, 'get_games_overview'), 'get_games_overview'),
-    setNickname: async (name) => parse(z.object({ nickname: z.string() }), await games(rpc, 'set_nickname', { nickname: name }), 'set_nickname').nickname,
+    setNickname: async (name) => {
+      // A refusal comes back as data, not as an error, so the server keeps its record of the attempt for rate limiting
+      // (supabase/migrations/20261106120000_nickname_rate_limit.sql). It surfaces exactly like the old raised refusals.
+      const r = parse(nicknameResult, await games(rpc, 'set_nickname', { nickname: name }), 'set_nickname');
+      if ('nickname' in r) return r.nickname;
+      const refusal = /^games:([a-z_]+)$/.exec(r.refused)?.[1];
+      if (refusal && refusal in REFUSAL_MESSAGES) throw new GameError(refusal as GameRefusal, r.refused);
+      throw new DataError('server', `set_nickname refused for an unknown reason: ${r.refused.slice(0, 80)}`);
+    },
     startCompetitionMatch: async (competitionId) => parse(matchSchema, await games(rpc, 'start_match', { kind: 'competition', competitionId }), 'start_match'),
     startChallengeMatch: async (token) => parse(matchSchema, await games(rpc, 'start_match', { kind: 'challenge', token }), 'start_match'),
     playRound: async (matchId, round, move) => parse(matchSchema, await games(rpc, 'play_match_round', { matchId, round, move }), 'play_match_round'),

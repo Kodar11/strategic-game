@@ -23,6 +23,7 @@ import { useDaily } from '@/src/data/daily-session';
 import { formatDay, monthKey, monthOf } from '@/src/features/daily/dates';
 import { DIFFICULTY_NAME } from '@/src/features/daily/content';
 import { SignInInvite } from '@/src/features/account/SignInInvite';
+import { UsageConsentCard } from '@/src/features/settings/UsageConsentCard';
 import { allScenarios } from '@/src/features/scenarios';
 import { useIsGuest } from '@/src/components/auth/SignInRequired';
 import { type LessonRuntime, useProgress } from '@/src/store/progress';
@@ -160,6 +161,7 @@ export default function Home() {
             <DailyRow />
           </Animated.View>
 
+          <UsageConsentCard />
           <SignInInvite />
 
           <View style={styles.sectionHead} onLayout={(e) => (lessonsY.current = e.nativeEvent.layout.y)}>
@@ -586,7 +588,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    height: 40,
+    // minHeight, not height: the label grows with the system text size.
+    minHeight: 40,
+    paddingVertical: space.xs,
     paddingHorizontal: 14,
     borderRadius: radius.pill,
     borderWidth: 1,

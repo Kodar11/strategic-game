@@ -36,3 +36,40 @@ select jobid, jobname, schedule, command, active from cron.job where jobname = '
 --      where jobid = (select jobid from cron.job where jobname = 'tactiqo-competitions') order by start_time desc limit 5;
 --   3. Each step's last result (expect ok = true and a last_run within the last few minutes):
 --      select * from content_admin.scheduler_health;
+
+-- ── PostHog deletion worker (docs/ACCOUNT_DELETION.md) ───────────────────────────────────────────────────────────
+-- Every 15 minutes, pg_net calls the posthog-deletion Edge Function, which deletes deleted accounts' PostHog persons,
+-- events and recordings from the public.account_deletions queue. The function URL and the shared secret are read from
+-- Supabase Vault at run time, so neither appears in cron.job. Before running this block, once:
+--   1. Dashboard → Database → Extensions: enable pg_net (and pg_cron, above).
+--   2. Store the two values in Vault (SQL Editor; replace the placeholders, keep the names):
+--        select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/posthog-deletion', 'posthog_deletion_url');
+--        select vault.create_secret('<the same value as the DELETION_WORKER_SECRET function secret>', 'posthog_deletion_secret');
+--   3. Deploy the function and set its secrets (docs/ACCOUNT_DELETION.md → Deployment).
+
+create extension if not exists pg_net;
+
+do $$
+begin
+  if exists (select 1 from cron.job where jobname = 'tactiqo-posthog-deletion') then
+    perform cron.unschedule('tactiqo-posthog-deletion');
+  end if;
+end;
+$$;
+
+select cron.schedule('tactiqo-posthog-deletion', '*/15 * * * *', $$
+  select net.http_post(
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'posthog_deletion_url'),
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-deletion-worker-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'posthog_deletion_secret')
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 60000
+  )
+$$);
+
+-- Verify (after 15–30 minutes):
+--   select jobid, jobname, schedule, active from cron.job where jobname = 'tactiqo-posthog-deletion';
+--   select status_code, left(content::text, 200), created from net._http_response order by created desc limit 5;
+--   select * from public.account_deletions_health;   -- expect no 'failed' row and no old 'pending' row

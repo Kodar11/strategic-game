@@ -7,6 +7,7 @@ import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Card';
+import { EmptyState } from '@/src/components/ui/EmptyState';
 import { ArrowLeft, Crown, Medal, Pencil, RefreshCw } from '@/src/components/ui/icons';
 import { Segmented } from '@/src/components/ui/Segmented';
 import type { GlobalEntry, HallOfFameEntry, WeeklyBoard, WeeklyEntry } from '@/src/data/games';
@@ -243,7 +244,7 @@ function GlobalRow({ e }: { e: GlobalEntry }) {
 }
 
 function Hall({ entries }: { entries: HallOfFameEntry[] }) {
-  if (!entries.length) return <AppText color={colors.textMuted}>No finished weeks yet. Every week’s official winner will be kept here.</AppText>;
+  if (!entries.length) return <EmptyState icon={Crown} text="No finished weeks yet. Every week’s winner will be kept here." />;
   return (
     <View style={{ gap: space.md }}>
       {entries.map((h) => {

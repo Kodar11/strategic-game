@@ -29,6 +29,17 @@ export interface VersionInfo {
   build: string | null;
 }
 
+/**
+ * Which version to show. The installed binary's values win (a store or preview build); in Expo Go they belong to Expo
+ * Go itself, and on web they don't exist, so the app config's version is used with no build number.
+ */
+export function resolveVersion(input: { expoGo: boolean; nativeVersion: string | null; nativeBuild: string | null; configVersion: string | null }): VersionInfo {
+  const clean = (v: string | null) => (v && v.trim() ? v.trim() : null);
+  if (input.expoGo) return { version: clean(input.configVersion), build: null };
+  const nativeVersion = clean(input.nativeVersion);
+  return { version: nativeVersion ?? clean(input.configVersion), build: nativeVersion ? clean(input.nativeBuild) : null };
+}
+
 /** "1.0.0 (build 12)", "1.0.0", or "Unknown" — never a made-up number. */
 export function versionLabel(v: VersionInfo): string {
   if (!v.version) return 'Unknown';

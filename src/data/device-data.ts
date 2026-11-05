@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ARENA_RECORDS_KEY, useArenaRecords } from '@/src/features/arena/records';
 import { GAMES_SEEN_KEY, useSeenRules } from '@/src/features/games/seen';
+import { clearExportFiles } from '@/src/features/learning/shareFile';
 import { resetStoryAudioPrefs } from '@/src/features/stories/audio/session';
 import { useStories } from '@/src/features/stories/store';
 import { ARENA_UPLOADS_KEY, arenaUploads } from './arena-session';
@@ -31,12 +32,17 @@ export const DEVICE_DATA = [
   { key: 'sb-<project-ref>-auth-token', scope: 'session', what: 'The Supabase session, in the OS secure store (src/auth/session-storage.ts); the old AsyncStorage copy from anonymous builds is removed at start-up' },
   { key: 'tactiqo/device-owner/v1', scope: 'device', what: 'Whose data the account-scoped items hold: guest or a user id (src/data/device-owner.ts)' },
   { key: 'tactiqo/sign-in-invite/v1', scope: 'device', what: 'Whether the “Keep your progress safe” invitation was dismissed' },
-  { key: 'strategic-game/settings', scope: 'device', what: 'Device preferences: reduced motion, haptics, narration, the intro-seen flag, “Share usage and crash data”' },
-  // PostHog SDK files (src/observability), in the app's document directory, written by the SDK itself: the anonymous
-  // or signed-in analytics id, the opt-in state and events not sent yet. Signing out, account deletion and a revoked
-  // session reset them (`posthog.reset()` through src/observability/core.ts `setUser(null)`); nothing is written when
-  // telemetry is switched off for the build.
-  { key: '.posthog-rn.json', scope: 'device', what: 'Analytics SDK state and unsent events (reset on sign-out and deletion)' },
+  { key: 'strategic-game/settings', scope: 'device', what: 'Device preferences: reduced motion, haptics, narration, the intro-seen flag, the analytics choice (usageConsent)' },
+  // ── Files (expo-file-system) ──
+  // "Export data" writes the learning record (answers) to the app cache before the share sheet opens. The player may
+  // keep a copy elsewhere; the cached file itself is removed with the account's data (clearExportFiles).
+  { key: 'cache/strategic-thinking-data-<date>.json', scope: 'account', what: 'Learning-data export written for the share sheet (src/features/learning/shareFile.ts)' },
+  // Story audio and narration play files bundled with the app (expo-audio); nothing is downloaded or cached by the app.
+  // PostHog SDK files (src/observability), in the app's document directory, written by the SDK itself: the analytics
+  // id, the opt-in state and events not sent yet. They exist only after the player chose "Share" (the SDK isn't
+  // created before). Signing out, account deletion and a revoked session reset the id (`posthog.reset()` through
+  // core.ts `setUser(null)`); turning the choice off resets it too. The choice itself is a device preference and stays.
+  { key: '.posthog-rn.json', scope: 'device', what: 'Analytics SDK state and unsent events (only after consent; reset on sign-out, deletion and opt-out)' },
   { key: '.posthog-rn-logs.json', scope: 'device', what: 'Analytics SDK log queue (logs are not used; normally empty)' },
 ] as const;
 
@@ -47,6 +53,7 @@ export const DEVICE_DATA = [
  */
 export async function clearAccountDeviceData(): Promise<void> {
   await arenaUploads.clear();
+  clearExportFiles();
   await Promise.all([
     useArenaRecords.getState().reset(),
     useStories.getState().reset(),

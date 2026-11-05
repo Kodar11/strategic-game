@@ -8,8 +8,11 @@ import type { ScreenView } from './routes.ts';
  *
  * Guarantees:
  * - Never throws into the app and never blocks it. A broken or missing SDK means nothing is sent, nothing else.
- * - Before the SDK is installed (start-up is still deciding), calls are buffered (≤ 100) and replayed once it is; if
- *   telemetry turns out to be off, the buffer is dropped.
+ * - Nothing is collected without the player's explicit "Share" (consent is false until `setConsent(true)`). Before
+ *   that, every call is dropped on the spot — not buffered, so nothing from before the choice is sent after it. The
+ *   SDK itself is only created once consent is granted (start.ts), so no analytics id or file exists before that.
+ * - After consent, calls made while the SDK is still starting are buffered (≤ 100) and sent once it is installed; if
+ *   telemetry turns out to be off for the build, the buffer is dropped.
  * - Only catalogued events with clean properties are sent (events.ts, privacy.ts).
  * - Identity changes only through `setUser` and consent only through `setConsent` (identity rules below).
  */
@@ -22,6 +25,8 @@ export interface TelemetryClient {
   addExceptionStep(message: string, properties?: Record<string, Primitive>): void;
   identify(distinctId: string): void;
   reset(): void;
+  /** Sends everything queued on the device now. Resolves when done or failed. */
+  flush(): Promise<void>;
   optIn(): void;
   optOut(): void;
   register(properties: Record<string, Primitive>): void;
@@ -51,7 +56,8 @@ export class Telemetry {
   private client: TelemetryClient | null = null;
   private status: 'pending' | 'on' | 'off' = 'pending';
   private buffer: ((c: TelemetryClient) => void)[] = [];
-  private consent = true;
+  /** Only an explicit "Share" sets this (src/store/settings.ts `usageConsent: 'granted'`). */
+  private consent = false;
   private userId: string | null = null;
   private superProps: Record<string, Primitive> = { auth_state: 'guest' };
   private errorCounts = new Map<string, number>();
@@ -194,17 +200,61 @@ export class Telemetry {
   }
 
   /**
-   * The player's "Share usage and crash data" choice, kept in device settings so it survives sign-out and account
-   * switches. Turning it off sends one last `analytics_opted_out`, then stops all collection at once.
+   * The player's "Share anonymous usage and diagnostic data" choice, kept in device settings so it survives sign-out
+   * and account switches. Takes effect at once:
+   * - Turning it off stops collection immediately (nothing more is sent, not even a last "opted out" event), drops
+   *   anything buffered, and resets the SDK's on-device identity and properties. Events captured while consent was
+   *   on and already queued may still be delivered; nothing captured after this point is.
+   * - Turning it on (again) opts in, re-applies the common properties and re-identifies a signed-in player.
    */
   setConsent(allowed: boolean): void {
     this.safely(() => {
       if (allowed === this.consent) return;
-      if (!allowed && this.status === 'on') this.track('analytics_opted_out');
       this.consent = allowed;
-      if (!allowed) this.buffer = [];
-      this.applyConsent();
+      const c = this.client;
+      if (!allowed) {
+        this.buffer = [];
+        if (c && this.status === 'on') {
+          c.optOut();
+          c.reset();
+          // reset() clears the persisted opt-out too; apply it again.
+          c.optOut();
+        }
+        return;
+      }
+      if (c && this.status === 'on') {
+        c.optIn();
+        c.register(this.superProps);
+        if (this.userId) c.identify(this.userId);
+      }
     });
+  }
+
+  /**
+   * Sends whatever the SDK has queued on the device, waiting at most `timeoutMs`. Used before an account deletion so
+   * events already captured for that account reach PostHog before its deletion is requested. Never throws.
+   */
+  async flush(timeoutMs = 3000): Promise<void> {
+    const c = this.client;
+    if (!c || this.status !== 'on') return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([c.flush().catch(() => undefined), new Promise<void>((resolve) => (timer = setTimeout(resolve, timeoutMs)))]);
+    } catch {
+      // Telemetry must never break the app.
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  /** False once telemetry is known to be off for this build (web, switched off, no key). */
+  get available(): boolean {
+    return this.status !== 'off';
+  }
+
+  /** Whether the SDK has been installed for this launch (it is only created once consent is granted). */
+  get installed(): boolean {
+    return this.client !== null;
   }
 
   get consented(): boolean {
@@ -229,6 +279,7 @@ export class Telemetry {
   }
 
   private run(op: (c: TelemetryClient) => void): void {
+    // Without consent nothing is kept, so nothing from before the choice can be sent after it.
     if (!this.consent || this.status === 'off') return;
     if (this.status === 'pending' || !this.client) {
       if (this.buffer.length < BUFFER_LIMIT) this.buffer.push(op);
