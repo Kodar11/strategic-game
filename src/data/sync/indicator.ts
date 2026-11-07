@@ -37,13 +37,10 @@ export function looksOffline(network: NetworkState, backend: BackendState): bool
   return network === 'offline' || network === 'no_internet' || backend === 'unreachable';
 }
 
+/**
+ * Sync itself is silent: saving, retrying and uploading all happen in the background with no label. The only thing
+ * ever shown is "Offline", while the device looks unable to reach the server.
+ */
 export function indicatorFor(input: { signedIn: boolean; network: NetworkState; backend: BackendState; sync: SyncSnapshot }): Indicator | null {
-  const offline = looksOffline(input.network, input.backend);
-  const { pending, state } = input.sync;
-  if (!input.signedIn) return offline ? { kind: 'offline', label: 'Offline' } : null;
-  if (offline) return pending > 0 ? { kind: 'saved', label: 'Saved on device' } : { kind: 'offline', label: 'Offline' };
-  if (state === 'error') return { kind: 'error', label: 'Some progress couldn’t sync' };
-  if (state === 'retrying' && pending > 0) return { kind: 'retrying', label: 'Couldn’t sync yet. We’ll retry.' };
-  if (pending > 0) return { kind: 'syncing', label: 'Syncing progress…' };
-  return null;
+  return looksOffline(input.network, input.backend) ? { kind: 'offline', label: 'Offline' } : null;
 }

@@ -85,9 +85,18 @@ export default function RootLayout() {
   );
 }
 
-function AppStack({ reduced }: { reduced: boolean }) {
+/**
+ * Screen tracking re-renders on every route change (useSegments/useGlobalSearchParams), so it lives in its own empty
+ * component rather than in AppStack: otherwise every tab switch re-rendered the whole root navigator.
+ */
+function ScreenTracking() {
   useScreenTracking();
+  return null;
+}
+
+function AppStack({ reduced }: { reduced: boolean }) {
   return (
+    <>
     <Stack
       screenOptions={{
         headerShown: false,
@@ -124,5 +133,8 @@ function AppStack({ reduced }: { reduced: boolean }) {
       <Stack.Screen name="sign-in" options={{ presentation: 'modal', animation: reduced ? 'fade' : 'slide_from_bottom' }} />
       <Stack.Screen name="auth-callback" options={{ animation: 'none' }} />
     </Stack>
+    {/* After the Stack, so a screen's own effects still run before the new screen is recorded (as before). */}
+    <ScreenTracking />
+    </>
   );
 }

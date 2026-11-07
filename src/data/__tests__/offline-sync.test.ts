@@ -483,16 +483,17 @@ describe('Retry policy and status', () => {
     assert.equal(retryDelay(1, () => 1), 2400);
   });
 
-  it('the indicator is calm and never claims a sync it hasn’t seen', () => {
+  it('the indicator only ever says Offline; syncing is silent', () => {
     const idle = { pending: 0, state: 'idle' as const };
     assert.equal(networkOf({ isConnected: true, isInternetReachable: false }), 'no_internet');
     assert.equal(networkOf(null), 'unknown');
     assert.ok(looksOffline('online', 'unreachable'));
     assert.equal(indicatorFor({ signedIn: true, network: 'online', backend: 'reachable', sync: idle }), null);
     assert.equal(indicatorFor({ signedIn: false, network: 'offline', backend: 'unknown', sync: idle })?.label, 'Offline');
-    assert.equal(indicatorFor({ signedIn: true, network: 'offline', backend: 'unknown', sync: { pending: 2, state: 'retrying' } })?.label, 'Saved on device');
-    assert.equal(indicatorFor({ signedIn: true, network: 'online', backend: 'unknown', sync: { pending: 2, state: 'saving' } })?.label, 'Syncing progress…');
-    assert.equal(indicatorFor({ signedIn: true, network: 'online', backend: 'unknown', sync: { pending: 2, state: 'retrying' } })?.label, 'Couldn’t sync yet. We’ll retry.');
+    assert.equal(indicatorFor({ signedIn: true, network: 'offline', backend: 'unknown', sync: { pending: 2, state: 'retrying' } })?.label, 'Offline');
+    assert.equal(indicatorFor({ signedIn: true, network: 'online', backend: 'unknown', sync: { pending: 2, state: 'saving' } }), null);
+    assert.equal(indicatorFor({ signedIn: true, network: 'online', backend: 'unknown', sync: { pending: 2, state: 'retrying' } }), null);
+    assert.equal(indicatorFor({ signedIn: true, network: 'online', backend: 'reachable', sync: { pending: 1, state: 'error' } }), null);
     assert.equal(indicatorFor({ signedIn: true, network: 'unknown', backend: 'unknown', sync: idle }), null);
   });
 });

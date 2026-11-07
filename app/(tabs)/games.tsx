@@ -9,7 +9,7 @@ import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Card';
-import { ArrowRight, Clock, Crown, History, ListOrdered, Pencil, Play, RefreshCw, Settings, Trophy } from '@/src/components/ui/icons';
+import { ArrowRight, Clock, Crown, History, ListOrdered, Play, RefreshCw, Settings, Trophy } from '@/src/components/ui/icons';
 import type { Competition, GamesOverview } from '@/src/data/games';
 import { useGames } from '@/src/data/games-session';
 import { GAMES } from '@/src/games/catalog';
@@ -59,7 +59,6 @@ export default function GamesScreen() {
               <AppText variant="title" accessibilityRole="header" style={{ flex: 1 }}>
                 Games
               </AppText>
-              <NicknameChip name={overview.status === 'ready' ? overview.data.nickname : undefined} />
               <IconButton icon={Settings} label="Settings" onPress={() => router.navigate('/settings')} />
             </View>
             <AppText variant="small" color={colors.textMuted}>
@@ -122,22 +121,6 @@ export default function GamesScreen() {
         </View>
       </ScrollView>
     </View>
-  );
-}
-
-function NicknameChip({ name }: { name: string | null | undefined }) {
-  if (name === undefined) return null;
-  return (
-    <Pressable
-      onPress={() => router.push('/nickname')}
-      accessibilityRole="button"
-      accessibilityLabel={name ? `Your public name is ${name}. Change it` : 'Set a public name for leaderboards'}
-      style={({ pressed }) => [styles.nick, pressed && { backgroundColor: colors.surfaceHigh }]}>
-      <Pencil size={14} color={colors.textMuted} />
-      <AppText variant="caption" color={name ? colors.text : colors.primaryText} numberOfLines={1} style={{ maxWidth: 120 }}>
-        {name ?? 'Set your name'}
-      </AppText>
-    </Pressable>
   );
 }
 
@@ -395,7 +378,6 @@ function GameCard({ id, featured }: { id: GameId; featured: boolean }) {
 
 const styles = StyleSheet.create({
   column: { maxWidth: MAX_CONTENT_WIDTH, width: '100%', alignSelf: 'center', gap: space.lg },
-  nick: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   weekly: { padding: space.lg, borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(253,186,116,0.35)', backgroundColor: colors.bgRaised },
   me: { flexDirection: 'row', gap: space.md, padding: space.md, borderRadius: radius.md, backgroundColor: colors.surface },
   confirm: { gap: space.sm, padding: space.md, borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(253,186,116,0.35)', backgroundColor: colors.surface },
