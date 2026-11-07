@@ -19,6 +19,23 @@ Statuses: **DONE** (implemented and tested in the repo), **PARTIALLY DONE**, **B
 | I. TTS function | DONE (repo) · live deletion manual | Directory removed; tsc now 0 errors |
 | J. Dependencies | DONE | Removed i18next, react-i18next, nativewind, tailwindcss. Kept expo-symbols (a dependency of expo-router) |
 
+## Second pass (2026-11-06, after the offline-first sprint)
+
+A re-audit of every area against the full sprint brief, on top of commits 46da362 and 72d4579. Baseline before: 1530 tests passing in 299 suites, tsc 0 errors, lint clean, expo-doctor with the same 6 patch mismatches. After: **1536 passing, 0 failing**, tsc 0, lint clean, expo-doctor unchanged.
+
+Most of the brief was already done and verified (consent gating, the deletion queue and RPC, sign-out with unsent-change warnings, the device-data registry including SQLite, licences, TTS removal, dependency cleanup). Gaps found and fixed:
+
+| Gap | Fix |
+|---|---|
+| PostHog `bulk_delete` returns 202 even when it lists failures in `deletion_errors` (official docs). The worker treated any 202 as submitted | Reads `deletion_errors`; any entry → retry, recording only the step names. Tests added |
+| "Deleted within a few days" overpromised: PostHog runs event deletion in weekly batches | Delete dialog, FAQ and docs now say "a few weeks". `done` is documented as "person gone and deletion accepted", not "events confirmed gone" |
+| Nickname rate-limit refusals didn't say which limit or when it frees up | New migration `20261108120000_nickname_limit_details.sql` (rules and lock unchanged): refusals add `limit` (`attempts` / `changes`) and `retryAfterSeconds`; successes add `changesLeft`. The app shows "Try again in about N minutes/hours" from the server's value |
+| Problem reports had the version and platform but no OS version or device model | `expo-device` (already installed, unused) adds OS, version and model; the email is reviewed before sending; nothing from the account |
+| FAQ had no offline answer (it predated offline mode) | Added, matching docs/OFFLINE_FIRST.md: what works offline, saved locally first, what needs a connection |
+| Settings label said "anonymous", but signed-in data is linked to the account UUID | Now "Share usage and crash data"; an `unset` choice reads "Off — you haven't chosen yet" |
+
+Still open after this pass: `changesLeft` is returned but not shown in the UI yet; event-deletion completion (`persons/deletion_status`) is not polled; every item under Manual steps below.
+
 ## Design decisions made in this sprint
 
 - **Nickname refusals are returned, not raised.** A raised exception rolls back the request, which would erase the record of a refused attempt, so refused attempts could never count towards the hourly limit. `set_nickname` now answers `{"refused": "games:nickname_<reason>"}` (same codes as before, plus `games:nickname_rate_limited`). The app maps that to the same `GameError`s.
@@ -46,7 +63,7 @@ In order. None of these has been done.
 ### Supabase dashboard
 
 1. Authentication → Providers: **Email off, sign-ups off**. Confirm **anonymous sign-ins off** and Google on. Check with `GET <project>/auth/v1/settings` (expect `external.email: false`, `disable_signup` true for email, `anonymous_users: false`).
-2. Apply the pending migrations in order, including the earlier v2 ones the audit found missing (`20261105120000`, `20261105120100`, `20261105120200`), then `20261104120100_nickname_rules.sql` if missing, then **`20261106120000_nickname_rate_limit.sql`** and **`20261106120100_account_deletions.sql`**.
+2. Apply the pending migrations in order, including the earlier v2 ones the audit found missing (`20261105120000`, `20261105120100`, `20261105120200`), then `20261104120100_nickname_rules.sql` if missing, then **`20261106120000_nickname_rate_limit.sql`** and **`20261106120100_account_deletions.sql`**, then the offline sprint's `20261107120000_progress_sync_ops.sql`, then **`20261108120000_nickname_limit_details.sql`**.
 3. Run the read-only nickname audit `supabase/games/nickname-audit.sql` and review any flagged names by hand.
 4. Delete the old template function: `npx supabase functions delete text-to-speech`. It had no secrets of its own. If a `GOOGLE_TTS_API_KEY` was ever set as a *function* secret, remove it with `npx supabase secrets unset GOOGLE_TTS_API_KEY`. The local `.env` key used by `scripts/generate-tts.mjs` for build-time narration is separate; keep it.
 

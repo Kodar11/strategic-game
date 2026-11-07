@@ -55,10 +55,29 @@ const REFUSAL_MESSAGES: Record<GameRefusal, string> = {
 export class GameError extends DataError {
   readonly refusal: GameRefusal;
 
-  constructor(refusal: GameRefusal, detail: string) {
-    super('refused', detail, REFUSAL_MESSAGES[refusal]);
+  constructor(refusal: GameRefusal, detail: string, message: string = REFUSAL_MESSAGES[refusal]) {
+    super('refused', detail, message);
     this.refusal = refusal;
   }
+}
+
+/** "about 4 hours" / "about 25 minutes" / "a minute" — rounded up, from the server's retry-after. */
+function waitText(seconds: number): string {
+  const minutes = Math.max(1, Math.ceil(seconds / 60));
+  if (minutes < 2) return 'a minute';
+  if (minutes < 90) return `about ${minutes} minutes`;
+  return `about ${Math.ceil(minutes / 60)} hours`;
+}
+
+/**
+ * The nickname rate-limit message from what the server said (which limit, and when it frees up). The app never
+ * computes the quota itself; without details from an older server it falls back to the generic message.
+ */
+export function nicknameLimitMessage(limit: unknown, retryAfterSeconds: unknown): string {
+  const wait = typeof retryAfterSeconds === 'number' && retryAfterSeconds > 0 ? waitText(retryAfterSeconds) : null;
+  if (limit === 'changes') return `You can change your nickname 3 times a day. ${wait ? `Try again in ${wait}.` : 'Try again later.'}`;
+  if (limit === 'attempts') return `Too many tries in the last hour. ${wait ? `Try again in ${wait}.` : 'Try again later.'}`;
+  return REFUSAL_MESSAGES.nickname_rate_limited;
 }
 
 async function games(rpc: Rpc, fn: RpcName, request?: Record<string, unknown>): Promise<unknown> {
@@ -105,7 +124,10 @@ const outcome = z.enum(['win', 'loss', 'draw']);
 const phase = z.enum(['upcoming', 'active', 'closed', 'finalized']);
 const nickname = z.string().nullable();
 /** set_nickname: the saved name, or a refusal returned as data (see setNickname below). */
-const nicknameResult = z.union([z.object({ nickname: z.string() }), z.object({ refused: z.string() })]);
+const nicknameResult = z.union([
+  z.object({ nickname: z.string(), changesLeft: z.number().int().optional() }),
+  z.object({ refused: z.string(), limit: z.string().optional(), retryAfterSeconds: z.number().optional() }),
+]);
 
 const matchSchema = z.object({
   id: z.string(),
@@ -344,6 +366,7 @@ export function gamesRepository(rpc: Rpc): GamesRepository {
       const r = parse(nicknameResult, await games(rpc, 'set_nickname', { nickname: name }), 'set_nickname');
       if ('nickname' in r) return r.nickname;
       const refusal = /^games:([a-z_]+)$/.exec(r.refused)?.[1];
+      if (refusal === 'nickname_rate_limited') throw new GameError('nickname_rate_limited', r.refused, nicknameLimitMessage(r.limit, r.retryAfterSeconds));
       if (refusal && refusal in REFUSAL_MESSAGES) throw new GameError(refusal as GameRefusal, r.refused);
       throw new DataError('server', `set_nickname refused for an unknown reason: ${r.refused.slice(0, 80)}`);
     },

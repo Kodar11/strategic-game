@@ -190,8 +190,8 @@ function ExperienceSection() {
         ) : null}
         {Platform.OS !== 'web' ? (
           <ToggleRow
-            title="Share anonymous usage and diagnostic data"
-            body="Helps us fix crashes and improve Tactiqo. Never your answers, reflections or anything you type."
+            title="Share usage and crash data"
+            body={`${settings.usageConsent === 'unset' ? 'Off — you haven’t chosen yet. ' : ''}Helps us fix crashes and improve Tactiqo. Never your answers, reflections or anything you type.`}
             value={settings.usageConsent === 'granted'}
             onChange={(v) => setSetting('usageConsent', v ? 'granted' : 'denied')}
           />
@@ -615,7 +615,7 @@ function DeleteDialog({ open, onClose }: { open: boolean; onClose: () => void })
         That’s lessons and answers, Daily Challenge history, your nickname, game and Arena results, Game of the Week results and friend challenges you created. This phone forgets the account too; your app preferences stay.
       </AppText>
       <AppText variant="small" color={colors.textBody}>
-        Usage and crash data linked to your account is deleted by a background process, which can take a few days.
+        Usage and crash data linked to your account is deleted by a background process, which can take a few weeks to finish.
       </AppText>
       <AppText variant="caption" color={colors.textMuted}>
         Only want to leave this phone? Sign out instead. Want a copy first? Use Export data.

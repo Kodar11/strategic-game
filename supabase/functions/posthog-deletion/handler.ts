@@ -17,6 +17,10 @@
  *        → 202. Needs scope person:write. Events and recordings are QUEUED for deletion and removed later by PostHog;
  *        only events captured before the request are deleted.
  * A 404 from these endpoints means a wrong host or project id, not "no person": it is an error, never "done".
+ * Re-checked against PostHog's official docs (posthog.com/docs/privacy/data-deletion, 2026-11-06): a 202 can still
+ * list per-person failures in `deletion_errors` (treated as retry). `done` here means the PERSON is gone and the event
+ * and recording deletion was accepted; PostHog runs event deletion in batches (weekends on Cloud) and confirms it only
+ * through GET persons/deletion_status keyed by person uuid — not checked by this worker (docs/ACCOUNT_DELETION.md).
  *
  * Privacy: nothing here logs or stores a distinct id, a response body or a key. Errors are reduced to an HTTP status
  * and PostHog's short error code.
@@ -116,6 +120,28 @@ async function describe(res: { status: number; text(): Promise<string> }, what: 
   return `posthog ${what} ${res.status}${code}${hint}`;
 }
 
+/**
+ * The failed steps listed in a bulk_delete response's `deletion_errors` ([{person_uuid, step}, …]), as a short safe
+ * string, or null when there are none. An unreadable body counts as none: the verify phase still checks that the person
+ * is gone.
+ */
+export function deletionErrorSteps(body: string): string | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  const errors = (parsed as { deletion_errors?: unknown } | null)?.deletion_errors;
+  if (!Array.isArray(errors) || errors.length === 0) return null;
+  const steps = new Set<string>();
+  for (const e of errors) {
+    const step = (e as { step?: unknown } | null)?.step;
+    steps.add(typeof step === 'string' && /^[a-z_]{1,40}$/.test(step) ? step : 'unknown');
+  }
+  return [...steps].sort().join(', ');
+}
+
 export function postHogPersons(config: PostHogConfig, fetchImpl: Fetch, timeoutMs = 15_000): PostHogPersons {
   const base = `${config.host}/api/projects/${encodeURIComponent(config.projectId)}/persons`;
   const headers = { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' };
@@ -151,6 +177,11 @@ export function postHogPersons(config: PostHogConfig, fetchImpl: Fetch, timeoutM
         'delete',
       );
       if (res.status !== 202 && res.status !== 200) throw new PostHogError(await describe(res, 'delete'));
+      // PostHog reports per-person failures in `deletion_errors` WITH a 202 (posthog.com/docs/privacy/data-deletion),
+      // so an accepted status alone isn't success. Any listed failure → retry; the request is safe to send again.
+      // Only the failed step names are kept (they say which part failed), never the person uuid.
+      const failedSteps = deletionErrorSteps(await res.text().catch(() => ''));
+      if (failedSteps) throw new PostHogError(`posthog delete accepted with errors (${failedSteps})`);
     },
   };
 }

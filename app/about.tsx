@@ -61,7 +61,7 @@ export default function AboutScreen() {
 
           <Section label="Get in touch">
             <Card style={{ gap: space.xs }}>
-              <LinkRow icon={Bug} title="Report a problem" body="Opens an email with your app version filled in." onPress={() => mail('problem')} external={false} />
+              <LinkRow icon={Bug} title="Report a problem" body="Opens an email with your app version and device filled in, for you to check before sending. Nothing from your account is attached." onPress={() => mail('problem')} external={false} />
               <LinkRow icon={Mail} title="Send feedback" onPress={() => mail('feedback')} external={false} />
               <LinkRow icon={CircleHelp} title="Support page" onPress={() => openPage(LINKS.support)} />
               {note ? (

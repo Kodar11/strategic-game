@@ -8,6 +8,7 @@ import { useProgress } from '@/src/store/progress';
 import type { UsageConsent } from '@/src/store/settings';
 import { resolveConfig } from './config';
 import { telemetry } from './core';
+import { debugLog, describeKey } from './debug';
 import { createPostHogClient } from './posthog';
 
 /**
@@ -45,6 +46,11 @@ export function startObservability(): void {
       environment: extra.environment,
       gitSha: extra.gitSha,
     });
+    // TEMPORARY delivery diagnostic (debug.ts): logs nothing unless __DEV__ and EXPO_PUBLIC_POSTHOG_DEBUG=true.
+    debugLog(
+      `config: ${config.enabled ? `enabled, host=${config.host}` : `OFF (${config.reason})`}, env=${config.environment}, ` +
+        `key=${describeKey(process.env.EXPO_PUBLIC_POSTHOG_API_KEY)}, flag=${JSON.stringify(process.env.EXPO_PUBLIC_POSTHOG_ENABLED ?? null)}`,
+    );
     if (!config.enabled) {
       telemetry.disable(`${config.reason} (${config.environment})`);
       return;
@@ -62,12 +68,15 @@ export function startObservability(): void {
           return;
         }
         telemetry.install(client, { environment: config.environment, ...(config.gitSha ? { git_sha: config.gitSha } : {}) });
+        debugLog(`SDK installed; telemetry active=${telemetry.active}`);
         followSync();
       } catch (e) {
+        debugLog(`SDK install FAILED: ${e instanceof Error ? e.message : String(e)}`);
         telemetry.disable(`start failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     };
     const apply = (consent: UsageConsent) => {
+      debugLog(`consent: ${consent}${consent === 'granted' ? '' : ' (SDK not created until "Share")'}`);
       const granted = consent === 'granted';
       telemetry.setConsent(granted);
       if (granted) install();

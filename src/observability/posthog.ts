@@ -2,6 +2,7 @@ import PostHog from 'posthog-react-native';
 
 import type { ResolvedConfig } from './config';
 import type { TelemetryClient } from './core';
+import { runDeliveryCheck } from './debug';
 import { isBannedKey } from './privacy';
 
 /**
@@ -53,6 +54,8 @@ export function createPostHogClient(config: Extract<ResolvedConfig, { enabled: t
       return event;
     },
   });
+  // TEMPORARY delivery diagnostic (debug.ts): a no-op unless __DEV__ and EXPO_PUBLIC_POSTHOG_DEBUG=true.
+  runDeliveryCheck(ph);
 
   return {
     capture: (event, properties) => void ph.capture(event, properties),

@@ -46,6 +46,17 @@ export function versionLabel(v: VersionInfo): string {
   return v.build ? `${v.version} (build ${v.build})` : v.version;
 }
 
+/**
+ * "Android 14 · Pixel 7" for a problem report: the OS, its version and the phone model — nothing that identifies the
+ * person. Missing values are left out; with nothing known it falls back to the platform (e.g. "android 34").
+ */
+export function deviceLabel(input: { osName: string | null; osVersion: string | null; modelName: string | null; fallback: string }): string {
+  const clean = (v: string | null) => (v && v.trim() ? v.trim().slice(0, 60) : null);
+  const os = [clean(input.osName), clean(input.osVersion)].filter(Boolean).join(' ');
+  const parts = [os || null, clean(input.modelName)].filter(Boolean);
+  return parts.length ? parts.join(' · ') : input.fallback;
+}
+
 /** A mailto link with a subject and the version in the body, so a report says which build it's about. */
 export function supportMailto(kind: 'problem' | 'feedback', v: VersionInfo, platform: string): string {
   const subject = kind === 'problem' ? 'Tactiqo: problem report' : 'Tactiqo: feedback';

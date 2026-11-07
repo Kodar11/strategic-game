@@ -39,8 +39,12 @@ describe('the one-time analytics question', () => {
 
   it('the Settings switch shows the real state and stores an explicit choice', () => {
     const settings = readFileSync(join(ROOT, 'app', 'settings.tsx'), 'utf8');
-    assert.match(settings, /title="Share anonymous usage and diagnostic data"/);
-    assert.match(settings, /body="Helps us fix crashes and improve Tactiqo\. Never your answers, reflections or anything you type\."/);
+    assert.match(settings, /title="Share usage and crash data"/);
+    // Signed-in data is linked to the account id, so the label never says "anonymous".
+    assert.doesNotMatch(settings, /anonymous usage/i);
+    // "Not chosen yet" is shown as such, not as a silent "off".
+    assert.match(settings, /usageConsent === 'unset' \? 'Off — you haven’t chosen yet\. '/);
+    assert.match(settings, /Helps us fix crashes and improve Tactiqo\. Never your answers, reflections or anything you type\./);
     assert.match(settings, /value=\{settings\.usageConsent === 'granted'\}/);
     assert.match(settings, /setSetting\('usageConsent', v \? 'granted' : 'denied'\)/);
   });

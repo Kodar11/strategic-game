@@ -205,7 +205,7 @@ The player's choice is `usageConsent: 'unset' | 'granted' | 'denied'` in device 
 | Sign-out, account switch, account deletion | The choice is a device preference and stays as it is; `reset()` re-applies the opt-out |
 | Old installs | The old boolean `shareUsageData` defaulted to `true`, so a stored `true` is **not** consent → `unset` (asked again). A stored `false` was an explicit switch-off → `denied` |
 
-Settings → Experience: **Share anonymous usage and diagnostic data** — "Helps us fix crashes and improve Tactiqo. Never your answers, reflections or anything you type." The switch shows `usageConsent === 'granted'`.
+Settings → Experience: **Share usage and crash data** — "Helps us fix crashes and improve Tactiqo. Never your answers, reflections or anything you type." The switch shows `usageConsent === 'granted'`; while `unset` its description starts "Off — you haven’t chosen yet."
 
 ### Identity
 
@@ -240,7 +240,7 @@ What it does not guarantee: PostHog deletes events and recordings asynchronously
 
 The current website policy says the app has "no advertising, analytics or crash-reporting SDKs" and describes anonymous accounts. Both are wrong once this ships. Text to adapt (not legal advice):
 
-> **Usage and diagnostics.** Only if you choose "Share" (asked once; Settings → Experience → "Share anonymous usage and diagnostic data"), the app sends pseudonymous usage events to PostHog (our analytics provider, hosted in the [EU/US]): which screens, lessons, scenarios, games and stories you open and finish, how long they take, sign-in outcomes, how long the app takes to start, and crash and error reports (the error, the app version, your device model and OS version, and the screens and actions just before it). Events are linked to a random analytics id, and, if you are signed in, to your account's internal id — never your name, email, nickname, answers or anything you type. It is off until you choose Share, and you can turn it off at any time in Settings; it stops at once. We keep this data for [N] months. When you delete your account, your PostHog person, events and recordings are deleted by a background process, normally within a few days.
+> **Usage and diagnostics.** Only if you choose "Share" (asked once; Settings → Experience → "Share usage and crash data"), the app sends pseudonymous usage events to PostHog (our analytics provider, hosted in the [EU/US]): which screens, lessons, scenarios, games and stories you open and finish, how long they take, sign-in outcomes, how long the app takes to start, and crash and error reports (the error, the app version, your device model and OS version, and the screens and actions just before it). Events are linked to a random analytics id, and, if you are signed in, to your account's internal id — never your name, email, nickname, answers or anything you type. It is off until you choose Share, and you can turn it off at any time in Settings; it stops at once. We keep this data for [N] months. When you delete your account, your PostHog person, events and recordings are deleted by a background process, which can take a few weeks because PostHog deletes events in weekly batches.
 
 **Play Data Safety:**
 

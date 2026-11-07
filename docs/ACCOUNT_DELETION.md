@@ -13,7 +13,7 @@ What happens when a player deletes their Tactiqo account, how the analytics data
 | Account data on the phone (Stories, Arena records, queued writes, exported file, analytics id) | Device | `clearAccountDeviceData()` and `posthog.reset()` (src/data/device-data.ts) | Once the server confirms the deletion |
 | Device preferences (motion, haptics, narration, the analytics choice) | Device | Kept: they belong to the phone, not the account | — |
 
-The app shows success only after the server confirms the account deletion. It never waits for PostHog, and the dialog says that analytics data is deleted in the background and can take a few days.
+The app shows success only after the server confirms the account deletion. It never waits for PostHog, and the dialog says that analytics data is deleted in the background and can take a few weeks (PostHog deletes events in weekly batches).
 
 ## How it works
 
@@ -45,6 +45,19 @@ pg_cron every 15 min (supabase/scheduler.sql) → pg_net POST → posthog-deleti
 - `GET /api/projects/:project_id/persons/?distinct_id=<id>`: exact match on any of a person's distinct ids. No match returns an empty `results`. Scope `person:read`.
 - `POST /api/projects/:project_id/persons/bulk_delete/` with JSON `{"distinct_ids": [id], "delete_events": true, "delete_recordings": true}`. It accepts at most 1000 ids and returns **202**. Scope `person:write`. Event and recording deletion is **queued** by PostHog, and only events captured before the request are deleted.
 - A **404** from either endpoint means a wrong host or project id, never "no person". It is treated as an error, never as done.
+
+**Re-checked against PostHog's official docs** (posthog.com/docs/privacy/data-deletion, 2026-11-06, second pass):
+
+- `bulk_delete` reports per-person failures in **`deletion_errors` inside a 202**, not as an error status. The worker now reads that list. Any entry means retry, and only the failed step names are recorded (e.g. `posthog delete accepted with errors (events)`). Before this pass, a 202 alone counted as submitted.
+- Person deletion is queued and usually done within minutes. **Event deletion runs in batches during off-peak hours (weekends on PostHog Cloud).** A request must arrive about two days before a batch, or it waits for the next one. Recordings are crypto-shredded.
+- Completion of the **event** deletion can be confirmed only through `GET /api/projects/:project_id/persons/deletion_status?person_uuid=…` (`delete_verified_at` is set when done). It is keyed by PostHog's person UUID, not the distinct id, and the docs list neither its scope nor its full response shape.
+- **What `done` means here:** the PostHog person is gone (a lookup by distinct id finds nothing) **and** PostHog accepted the event and recording deletion without errors. It does **not** mean PostHog has finished deleting the events, which can take one or two weekly batches. The worker doesn't poll `deletion_status`. Adding that safely needs a real PostHog project to confirm the response shape and scope (see Known limitations below).
+- The docs don't name the scopes. `person:read` + `person:write` is from PostHog's source. If a 403 shows up after deployment, the row records it and stays visible.
+
+### Known limitations
+
+- Event-deletion completion is not confirmed by the worker (above). For an audit, look the person UUID up in PostHog's deletion status, or ask PostHog support.
+- Only events captured **before** the deletion request are deleted. The app sends nothing under the deleted id afterwards (flush first, then an anonymous `account_deleted`).
 - The app's PostHog distinct id for a signed-in player is their Supabase user UUID (`src/observability/core.ts` identifies with it and nothing else). That is what the queue stores.
 
 ### Statuses
@@ -54,7 +67,7 @@ pg_cron every 15 min (supabase/scheduler.sql) → pg_net POST → posthog-deleti
 | `pending` | Waiting to send the deletion request (also after a check found the person still there) |
 | `processing` | Claimed by a worker that is sending it (a lease; a crashed worker's claim expires after 5 minutes) |
 | `verifying` | PostHog accepted (202); waiting to confirm the person is gone |
-| `done` | PostHog has no person for this id: deleted, or there never was one (analytics never on) |
+| `done` | PostHog has no person for this id: deleted, or there never was one (analytics never on). Event deletion was accepted and finishes on PostHog's batch schedule (not confirmed by the worker) |
 | `failed` | 12 attempts without success. Visible in `public.account_deletions_health`, never silently dropped |
 
 ### What is stored, and for how long
@@ -89,7 +102,7 @@ For a request made by email or through the website's deletion page (for example,
    from public.account_deletions
    where fingerprint = public.account_deletion_fingerprint('<user id>');
    ```
-4. Reply to the requester once the account deletion is done, and say that analytics data is removed by PostHog within a few days.
+4. Reply to the requester once the account deletion is done, and say that analytics data is removed by PostHog over the following weeks (PostHog deletes events in weekly batches).
 
 There is deliberately **no public endpoint** that takes a user id.
 

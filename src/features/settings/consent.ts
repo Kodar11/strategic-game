@@ -12,7 +12,7 @@ export function shouldAskConsent(input: { platform: string; available: boolean; 
 /** The card's copy, in one place so a test can hold it to the rules (equal choices, no pressure). */
 export const CONSENT_COPY = {
   title: 'Help improve Tactiqo',
-  body: 'Share anonymous usage and diagnostic data to help us improve the app and fix crashes. Never your answers, reflections or anything you type. You can change this in Settings.',
+  body: 'Share usage and crash data to help us improve the app and fix crashes. Never your answers, reflections or anything you type. You can change this in Settings.',
   accept: 'Share',
   decline: 'Not now',
 } as const;

@@ -142,7 +142,7 @@ describe('delete_my_account', () => {
   it('frees the nickname for someone else', async () => {
     const carol = uid(0xc3);
     await addUser(db, carol);
-    assert.deepEqual(await rpc(carol, 'set_nickname', { nickname: 'Alice A' }), { nickname: 'Alice A' });
+    assert.deepEqual(await rpc(carol, 'set_nickname', { nickname: 'Alice A' }), { nickname: 'Alice A', changesLeft: 3 });
   });
 
   it('a retried request for an already deleted account is refused by the server, and the app reads it as done', async () => {

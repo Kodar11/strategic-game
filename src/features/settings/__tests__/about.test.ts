@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { ABOUT_TEXT, LINKS, SITE, SUPPORT_EMAIL, supportMailto, versionLabel } from '../about.ts';
+import { ABOUT_TEXT, LINKS, SITE, SUPPORT_EMAIL, deviceLabel, supportMailto, versionLabel } from '../about.ts';
 
 describe('settings: about and support', () => {
   it('links only to the website pages that were checked to exist', () => {
@@ -21,6 +21,14 @@ describe('settings: about and support', () => {
     const body = decodeURIComponent(m.split('&body=')[1]);
     assert.match(body, /App 1\.0\.0 \(build 3\) · android 34/);
     assert.doesNotMatch(body, /[0-9a-f]{8}-[0-9a-f]{4}-/, 'no user id');
+  });
+
+  it('problem reports name the OS, its version and the phone model, and fall back to the platform', () => {
+    assert.equal(deviceLabel({ osName: 'Android', osVersion: '14', modelName: 'Pixel 7', fallback: 'android 34' }), 'Android 14 · Pixel 7');
+    assert.equal(deviceLabel({ osName: 'iOS', osVersion: '18.1', modelName: null, fallback: 'ios 18.1' }), 'iOS 18.1');
+    assert.equal(deviceLabel({ osName: null, osVersion: null, modelName: '  ', fallback: 'web' }), 'web');
+    const m = supportMailto('problem', { version: '1.0.0', build: '3' }, deviceLabel({ osName: 'Android', osVersion: '14', modelName: 'Pixel 7', fallback: '' }));
+    assert.match(decodeURIComponent(m.split('&body=')[1]), /App 1\.0\.0 \(build 3\) · Android 14 · Pixel 7$/);
   });
 
   it('the about text makes no outcome claims', () => {

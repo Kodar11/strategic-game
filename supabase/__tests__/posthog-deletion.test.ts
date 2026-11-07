@@ -13,6 +13,7 @@ import {
   PostHogError,
   SECRET_HEADER,
   apiHost,
+  deletionErrorSteps,
   handleWorkerRequest,
   postHogConfig,
   postHogPersons,
@@ -34,7 +35,7 @@ const ENV: Record<string, string> = {
 };
 
 /** A fake PostHog persons API: which ids exist, and what each call returns. */
-function fakePostHog(opts: { people?: Set<string>; failLookup?: (id: string) => number | 'network' | null; failDelete?: (id: string) => number | null } = {}) {
+function fakePostHog(opts: { people?: Set<string>; failLookup?: (id: string) => number | 'network' | null; failDelete?: (id: string) => number | null; deletionErrors?: unknown[] } = {}) {
   const people = opts.people ?? new Set<string>();
   const calls: { method: string; url: string; body?: string; auth?: string }[] = [];
   const fetchImpl = async (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => {
@@ -51,8 +52,12 @@ function fakePostHog(opts: { people?: Set<string>; failLookup?: (id: string) => 
     const { distinct_ids } = JSON.parse(init?.body ?? '{}') as { distinct_ids: string[] };
     const fail = opts.failDelete?.(distinct_ids[0]);
     if (fail) return { status: fail, ok: false, text: async () => JSON.stringify({ type: 'authentication_error', code: 'permission_denied', detail: 'nope' }) };
+    if (opts.deletionErrors) {
+      // Documented: failures come back inside a 202, not as an error status.
+      return { status: 202, ok: true, text: async () => JSON.stringify({ persons_found: 1, persons_queued_for_deletion: 0, deletion_errors: opts.deletionErrors }) };
+    }
     for (const id of distinct_ids) people.delete(id);
-    return { status: 202, ok: true, text: async () => '{"persons_found":1,"persons_deleted":1}' };
+    return { status: 202, ok: true, text: async () => '{"persons_found":1,"persons_queued_for_deletion":1,"persons_deleted":0,"events_queued_for_deletion":true,"recordings_queued_for_deletion":true,"deletion_errors":[]}' };
   };
   return { people, calls, fetchImpl };
 }
@@ -71,6 +76,30 @@ describe('PostHog client', () => {
     ]);
     assert.deepEqual(JSON.parse(ph.calls[1].body!), { distinct_ids: ['u1'], delete_events: true, delete_recordings: true });
     assert.ok(ph.calls.every((c) => c.auth === `Bearer ${KEY}`));
+  });
+
+  it('a 202 that lists deletion_errors is a retry, keeping only the failed step names', async () => {
+    const ph = fakePostHog({ people: new Set(['user-123']), deletionErrors: [{ person_uuid: 'p-uuid-secret', step: 'events' }, { person_uuid: 'p-uuid-secret', step: 'events' }] });
+    const client = postHogPersons({ host: 'https://eu.posthog.com', projectId: '1', apiKey: KEY }, ph.fetchImpl);
+    const err = await client.requestDeletion('user-123').then(() => null, (e: PostHogError) => e.safe);
+    assert.equal(err, 'posthog delete accepted with errors (events)');
+    // Through the batch: the row is retried, never reported as submitted.
+    const reports: string[] = [];
+    const queue: DeletionQueue = {
+      claim: async () => [{ id: 'r1', distinct_id: 'user-123', phase: 'submit', attempts: 0 }],
+      report: async (_id, outcome) => (reports.push(outcome), 'pending'),
+      cleanup: async () => 0,
+    };
+    const summary = await processBatch(queue, client);
+    assert.deepEqual(reports, ['retry']);
+    assert.equal(summary.submitted, 0);
+  });
+
+  it('deletion_errors parsing: empty or unreadable is none; odd step values are not echoed', () => {
+    assert.equal(deletionErrorSteps('{"deletion_errors":[]}'), null);
+    assert.equal(deletionErrorSteps('{"persons_found":1}'), null);
+    assert.equal(deletionErrorSteps('not json'), null);
+    assert.equal(deletionErrorSteps('{"deletion_errors":[{"step":"recordings"},{"step":"Person 42 <x>"},{}]}'), 'recordings, unknown');
   });
 
   it('a 404 is a configuration error, never "no person"', async () => {

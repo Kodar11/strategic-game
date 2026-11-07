@@ -8,7 +8,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { DIFFICULTIES, GAME_IDS, draw } from '../../src/games/core.ts';
 import { weekWindow, weeklyPoints } from '../../src/games/competition.ts';
 import { ENGINES } from '../../src/games/registry.ts';
-import { GameError, gamesRepository } from '../../src/data/games.ts';
+import { GameError, gamesRepository, nicknameLimitMessage } from '../../src/data/games.ts';
 import { addUser, as, createDatabase, failure, pgRpc } from './pg.ts';
 
 /**
@@ -462,8 +462,8 @@ describe('nicknames', () => {
     // The ten refusals above used up Bob's hourly attempts (nickname rate limit); start this test with a fresh hour.
     await db.query('delete from game_engine.nickname_attempts where user_id = $1', [BOB]);
     assert.match((await nicknameRefusal(BOB, 'ada_lovelace'))!, /games:nickname_taken/);
-    assert.deepEqual(await rpc(BOB, 'set_nickname', { nickname: '  Bob the Builder ' }), { nickname: 'Bob the Builder' });
-    assert.deepEqual(await rpc(BOB, 'set_nickname', { nickname: 'Bob B' }), { nickname: 'Bob B' });
+    assert.deepEqual(await rpc(BOB, 'set_nickname', { nickname: '  Bob the Builder ' }), { nickname: 'Bob the Builder', changesLeft: 3 });
+    assert.deepEqual(await rpc(BOB, 'set_nickname', { nickname: 'Bob B' }), { nickname: 'Bob B', changesLeft: 2 });
     const lb = await rpc(ALICE, 'get_leaderboard', { scope: 'weekly', competitionId: 'live' });
     assert.ok(lb.entries.some((e: any) => e.nickname === 'Bob B'));
     assert.ok(!JSON.stringify(lb).includes('Bob the Builder'));
@@ -608,13 +608,21 @@ describe('gamesRepository (src/data/games.ts) parses every server response', () 
     await assert.rejects(repo.startCompetitionMatch('live'), (e: unknown) => e instanceof GameError && e.refusal === 'no_attempts');
     await assert.rejects(repo.getChallenge('0'.repeat(20)), (e: unknown) => e instanceof GameError && e.refusal === 'not_found');
     await assert.rejects(repo.setNickname('x'), (e: unknown) => e instanceof GameError && e.refusal === 'nickname_length');
-    // The rate limit reads the same way, with its own message.
+    // The rate limit reads the same way, with the server's own wait time in the message (never computed on the device).
     await db.query(`insert into game_engine.nickname_attempts (user_id, outcome) select $1, 'refused' from generate_series(1, 10)`, [ALICE]);
     await assert.rejects(
       repo.setNickname('Fresh Name'),
-      (e: unknown) => e instanceof GameError && e.refusal === 'nickname_rate_limited' && /changed your nickname a lot/.test(e.message),
+      (e: unknown) => e instanceof GameError && e.refusal === 'nickname_rate_limited' && e.message === 'Too many tries in the last hour. Try again in about 60 minutes.',
     );
     await db.query('delete from game_engine.nickname_attempts where user_id = $1', [ALICE]);
+  });
+
+  it('nickname limit messages: which limit, the wait rounded up, and a generic fallback for an older server', () => {
+    assert.equal(nicknameLimitMessage('changes', 4 * 3600 - 30), 'You can change your nickname 3 times a day. Try again in about 4 hours.');
+    assert.equal(nicknameLimitMessage('attempts', 20), 'Too many tries in the last hour. Try again in a minute.');
+    assert.equal(nicknameLimitMessage('attempts', 25 * 60), 'Too many tries in the last hour. Try again in about 25 minutes.');
+    assert.equal(nicknameLimitMessage('changes', undefined), 'You can change your nickname 3 times a day. Try again later.');
+    assert.match(nicknameLimitMessage(undefined, undefined), /changed your nickname a lot/);
   });
 });
 

@@ -67,7 +67,7 @@ describe('nickname rules', () => {
 
   it('clients can’t call the checker directly', async () => {
     const r = await pgRpc(db, USER).call('set_nickname', { request: { nickname: 'Fine Name' } });
-    assert.deepEqual(r, { nickname: 'Fine Name' });
+    assert.equal((r as { nickname: string }).nickname, 'Fine Name');
     await assert.rejects(
       db.transaction(async (tx) => {
         await tx.exec('set local role authenticated');
@@ -185,6 +185,42 @@ describe('nickname rate limits', () => {
         sql,
       );
     }
+  });
+
+  it('answers say how many changes are left, which limit was hit and when it frees up (server clock)', async () => {
+    const u = await newUser();
+    const call = (nickname: string) => pgRpc(db, u).call('set_nickname', { request: { nickname } }) as Promise<Record<string, unknown>>;
+    assert.deepEqual(await call('Left One'), { nickname: 'Left One', changesLeft: 3 }, 'the first name is free');
+    assert.deepEqual(await call('Left Two'), { nickname: 'Left Two', changesLeft: 2 });
+    assert.deepEqual(await call('Left Two'), { nickname: 'Left Two', changesLeft: 2 }, 'same name costs nothing');
+    assert.deepEqual(await call('Left Three'), { nickname: 'Left Three', changesLeft: 1 });
+    assert.deepEqual(await call('Left Four'), { nickname: 'Left Four', changesLeft: 0 });
+    // Move the oldest change 20 hours back: the 4th rename frees up ~4 hours from now (when that change is 24 h old).
+    await db.query(
+      `update game_engine.nickname_attempts set at = at - interval '20 hours'
+       where id = (select min(id) from game_engine.nickname_attempts where user_id = $1 and outcome = 'changed')`,
+      [u],
+    );
+    const refused = await call('Left Five');
+    assert.equal(refused.refused, 'games:nickname_rate_limited');
+    assert.equal(refused.limit, 'changes');
+    const wait = refused.retryAfterSeconds as number;
+    assert.ok(wait > 4 * 3600 - 60 && wait <= 4 * 3600, `retry after ${wait}s`);
+
+    const h = await newUser();
+    for (let i = 0; i < 10; i++) await attempt(h, 'ab');
+    await age(h, '30 minutes');
+    const hourly = (await pgRpc(db, h).call('set_nickname', { request: { nickname: 'Hour Name' } })) as Record<string, unknown>;
+    assert.equal(hourly.limit, 'attempts');
+    const w = hourly.retryAfterSeconds as number;
+    assert.ok(w > 29 * 60 && w <= 30 * 60, `retry after ${w}s`);
+  });
+
+  it('the request carries nothing the server trusts but the name: a client-sent time or count changes nothing', async () => {
+    const u = await newUser();
+    for (const name of ['Trust One', 'Trust Two', 'Trust Three', 'Trust Four']) assert.equal(await attempt(u, name), 'ok');
+    const r = (await pgRpc(db, u).call('set_nickname', { request: { nickname: 'Trust Five', at: '2000-01-01T00:00:00Z', changesLeft: 3, attempts: 0 } })) as Record<string, unknown>;
+    assert.equal(r.refused, 'games:nickname_rate_limited');
   });
 
   it('the attempt log goes with the account', async () => {

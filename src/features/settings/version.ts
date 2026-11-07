@@ -1,8 +1,9 @@
 import * as Application from 'expo-application';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
+import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 
-import { type VersionInfo, resolveVersion } from './about';
+import { type VersionInfo, deviceLabel, resolveVersion } from './about';
 
 /**
  * The running app's version and build (expo-application, SDK 57): the installed binary's version name and build
@@ -25,4 +26,12 @@ export function appVersion(): VersionInfo {
   }
 }
 
-export const platformLabel = () => `${Platform.OS} ${Platform.Version ?? ''}`.trim();
+/** The OS, its version and the phone model for a problem report (expo-device, SDK 57: all `string | null`). */
+export function platformLabel(): string {
+  const fallback = `${Platform.OS} ${Platform.Version ?? ''}`.trim();
+  try {
+    return deviceLabel({ osName: Device.osName, osVersion: Device.osVersion, modelName: Device.modelName, fallback });
+  } catch {
+    return fallback;
+  }
+}

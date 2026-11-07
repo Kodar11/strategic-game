@@ -201,7 +201,7 @@ export class Telemetry {
   }
 
   /**
-   * The player's "Share anonymous usage and diagnostic data" choice, kept in device settings so it survives sign-out
+   * The player's "Share usage and crash data" choice, kept in device settings so it survives sign-out
    * and account switches. Takes effect at once:
    * - Turning it off stops collection immediately (nothing more is sent, not even a last "opted out" event), drops
    *   anything buffered, and resets the SDK's on-device identity and properties. Events captured while consent was

@@ -15,7 +15,7 @@ export interface Settings {
   /** The first-session welcome (one decision against Maya, then a recommended lesson) was finished or skipped here. */
   onboarded: boolean;
   /**
-   * "Share anonymous usage and diagnostic data". A device preference, so it survives signing out, switching accounts
+   * "Share usage and crash data". A device preference, so it survives signing out, switching accounts
    * and deleting the account. Asked once after onboarding (UsageConsentCard), changeable in Settings at any time.
    */
   usageConsent: UsageConsent;
