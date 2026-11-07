@@ -29,7 +29,7 @@ export interface StoryTone {
 
 export function leaveStory() {
   if (router.canGoBack()) router.back();
-  else router.replace('/stories');
+  else router.replace('/lessons');
 }
 
 /** Close button and the current chapter, laid over the top of the story. */

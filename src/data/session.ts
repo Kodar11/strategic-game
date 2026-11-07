@@ -12,6 +12,9 @@ import { bundledContent } from '@/src/content/bundled';
 import { type Catalog, installCatalog } from '@/src/content/catalog';
 import { type CategoryIndex, buildCategoryIndex, installCategories } from '@/src/content/categories';
 import { monthOf } from '@/src/features/daily/dates';
+import { installTournament } from '@/src/features/tournament/content';
+import { parseTournament, type TournamentDoc } from '@/src/tournament/schema';
+import { SEASON_ONE } from '@/src/tournament/season1';
 import { currentScreen, errorCode, flushTelemetry, reportError, setCommonProperties, track } from '@/src/observability/api';
 import { useProgress } from '@/src/store/progress';
 import { EMPTY_PROGRESS, type ProgressData, sanitizeProgress } from '@/src/store/progress-state';
@@ -28,7 +31,7 @@ import { guestProgressStore } from './guest-progress';
 import { localStore } from './local/database';
 import type { LocalStore } from './local/local-store';
 import { Outbox, type OutboxStatus } from './outbox';
-import { categoryRepository, contentRepository, progressRepository } from './repositories';
+import { call, categoryRepository, contentRepository, progressRepository } from './repositories';
 import { startConnectivity } from './sync/connectivity';
 import { operationId } from './sync/ids';
 import { localOutboxStore } from './sync/outbox-store';
@@ -371,6 +374,26 @@ const categoriesSource = (catalog: Catalog): DocumentSource<CategoryIndex> => ({
 });
 
 /**
+ * The Tournament's rivals, stages and matches (src/tournament/schema.ts): cached like the catalog, with Season 1
+ * bundled, so the Tournament always opens. A server copy that doesn't validate is never used.
+ */
+const tournamentSource: DocumentSource<TournamentDoc> = {
+  key: 'tournament',
+  fetch: () => call(supabaseRpc, 'get_tournament_content'),
+  bundled: () => SEASON_ONE,
+  validate: parseTournament,
+};
+
+/** Never rejects and never blocks start-up: the bundled season is already installed. */
+async function loadTournament(local: LocalStore): Promise<void> {
+  try {
+    installTournament((await loadStartupDocument(local, tournamentSource, { networkBudgetMs: 3000 })).value);
+  } catch (e) {
+    if (__DEV__) console.warn(`[data] tournament not loaded: ${toDataError(e).detail}`);
+  }
+}
+
+/**
  * Lesson categories are a browsing aid, not something a lesson depends on: cached like the catalog, and if there is
  * no usable copy the app starts anyway and the lesson list shows no category filter.
  */
@@ -396,7 +419,8 @@ function refreshContent(catalog: Catalog): void {
     const local = await localStore();
     const c = await refreshDocument(local, catalogSource);
     const k = await refreshDocument(local, categoriesSource(catalog));
-    if (__DEV__ && (c === 'invalid' || k === 'invalid')) console.warn(`[content] refresh: catalog ${c}, categories ${k}`);
+    const t = await refreshDocument(local, tournamentSource);
+    if (__DEV__ && (c === 'invalid' || k === 'invalid' || t === 'invalid')) console.warn(`[content] refresh: catalog ${c}, categories ${k}, tournament ${t}`);
   })();
 }
 
@@ -583,6 +607,7 @@ export function startAppData(): Promise<void> {
       const categoriesLoaded = loadCategories(local, catalog).then(() => {
         categoriesMs = Date.now() - categoriesStart;
       });
+      void loadTournament(local);
       const owner: Owner = user ? { user: user.id } : 'guest';
       const { cleared } = await reconcileOwner(AsyncStorage, owner, async () => {
         // Anyone else's snapshot and history go; their queued writes stay, scoped to them (never shown or sent here).

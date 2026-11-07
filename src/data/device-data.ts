@@ -5,6 +5,7 @@ import { GAMES_SEEN_KEY, useSeenRules } from '@/src/features/games/seen';
 import { clearExportFiles } from '@/src/features/learning/shareFile';
 import { resetStoryAudioPrefs } from '@/src/features/stories/audio/session';
 import { useStories } from '@/src/features/stories/store';
+import { TOURNAMENT_KEY, useTournament } from '@/src/features/tournament/store';
 import { ARENA_UPLOADS_KEY, arenaUploads } from './arena-session';
 import { GUEST_PROGRESS_KEY } from './guest-progress';
 
@@ -38,6 +39,7 @@ export const DEVICE_DATA = [
   { key: 'tactiqo/local-content/v1/', scope: 'device', what: 'Web / fallback: the published content cache, one key per document (`catalog`, `categories`); not personal' },
   { key: ARENA_UPLOADS_KEY, scope: 'account', what: 'Arena match summaries waiting to be sent to the server (owner-scoped)' },
   { key: 'tactiqo/guest-progress/v1', scope: 'account', what: 'A guest’s lesson progress (handed to the account on sign-in)' },
+  { key: TOURNAMENT_KEY, scope: 'account', what: 'Tournament progress: match records and stars, the games behind the rating, key-card checks, intro scenes seen, Mind Check scores' },
   { key: ARENA_RECORDS_KEY, scope: 'account', what: 'Arena records: results per game and opponent, recent matches, reads, last setup, coach tips seen' },
   { key: 'tactiqo/stories/v1', scope: 'account', what: 'Stories progress: positions, choices, endings seen' },
   { key: 'tactiqo/story-audio/v1', scope: 'account', what: 'Story sound levels' },
@@ -70,6 +72,7 @@ export async function clearAccountDeviceData(): Promise<void> {
   clearExportFiles();
   await Promise.all([
     useArenaRecords.getState().reset(),
+    useTournament.getState().reset(),
     useStories.getState().reset(),
     resetStoryAudioPrefs(),
     useSeenRules.getState().reset(),

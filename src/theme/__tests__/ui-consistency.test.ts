@@ -46,15 +46,16 @@ describe('navigation terms', () => {
   const tabs = read('app', '(tabs)', '_layout.tsx');
   const titles = [...tabs.matchAll(/title: '([^']+)'/g)].map((m) => m[1]);
 
-  it('the tabs are Learn, Games, Stories and Profile', () => {
-    assert.deepEqual(titles, ['Learn', 'Games', 'Stories', 'Profile']);
+  it('the tabs are Home, Lessons, Games and Profile', () => {
+    assert.deepEqual(titles, ['Home', 'Lessons', 'Games', 'Profile']);
   });
 
   it('onboarding names the tabs exactly as the tab bar does', () => {
     const world = read('src', 'features', 'onboarding', 'ui', 'WorldStage.tsx');
     const overlines = [...world.matchAll(/<PillarText overline="([^"]+)"/g)].map((m) => m[1]);
-    assert.deepEqual(overlines, ['Learn', 'Games', 'Stories']);
-    for (const t of overlines) assert.ok(titles.includes(t));
+    assert.deepEqual(overlines, ['Lessons', 'Games', 'Stories']);
+    // Stories live inside the Lessons tab; the other pillars are tabs.
+    for (const t of overlines) assert.ok(titles.includes(t) || (t === 'Stories' && /Stories, in the Lessons tab/.test(world)), t);
     for (const m of world.matchAll(/accessibilityLabel=\{`(\w+) tab\./g)) assert.ok(titles.includes(m[1]), m[1]);
   });
 

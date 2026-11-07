@@ -14,6 +14,7 @@ export interface Database {
     Functions: {
       get_published_content: { Args: Record<string, never>; Returns: Json };
       get_lesson_categories: { Args: Record<string, never>; Returns: Json };
+      get_tournament_content: { Args: Record<string, never>; Returns: Json };
       get_my_progress: { Args: Record<string, never>; Returns: Json };
       apply_progress_changes: { Args: { changes: Json }; Returns: Json };
       apply_progress_ops: { Args: { ops: Json }; Returns: Json };

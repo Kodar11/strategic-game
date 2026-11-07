@@ -15,9 +15,14 @@ interface RouteSpec {
 }
 
 const ROUTES: Readonly<Record<string, RouteSpec>> = {
-  '': { screen: 'learn' },
+  '': { screen: 'home' },
+  lessons: { screen: 'learn' },
   games: { screen: 'games' },
-  stories: { screen: 'stories' },
+  'tournament/[stageId]': { screen: 'tournament_stage' },
+  'tournament/match/[matchId]': { screen: 'tournament_match' },
+  'tournament/check/[stageId]': { screen: 'tournament_check' },
+  'tournament/cards': { screen: 'tournament_cards' },
+  'tournament/mind-check': { screen: 'mind_check' },
   profile: { screen: 'profile' },
   onboarding: { screen: 'onboarding' },
   'lesson/[lessonId]': { screen: 'lesson', params: { lessonId: 'lesson_id' } },

@@ -29,7 +29,7 @@ export function MessageScreen({ title, body, loading, onRetry }: { title?: strin
           {onRetry ? (
             <Button label="Try again" icon={RotateCcw} iconPosition="left" onPress={onRetry} />
           ) : (
-            <Button label="Back to lessons" icon={House} iconPosition="left" onPress={() => router.replace('/')} />
+            <Button label="Back to lessons" icon={House} iconPosition="left" onPress={() => router.replace('/lessons')} />
           )}
         </>
       )}

@@ -25,6 +25,7 @@ import { DataError, toDataError } from './errors.ts';
 export type RpcName =
   | 'get_published_content'
   | 'get_lesson_categories'
+  | 'get_tournament_content'
   | 'get_my_progress'
   | 'apply_progress_changes'
   | 'apply_progress_ops'

@@ -28,6 +28,7 @@ import { CoachTip } from '@/src/features/arena/ui/parts';
 import { suspectName, type MoleState } from '@/src/arena/mole';
 import { crewName, type SaboteurState } from '@/src/arena/saboteur';
 import { ReadPanel } from '@/src/features/arena/ui/ReadPanel';
+import { TournamentResult } from '@/src/features/tournament/ui/TournamentResult';
 import { SignalBoard } from '@/src/features/arena/ui/SignalBoard';
 import { UltimatumGameBoard } from '@/src/features/arena/ui/UltimatumGameBoard';
 import { MatchReflection } from '@/src/features/reflections/ReflectionCard';
@@ -37,7 +38,8 @@ import { ARENA_REPEAT } from '@/src/repeat/arena';
 import { NO_REPEAT } from '@/src/repeat/plan';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
-type Params = { game?: string; persona?: string; level?: string; length?: string; variant?: string };
+/** `t`: a tournament match id (src/features/tournament): the result is recorded there and its reveal shown. */
+type Params = { game?: string; persona?: string; level?: string; length?: string; variant?: string; t?: string };
 
 /** Games whose scoreboard compares you with the best of several rivals. */
 const FIELD_GAMES: ReadonlySet<ArenaGameId> = new Set(['auction', 'market', 'commons', 'coalition']);
@@ -53,22 +55,22 @@ export default function ArenaPlayScreen() {
   const p = useLocalSearchParams<Params>();
   const valid = isArenaId(p.game) && typeof p.persona === 'string' && (p.persona === MYSTERY || arenaEngine(p.game).opponents.includes(p.persona)) && isLevel(p.level) && isLength(p.length) && arenaEngine(p.game).variants.includes(p.variant);
   if (!valid) return <MessageScreen title="Game not found" body="That game, opponent or setting isn’t available." />;
-  return <Rematches key={`${p.game}:${p.persona}:${p.level}:${p.length}:${p.variant}`} game={p.game as ArenaGameId} persona={p.persona!} level={p.level as Level} length={p.length as MatchLength} variant={p.variant!} />;
+  return <Rematches key={`${p.game}:${p.persona}:${p.level}:${p.length}:${p.variant}`} game={p.game as ArenaGameId} persona={p.persona!} level={p.level as Level} length={p.length as MatchLength} variant={p.variant!} tournament={typeof p.t === 'string' && p.t ? p.t : undefined} />;
 }
 
-function Rematches(props: { game: ArenaGameId; persona: string; level: Level; length: MatchLength; variant: string }) {
+function Rematches(props: { game: ArenaGameId; persona: string; level: Level; length: MatchLength; variant: string; tournament?: string }) {
   // A fresh seed for every match; the seed doubles as the session key, so a rematch remounts from a clean state.
   const [seed, setSeed] = useState(randomSeed);
   const again = () => setSeed(randomSeed());
   const mystery = props.persona === MYSTERY;
   const persona = mystery ? hiddenOpponent(arenaEngine(props.game).opponents, seed) : props.persona;
   if (props.game === 'cooperation') {
-    return <CooperationMatch key={seed} persona={persona as CoopOpponent} mystery={mystery} level={props.level} length={props.length} variant={props.variant as CoopVariant} seed={seed} onPlayAgain={again} />;
+    return <CooperationMatch key={seed} persona={persona as CoopOpponent} mystery={mystery} level={props.level} length={props.length} variant={props.variant as CoopVariant} seed={seed} onPlayAgain={again} tournament={props.tournament} />;
   }
   return <Session key={seed} {...props} persona={persona} mystery={mystery} seed={seed} onPlayAgain={again} />;
 }
 
-function Session({ game, persona, mystery, level, length, variant, seed, onPlayAgain }: { game: ArenaGameId; persona: string; mystery: boolean; level: Level; length: MatchLength; variant: string; seed: number; onPlayAgain: () => void }) {
+function Session({ game, persona, mystery, level, length, variant, seed, onPlayAgain, tournament }: { game: ArenaGameId; persona: string; mystery: boolean; level: Level; length: MatchLength; variant: string; seed: number; onPlayAgain: () => void; tournament?: string }) {
   const insets = useSafeAreaInsets();
   const engine = arenaEngine(game);
   const setup: Setup<string, string> = { persona, level, length, variant, seed };
@@ -113,7 +115,7 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
 
   const live = result ?? engine.result(state);
   const finished = over && !!result && read.revealed && !repeat.holding;
-  useGameTelemetry({ game_id: game, system: 'arena', mode: 'practice', level, variant, length, mystery }, { round: playedRounds, roundsTotal: total, finished, outcome: result?.outcome ?? null });
+  useGameTelemetry({ game_id: game, system: 'arena', mode: tournament ? 'tournament' : 'practice', level, variant, length, mystery }, { round: playedRounds, roundsTotal: total, finished, outcome: result?.outcome ?? null });
   const challenge = g.variants.find((v) => v.id === variant && v.challenge);
   const roundLabel = g.roundWord === 'lots' ? 'Lot' : g.roundWord === 'turns' ? 'Turn' : 'Round';
   const tip = !coached && !tipHidden && !over ? g.coach[Math.min(playedRounds, g.coach.length - 1)] : null;
@@ -161,6 +163,7 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
           {over && result && read.revealed && repeat.holding ? <RepeatDone repeat={repeat} roundWord={g.roundWord} /> : null}
           {finished && result ? (
             <View onLayout={(e) => toResult(e.nativeEvent.layout.y)} style={{ gap: space.md }}>
+              {tournament ? <TournamentResult matchId={tournament} outcome={result.outcome} level={level} readCorrect={read.verdict === 'correct'} debrief={engine.debrief(state)} onRematch={onPlayAgain} /> : null}
               <ArenaResult
                 unmasked={game === 'mole' || game === 'saboteur' ? unmaskedLine(game, state) : null}
                 game={game}

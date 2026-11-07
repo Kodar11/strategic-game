@@ -86,6 +86,7 @@ export { default as Megaphone } from 'lucide-react-native/icons/megaphone';
 export { default as HandCoins } from 'lucide-react-native/icons/hand-coins';
 export { default as ShieldAlert } from 'lucide-react-native/icons/shield-alert';
 export { default as ScanSearch } from 'lucide-react-native/icons/scan-search';
+export { default as Star } from 'lucide-react-native/icons/star';
 export { default as Sparkles } from 'lucide-react-native/icons/sparkles';
 export { default as Shield } from 'lucide-react-native/icons/shield';
 export { default as Search } from 'lucide-react-native/icons/search';

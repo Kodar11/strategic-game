@@ -73,9 +73,10 @@ describe('event catalogue', () => {
       'account_deleted', 'app_ready', 'challenge_link_created', 'challenge_link_opened', 'checkout_result',
       'checkout_started', 'checkpoint_submitted', 'daily_submitted', 'game_exited', 'game_finished', 'game_started', 'lesson_completed',
       'lesson_exited', 'lesson_started', 'nickname_set', 'onboarding_finished', 'onboarding_step', 'paywall_viewed', 'plan_selected',
-      'purchase_restored', 'reflection_link_opened', 'scenario_completed', 'sign_in_finished', 'sign_in_invite_dismissed',
-      'sign_in_started', 'signed_out', 'story_finished', 'story_started',
-    ]);
+      'mind_check_completed', 'purchase_restored', 'reflection_link_opened', 'scenario_completed', 'sign_in_finished', 'sign_in_invite_dismissed',
+      'sign_in_started', 'signed_out', 'story_finished', 'story_started', 'tournament_check_submitted', 'tournament_match_finished',
+      'tournament_match_skipped', 'tournament_rival_defeated', 'tournament_stage_opened',
+    ].sort());
   });
 });
 
@@ -170,7 +171,9 @@ describe('screens', () => {
   it('normalizes routes and keeps only named ids', () => {
     assert.equal(routeKey(['(tabs)']), '');
     assert.equal(routeKey(['(tabs)', 'games']), 'games');
-    assert.deepEqual(screenOf(['(tabs)'], {}), { screen: 'learn', props: {}, key: 'learn' });
+    assert.deepEqual(screenOf(['(tabs)'], {}), { screen: 'home', props: {}, key: 'home' });
+    assert.deepEqual(screenOf(['(tabs)', 'lessons'], {}), { screen: 'learn', props: {}, key: 'learn' });
+    assert.deepEqual(screenOf(['tournament', 'match', '[matchId]'], { matchId: 's1.q.rps' }), { screen: 'tournament_match', props: {}, key: 'tournament_match' });
     assert.deepEqual(screenOf(['lesson', '[lessonId]'], { lessonId: 'cooperation-trap', utm: 'x' }), { screen: 'lesson', props: { lesson_id: 'cooperation-trap' }, key: 'lesson|cooperation-trap' });
     assert.deepEqual(screenOf(['arena', 'play'], { game: 'market', persona: 'mystery', seed: '9' })?.props, { game_id: 'market' });
     assert.deepEqual(screenOf(['challenge', '[token]'], { token: 'secret-token' }), { screen: 'friend_challenge', props: {}, key: 'friend_challenge' });

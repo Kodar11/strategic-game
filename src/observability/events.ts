@@ -30,7 +30,7 @@ export interface EventSpec {
 const ONBOARDING_STEP = ['welcome', 'decision', 'reveal', 'map'] as const;
 const GAME_SYSTEM = ['classic', 'arena'] as const;
 /** Every way a match is played today: on the device, Game of the Week (server), a friend's challenge link (server). */
-const GAME_MODE = ['practice', 'ranked', 'friend'] as const;
+const GAME_MODE = ['practice', 'ranked', 'friend', 'tournament'] as const;
 const OUTCOME = ['win', 'draw', 'loss'] as const;
 const SCORE_BAND = ['0-39', '40-59', '60-79', '80-100'] as const;
 const PERIOD = ['monthly', 'annual'] as const;
@@ -129,6 +129,38 @@ export const EVENTS = {
     props: { challenge_date: 'id', official: 'bool', format: 'id', result: ['recorded', 'existing', 'practice'] },
   },
 
+  // ── Tournament (its matches also send the game_* events, with mode "tournament") ───────────────────────────────
+  tournament_stage_opened: {
+    trigger: 'A tournament stage screen opens. `first`: the stage’s intro scene is shown for the first time.',
+    privacy: 'behaviour',
+    props: { season_id: 'id', stage_id: 'id', first: 'bool' },
+  },
+  tournament_match_finished: {
+    trigger: 'A tournament match’s result is recorded. Once per game played. Never which hidden opponent it was.',
+    privacy: 'behaviour',
+    props: { season_id: 'id', stage_id: 'id', match_id: 'id', game_id: 'id', level: 'id', outcome: OUTCOME, stars: 'int', first_clear: 'bool', read_correct: 'bool', attempt_number: 'int' },
+  },
+  tournament_rival_defeated: {
+    trigger: 'A stage’s duel is won for the first time.',
+    privacy: 'behaviour',
+    props: { season_id: 'id', stage_id: 'id', rival_id: 'id', attempts: 'int' },
+  },
+  tournament_match_skipped: {
+    trigger: 'A match is skipped after three games without a win (never a duel).',
+    privacy: 'behaviour',
+    props: { season_id: 'id', stage_id: 'id', match_id: 'id' },
+  },
+  tournament_check_submitted: {
+    trigger: 'A stage’s key-card check (3 questions) is submitted.',
+    privacy: 'behaviour',
+    props: { season_id: 'id', stage_id: 'id', correct: 'int', total: 'int', passed: 'bool' },
+  },
+  mind_check_completed: {
+    trigger: 'A Mind Check form is finished. Once per form.',
+    privacy: 'behaviour',
+    props: { form: ['a', 'b', 'c'], correct: 'int', total: 'int' },
+  },
+
   // ── Stories ─────────────────────────────────────────────────────────────────────────────────────────────────────
   story_started: {
     trigger: 'A story screen opens (new, or resuming a saved position).',
@@ -196,7 +228,13 @@ export function isSendable(name: string): name is EventName {
 
 /** Normalized screen names: the only values a `$screen` event or a `source` property can carry. */
 export const SCREENS = [
+  'home',
   'learn',
+  'tournament_stage',
+  'tournament_match',
+  'tournament_check',
+  'tournament_cards',
+  'mind_check',
   'games',
   'stories',
   'profile',

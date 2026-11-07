@@ -30,13 +30,15 @@ import { RpsReveal, RpsRounds } from '@/src/features/games/ui/RpsReveal';
 import { ClassicReveal } from '@/src/features/games/ui/ClassicReveal';
 import { WhatIfPanel } from '@/src/features/games/ui/WhatIfPanel';
 import { ReadOpponentPanel } from '@/src/features/games/ui/ReadOpponentPanel';
+import { TournamentResult } from '@/src/features/tournament/ui/TournamentResult';
 import { RepeatDone, RepeatPanel } from '@/src/features/repeat/RepeatPanel';
 import { useRepeat } from '@/src/features/repeat/useRepeat';
 import { CLASSIC_REPEAT } from '@/src/repeat/classic';
 import { NO_REPEAT } from '@/src/repeat/plan';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
-type Params = { game?: string; bot?: string; difficulty?: string; opponent?: string; mode?: string; competitionId?: string; token?: string; n?: string };
+/** `t`: a tournament match id (src/features/tournament): the result is recorded there and its reveal shown. */
+type Params = { game?: string; bot?: string; difficulty?: string; opponent?: string; mode?: string; competitionId?: string; token?: string; n?: string; t?: string };
 
 /**
  * Playing a match. Practice (`game`, `bot`, `difficulty`) runs on the device; any game with
@@ -61,22 +63,26 @@ export default function PlayScreen() {
     return <MessageScreen title="Game not found" body="That game, opponent or difficulty isn’t available." />;
   }
   const bot = mystery ? null : p.bot!;
-  return <Practice key={`${p.game}:${bot ?? 'mystery'}:${p.difficulty}`} game={p.game} bot={bot} difficulty={p.difficulty} />;
+  const tournament = typeof p.t === 'string' && p.t ? p.t : undefined;
+  return <Practice key={`${p.game}:${bot ?? 'mystery'}:${p.difficulty}`} game={p.game} bot={bot} difficulty={p.difficulty} tournament={tournament} />;
 }
 
 /** `bot` null: a mystery opponent. */
-function Practice({ game, bot, difficulty }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard' }) {
+function Practice({ game, bot, difficulty, tournament }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; tournament?: string }) {
   const [round, setRound] = useState(0);
-  return <PracticeSession key={round} game={game} bot={bot} difficulty={difficulty} onPlayAgain={() => setRound((n) => n + 1)} />;
+  return <PracticeSession key={round} game={game} bot={bot} difficulty={difficulty} tournament={tournament} onPlayAgain={() => setRound((n) => n + 1)} />;
 }
 
-function PracticeSession({ game, bot, difficulty, onPlayAgain }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; onPlayAgain: () => void }) {
+function PracticeSession({ game, bot, difficulty, tournament, onPlayAgain }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; tournament?: string; onPlayAgain: () => void }) {
   const view = usePracticeMatch(game, bot, difficulty);
   const practise = (b: string) => (bot === b ? onPlayAgain() : router.replace({ pathname: '/games/play', params: { game, bot: b, difficulty } }));
   return (
     <MatchLayout
       view={view}
+      tournament={!!tournament}
       result={
+        <>
+        {tournament && view.outcome ? <TournamentResult matchId={tournament} outcome={view.outcome} level={difficulty === 'medium' ? 'normal' : difficulty} readCorrect={view.read?.current?.guess === view.bot} onRematch={onPlayAgain} /> : null}
         <ResultPanel
           view={view}
           onPlayAgain={onPlayAgain}
@@ -85,6 +91,7 @@ function PracticeSession({ game, bot, difficulty, onPlayAgain }: { game: GameId;
           insight={game === 'rps' ? <RpsReveal view={view} onPractise={practise} /> : <ClassicReveal view={view} onPractise={practise} />}>
           <WhatIfPanel view={view} />
         </ResultPanel>
+        </>
       }
     />
   );
@@ -218,11 +225,11 @@ function ChallengeResult({ view, token }: { view: MatchView; token: string }) {
   );
 }
 
-function MatchLayout({ view, result }: { view: MatchView; result: React.ReactNode }) {
+function MatchLayout({ view, result, tournament = false }: { view: MatchView; result: React.ReactNode; tournament?: boolean }) {
   const insets = useSafeAreaInsets();
   // One match per mount: practice rematches and each server match get a new key (see the screens above).
   useGameTelemetry(
-    { game_id: view.game, system: 'classic', mode: view.mode === 'competition' ? 'ranked' : view.mode === 'challenge' ? 'friend' : 'practice', level: view.difficulty, mystery: view.opponent === 'mystery' },
+    { game_id: view.game, system: 'classic', mode: view.mode === 'competition' ? 'ranked' : view.mode === 'challenge' ? 'friend' : tournament ? 'tournament' : 'practice', level: view.difficulty, mystery: view.opponent === 'mystery' },
     { round: view.rounds.length, roundsTotal: view.totalRounds, finished: view.done, outcome: view.outcome },
   );
   const repeatable = CLASSIC_REPEAT[view.game];

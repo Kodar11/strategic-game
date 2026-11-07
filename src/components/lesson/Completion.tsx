@@ -189,7 +189,7 @@ export function Completion({
             onPress={() => router.replace({ pathname: '/lesson/[lessonId]', params: { lessonId: next.id } })}
           />
         ) : (
-          <Button label="Back to all lessons" icon={House} iconPosition="left" onPress={() => router.replace('/')} />
+          <Button label="Back to all lessons" icon={House} iconPosition="left" onPress={() => router.replace('/lessons')} />
         )}
         <View style={{ flexDirection: 'row', gap: space.sm }}>
           <Button label="Replay" variant="secondary" icon={RotateCcw} iconPosition="left" onPress={onReplay} style={{ flex: 1 }} />

@@ -24,6 +24,7 @@ import { haptic, useMotionReduced } from '@/src/utils/feedback';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 import { useArenaRecords } from '../records';
 import { useGameTelemetry } from '@/src/observability';
+import { TournamentResult } from '@/src/features/tournament/ui/TournamentResult';
 import { useArenaMatch } from '../useArenaMatch';
 import { useOpponentRead } from '../useOpponentRead';
 import { CoopResults } from './CoopResults';
@@ -56,6 +57,7 @@ export function CooperationMatch({
   mystery = false,
   server,
   resultSlot,
+  tournament,
 }: {
   persona: CoopOpponent;
   /** The personality is hidden until the end, with an optional prediction (src/arena/reads.ts). */
@@ -72,6 +74,8 @@ export function CooperationMatch({
   server?: { state: CoopState; act: (a: { move: CoopMove; round: number }) => void; result: MatchResult | null; busy: boolean };
   /** Shown instead of the practice results (ranked matches have their own). */
   resultSlot?: ReactNode;
+  /** A tournament match id: the result is recorded there and its reveal or debrief shown above the results. */
+  tournament?: string;
 }) {
   const insets = useSafeAreaInsets();
   const setup: CoopSetup = { persona, level, length, variant, seed };
@@ -92,7 +96,7 @@ export function CooperationMatch({
   const name = read.revealed ? COOP_NAME[persona] : 'Your opponent';
   const over = cooperation.isOver(state);
   // Practice matches only: a ranked match is reported by its own screen (app/games/ranked.tsx).
-  useGameTelemetry(server ? null : { game_id: 'cooperation', system: 'arena', mode: 'practice', level, variant, length, mystery }, {
+  useGameTelemetry(server ? null : { game_id: 'cooperation', system: 'arena', mode: tournament ? 'tournament' : 'practice', level, variant, length, mystery }, {
     round: h.length,
     roundsTotal: state.total,
     finished: !server && view === 'results',
@@ -178,7 +182,10 @@ export function CooperationMatch({
           ) : view === 'results' && result && resultSlot ? (
             resultSlot
           ) : view === 'results' && result ? (
-            <CoopResults state={state} result={result} newBest={newBest} onRematch={onPlayAgain} onChange={change} onLibrary={() => router.navigate('/games')} read={mystery && read.verdict ? { guess: read.guess, verdict: read.verdict } : null} />
+            <>
+              {tournament ? <TournamentResult matchId={tournament} outcome={result.outcome} level={level} readCorrect={read.verdict === 'correct'} debrief={cooperation.debrief(state)} onRematch={onPlayAgain} /> : null}
+              <CoopResults state={state} result={result} newBest={newBest} onRematch={onPlayAgain} onChange={change} onLibrary={() => router.navigate('/games')} read={mystery && read.verdict ? { guess: read.guess, verdict: read.verdict } : null} />
+            </>
           ) : (
             <>
               {rulesOpen ? <RulesCard variant={variant} total={state.total} /> : null}

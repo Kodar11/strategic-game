@@ -27,11 +27,11 @@ const SHOWCASE_GAMES: ({ kind: 'classic'; id: GameId } | { kind: 'arena'; id: Ar
   { kind: 'classic', id: 'two-thirds' },
 ];
 
-/** The Stories tab's two stories, by the titles its cards show. */
+/** The two stories in the Lessons tab, by the titles its cards show. */
 const STORY_TITLES = ['The Distance Between Us', 'The Rules of the Game'] as const;
 
 /**
- * Stages 4 and 5: the three pillars — named after the Learn, Games and Stories tabs, so the tour matches the tab bar — each with real catalog content and its own look (an illustration, a row of game
+ * Stages 4 and 5: the three pillars — named after what the Lessons and Games tabs hold — each with real catalog content and its own look (an illustration, a row of game
  * tiles, a stack of situations), then one recommended next step into the real app. Nothing here is a tutorial.
  */
 export function WorldStage({ next, onStart, onExplore }: { next: LessonMeta | undefined; onStart: () => void; onExplore: () => void }) {
@@ -50,7 +50,7 @@ export function WorldStage({ next, onStart, onExplore }: { next: LessonMeta | un
         <AppText color={colors.textMuted}>Here’s where the rest of them live.</AppText>
       </Animated.View>
 
-      <Animated.View entering={enter(60)} style={styles.pillar} accessible accessibilityLabel={`Learn tab. Understand the ideas. ${lessons.length} interactive lessons, plus ${allScenarios().length} decision scenarios to explore, such as ${scenarios.map((s) => s.title).join(', ')}.`}>
+      <Animated.View entering={enter(60)} style={styles.pillar} accessible accessibilityLabel={`Lessons tab. Understand the ideas. ${lessons.length} interactive lessons, plus ${allScenarios().length} decision scenarios to explore, such as ${scenarios.map((s) => s.title).join(', ')}.`}>
         <LessonArt lesson={lessons[0]?.id ?? 'cooperation-trap'} height={88} style={{ borderRadius: radius.lg }} />
         <View style={{ gap: space.xs }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           {scenarios.slice(0, 2).map((s) => (
@@ -62,7 +62,7 @@ export function WorldStage({ next, onStart, onExplore }: { next: LessonMeta | un
             </View>
           ))}
         </View>
-        <PillarText overline="Learn" tone={colors.primaryText} title="Understand the ideas." body={`${lessons.length} interactive lessons, plus ${allScenarios().length} decision scenarios about trust, negotiation and uncertainty.`} />
+        <PillarText overline="Lessons" tone={colors.primaryText} title="Understand the ideas." body={`${lessons.length} interactive lessons, plus ${allScenarios().length} decision scenarios about trust, negotiation and uncertainty.`} />
       </Animated.View>
 
       <Animated.View entering={enter(120)} style={styles.pillar} accessible accessibilityLabel={`Games tab. Put your decisions to the test. ${gameCount} games against opponents with different personalities.`}>
@@ -72,7 +72,7 @@ export function WorldStage({ next, onStart, onExplore }: { next: LessonMeta | un
         <PillarText overline="Games" tone={colors.rivalText} title="Put your decisions to the test." body={`${gameCount} games, each against opponents with their own personalities.`} />
       </Animated.View>
 
-      <Animated.View entering={enter(180)} style={styles.pillar} accessible accessibilityLabel={`Stories tab. Step inside a situation. ${STORY_TITLES.length} interactive stories: ${STORY_TITLES.join(' and ')}.`}>
+      <Animated.View entering={enter(180)} style={styles.pillar} accessible accessibilityLabel={`Stories, in the Lessons tab. Step inside a situation. ${STORY_TITLES.length} interactive stories: ${STORY_TITLES.join(' and ')}.`}>
         <View style={{ gap: space.xs }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           {STORY_TITLES.map((t, i) => (
             <View key={t} style={{ paddingLeft: i * space.md }}>
