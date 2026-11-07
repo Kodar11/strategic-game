@@ -29,6 +29,7 @@ import { useIsGuest } from '@/src/components/auth/SignInRequired';
 import { type LessonRuntime, useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, shadow, space } from '@/src/theme/tokens';
 import { useMotionReduced } from '@/src/utils/feedback';
+import { useStagedCount } from '@/src/utils/useStagedCount';
 
 /** The brain-puzzle mark on a transparent background (the same artwork as the splash screen). */
 const LOGO = require('@/assets/images/splash-icon.png');
@@ -73,6 +74,9 @@ export default function Home() {
   const scrollY = useRef(0);
   const columnY = useRef(0);
   const lessonsY = useRef(0);
+  // The first module draws with the screen; the rest (each card has a full illustration) follow frame by frame.
+  const modules = allModules();
+  const shownModules = useStagedCount(modules.length, 1, 1);
 
   // Switching filters swaps the list below; if the learner had scrolled past the Lessons heading, bring it back to
   // the top so the new list starts in view instead of leaving them somewhere in the middle of it.
@@ -184,8 +188,8 @@ export default function Home() {
             </View>
           ) : (
           <View style={{ gap: space.xxl }}>
-            {allModules().map((m, mi) => (
-              <Animated.View key={m.id} entering={enter(120 + mi * 60)} style={{ gap: space.md }}>
+            {modules.slice(0, shownModules).map((m, mi) => (
+              <Animated.View key={m.id} entering={mi === 0 ? enter(120) : undefined} style={{ gap: space.md }}>
                 <ModuleHeader module={m} done={allLessons().filter((l) => l.module === m.id && completed.includes(l.id)).length} total={allLessons().filter((l) => l.module === m.id).length} />
                 {allLessons().filter((l) => l.module === m.id).map((lesson) => (
                   <LessonCard key={lesson.id} lesson={lesson} done={completed.includes(lesson.id)} />
@@ -193,7 +197,7 @@ export default function Home() {
                 <AssessmentCard a={moduleCheckpoint(m.id)} run={assessmentRuns[m.id]} />
               </Animated.View>
             ))}
-            <AssessmentCard a={getAssessment('final')!} run={assessmentRuns.final} locked={!finalUnlocked(assessmentRuns)} unlockedCount={allAssessments().filter((x) => x.id !== 'final' && (assessmentRuns[x.id]?.attempts ?? 0) > 0).length} final />
+            {shownModules < modules.length ? null : <AssessmentCard a={getAssessment('final')!} run={assessmentRuns.final} locked={!finalUnlocked(assessmentRuns)} unlockedCount={allAssessments().filter((x) => x.id !== 'final' && (assessmentRuns[x.id]?.attempts ?? 0) > 0).length} final />}
           </View>
           )}
 

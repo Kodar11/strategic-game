@@ -141,9 +141,16 @@ async function saveSnapshotNow(owner: string, opts?: { serverLoaded?: boolean })
   await (await localStore()).saveSnapshot(owner, data, opts).catch(() => undefined);
 }
 
+/**
+ * At most one snapshot every few seconds while the player is active (each one serializes the whole progress record,
+ * which grows with every attempt). Nothing waits on it: every change is already saved on its own in the outbox the
+ * moment it happens, and the snapshot is also written when the app is backgrounded.
+ */
+const SNAPSHOT_EVERY_MS = 4000;
+
 function scheduleSnapshot(owner: string): void {
-  if (snapshotTimer) clearTimeout(snapshotTimer);
-  snapshotTimer = setTimeout(() => void saveSnapshotNow(owner), 800);
+  if (snapshotTimer) return;
+  snapshotTimer = setTimeout(() => void saveSnapshotNow(owner), SNAPSHOT_EVERY_MS);
 }
 
 function stopSaving(): void {
@@ -507,23 +514,33 @@ async function loadGuest(): Promise<void> {
 }
 
 /**
- * Who is signed in, for start-up. Online, the server confirms it (`confirmedUser`). With no answer from the server,
- * the saved session is used as it is — only when this device already holds that same account's data (the owner
- * marker), so being offline can never hand one person's data to another. That is not a fresh authentication: it is
+ * Who is signed in, for start-up. The saved session is used as it is — only when this device already holds that same
+ * account's data (the owner marker), so it can never hand one person's data to another. Otherwise (a first start for
+ * this account) the server confirms it (`confirmedUser`). That is not a fresh authentication: it is
  * marked unverified, every request still carries the token for the server to check, and the next connection asks the
  * server again (`verifySession`).
  */
 async function resolveUser(): Promise<{ user: AuthUser | null; verified: boolean }> {
+  // Local first: a saved session for the account whose data this device already holds opens the app at once, with no
+  // network round trip in front of the splash screen. The server confirms it right after start-up (`verifySession`,
+  // run in the background by startAppData); a revoked or deleted session then ends exactly as it would have here.
+  const known = await locallyKnownUser();
+  if (known) return { user: known, verified: false };
   try {
     return { user: await confirmedUser(), verified: true };
   } catch (e) {
     if (toDataError(e).kind !== 'network') throw e;
-    const stored = await storedSessionUser();
-    if (!stored) return { user: null, verified: false };
-    const marker = await AsyncStorage.getItem(DEVICE_OWNER_KEY).catch(() => null);
-    if (marker === ownerValue({ user: stored.id })) return { user: { id: stored.id, email: stored.email }, verified: false };
+    if (!(await storedSessionUser())) return { user: null, verified: false };
     throw e;
   }
+}
+
+/** The saved session's user, only when this device's data already belongs to that same account (the owner marker). */
+async function locallyKnownUser(): Promise<AuthUser | null> {
+  const stored = await storedSessionUser();
+  if (!stored) return null;
+  const marker = await AsyncStorage.getItem(DEVICE_OWNER_KEY).catch(() => null);
+  return marker === ownerValue({ user: stored.id }) ? { id: stored.id, email: stored.email } : null;
 }
 
 let starting: Promise<void> | null = null;
@@ -707,6 +724,9 @@ async function finishSignIn(user: AuthUser, isNew: boolean): Promise<void> {
   useGames.getState().reset();
   useDaily.getState().reset();
   dispatchAuth({ type: 'signedIn', user });
+  // The nickname and this week's standing come with the overview: fetch it now, alongside the progress, rather than
+  // waiting for a screen to ask.
+  void useGames.getState().loadOverview();
   // After the identity switch (src/observability follows the auth store), so the outcome belongs to the account.
   signInOutcome('success', isNew);
 

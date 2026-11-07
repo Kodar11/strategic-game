@@ -17,9 +17,12 @@ export function useNickname(): { name: string | null | undefined; failed: boolea
   const name = useGames((s) => (s.overview.status === 'ready' ? s.overview.data.nickname : s.mine.status === 'ready' ? s.mine.data.nickname : undefined));
   const failed = useGames((s) => s.overview.status === 'error' && s.mine.status !== 'ready');
   const loadOverview = useGames((s) => s.loadOverview);
+  // Reloads whenever the games data is cleared (sign-in, sign-out), not only on mount: a screen already open when the
+  // player signs in (Settings under the sign-in sheet) would otherwise wait for some other screen to load it.
+  const idle = useGames((s) => s.overview.status === 'idle');
   useEffect(() => {
-    void loadOverview();
-  }, [loadOverview]);
+    if (idle) void loadOverview();
+  }, [idle, loadOverview]);
   return { name, failed, reload: () => void loadOverview({ force: true }) };
 }
 

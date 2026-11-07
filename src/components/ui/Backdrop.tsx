@@ -1,27 +1,24 @@
+import { Image } from 'expo-image';
 import { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
-import { colors, palette } from '@/src/theme/tokens';
+import { colors } from '@/src/theme/tokens';
 
-/** Atmospheric background: deep navy with a soft blue key light and a faint orange rim light. */
+// Pre-rendered by scripts/generate-backdrop.mjs: the navy with its blue key light, and the orange rim light alone.
+const BASE = require('@/assets/images/backdrop/base.png');
+const RIM = require('@/assets/images/backdrop/rim.png');
+
+/**
+ * Atmospheric background: deep navy with a soft blue key light and a faint orange rim light.
+ *
+ * Two small images stretched to the screen, rather than SVG radial gradients drawn on every screen: decoded once and
+ * cached, so opening a screen no longer pays for rasterising a full-screen gradient. `warm` is the rim's strength.
+ */
 function BackdropView({ warm = 0.12 }: { warm?: number }) {
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} pointerEvents="none">
-      <Svg width="100%" height="100%" preserveAspectRatio="none">
-        <Defs>
-          <RadialGradient id="key" cx="15%" cy="0%" r="75%">
-            <Stop offset="0" stopColor={palette.blue} stopOpacity={0.22} />
-            <Stop offset="1" stopColor={palette.blue} stopOpacity={0} />
-          </RadialGradient>
-          <RadialGradient id="rim" cx="100%" cy="100%" r="70%">
-            <Stop offset="0" stopColor={palette.orange} stopOpacity={warm} />
-            <Stop offset="1" stopColor={palette.orange} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#key)" />
-        <Rect width="100%" height="100%" fill="url(#rim)" />
-      </Svg>
+      <Image source={BASE} style={StyleSheet.absoluteFill} contentFit="fill" transition={0} cachePolicy="memory" accessible={false} />
+      <Image source={RIM} style={[StyleSheet.absoluteFill, { opacity: warm }]} contentFit="fill" transition={0} cachePolicy="memory" accessible={false} />
     </View>
   );
 }

@@ -25,6 +25,7 @@ import { CompetitionArt } from '@/src/features/competition/CompetitionArt';
 import { played, useArenaRecords } from '@/src/features/arena/records';
 import { ARENA_TINT, ArenaArt } from '@/src/features/arena/ui/parts';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
+import { useStagedCount } from '@/src/utils/useStagedCount';
 
 function openGame(id: GameId) {
   router.push({ pathname: '/games/[gameId]', params: { gameId: id } });
@@ -41,6 +42,9 @@ export default function GamesScreen() {
   const overview = useGames((s) => s.overview);
   const loadOverview = useGames((s) => s.loadOverview);
   const [group, setGroup] = useState('all');
+  const groups = LIBRARY_GROUPS.filter((g) => group === 'all' || g.id === group);
+  // The first group of game cards draws with the screen; the rest (each with its artwork) follow frame by frame.
+  const shownGroups = useStagedCount(groups.length, 1, 1);
 
   useFocusEffect(
     useCallback(() => {
@@ -99,7 +103,7 @@ export default function GamesScreen() {
               );
             })}
           </ScrollView>
-          {LIBRARY_GROUPS.filter((g) => group === 'all' || g.id === group).map((g) => (
+          {groups.slice(0, shownGroups).map((g) => (
             <View key={g.id} style={{ gap: space.xs }}>
               <View style={{ gap: 1, marginTop: space.xs }}>
                 <AppText variant="bodyStrong" accessibilityRole="header">

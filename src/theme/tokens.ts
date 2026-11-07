@@ -80,12 +80,13 @@ export const type = {
 export type TypeVariant = keyof typeof type;
 
 export const shadow = {
+  // Kept small: a wide blurred shadow on every card in a long list is costly to draw, especially on Android.
   card: {
     shadowColor: '#000',
-    shadowOpacity: 0.28,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    shadowOpacity: 0.24,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
 } as const;
 

@@ -31,6 +31,9 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: { fontSize: 11, ...(fontsReady ? { fontFamily: fonts.semibold } : { fontWeight: '600' }) },
         tabBarHideOnKeyboard: true,
+        // Tabs you aren't looking at stop re-rendering (they're frozen, not unmounted: scroll position and state stay),
+        // so progress saved in a lesson or game doesn't make every other tab redraw underneath it.
+        freezeOnBlur: true,
       }}>
       <Tabs.Screen name="index" options={{ title: 'Learn', tabBarAccessibilityLabel: 'Learn: lessons, practice and the daily challenge', tabBarIcon: ({ focused }) => <TabIcon icon={BookOpen} focused={focused} /> }} />
       <Tabs.Screen name="games" options={{ title: 'Games', tabBarAccessibilityLabel: 'Games: play bots, Game of the Week and leaderboards', tabBarIcon: ({ focused }) => <TabIcon icon={Gamepad2} focused={focused} /> }} />
