@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ArrowRight, House, RotateCcw, Trophy } from '@/src/components/ui/icons';
+import { ArrowRight, House, Play, RotateCcw, Trophy } from '@/src/components/ui/icons';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { ZoomIn } from 'react-native-reanimated';
@@ -12,6 +12,7 @@ import { type LessonMeta, allLessons, nextLesson } from '@/src/content/lessons';
 import { moduleCheckpoint } from '@/src/features/assessments/content';
 import { challengesFor } from '@/src/features/challenges/content';
 import { isTried } from '@/src/features/challenges/progress';
+import { lessonBridge } from '@/src/features/lessons/game-bridge';
 import { useProgress } from '@/src/store/progress';
 import type { ClipId } from '@/src/features/audio/clips';
 import { useNarrateOnMount } from '@/src/features/audio/useNarration';
@@ -58,6 +59,8 @@ export function Completion({
   // The last lesson of a module leads into that module's checkpoint.
   const endsModule = allLessons().filter((l) => l.module === lesson.module).at(-1)?.id === lesson.id;
   const checkpoint = endsModule ? moduleCheckpoint(lesson.module) : null;
+  // A game that tests the same idea against an opponent, when one fits this lesson.
+  const bridge = lessonBridge(lesson.id);
 
   useEffect(() => {
     haptic.success();
@@ -121,6 +124,19 @@ export function Completion({
             Take it further
           </AppText>
           <AppText variant="body">{reflection}</AppText>
+        </Animated.View>
+      ) : null}
+
+      {bridge ? (
+        <Animated.View entering={enter(203)} style={styles.practice}>
+          <AppText variant="overline" color={colors.primaryText}>
+            Try it against an opponent
+          </AppText>
+          <AppText variant="heading">{bridge.title}</AppText>
+          <AppText variant="small" color={colors.textBody}>
+            {bridge.hook}
+          </AppText>
+          <Button label={`Play ${bridge.title}`} icon={Play} compact onPress={() => router.push(bridge.href)} />
         </Animated.View>
       ) : null}
 

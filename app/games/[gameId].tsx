@@ -13,7 +13,7 @@ import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { Segmented } from '@/src/components/ui/Segmented';
 import { gamesRepo, useGames } from '@/src/data/games-session';
 import { DIFFICULTY_HINT, DIFFICULTY_LABEL, GAMES, personality } from '@/src/games/catalog';
-import { DIFFICULTIES, type Difficulty, GAME_IDS, isGameId } from '@/src/games/core';
+import { DIFFICULTIES, type Difficulty, GAME_IDS, isDifficulty, isGameId } from '@/src/games/core';
 import { inviteText } from '@/src/games/share-text';
 import { readTarget } from '@/src/games/reads';
 import { ENGINES } from '@/src/games/registry';
@@ -39,7 +39,8 @@ export function generateStaticParams() {
  */
 export default function GameScreen() {
   const insets = useSafeAreaInsets();
-  const { gameId } = useLocalSearchParams<{ gameId: string }>();
+  // `difficulty` presets the level, e.g. from a lesson's "try it against an opponent" card.
+  const { gameId, difficulty: preset } = useLocalSearchParams<{ gameId: string; difficulty?: string }>();
   const seen = useSeenRules((s) => s.seen);
   const seenLoaded = useSeenRules((s) => s.loaded);
   const markSeen = useSeenRules((s) => s.markSeen);
@@ -49,7 +50,7 @@ export default function GameScreen() {
   // Every game starts with a mystery opponent (null); choosing a personality is deliberate practice.
   const [bot, setBot] = useState<string | null>(null);
   const [chooseOpen, setChooseOpen] = useState(false);
-  const [difficulty, setDifficulty] = useState<Difficulty>('easy');
+  const [difficulty, setDifficulty] = useState<Difficulty>(isDifficulty(preset) ? preset : 'easy');
   const [rulesOpen, setRulesOpen] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
   const [note, setNote] = useState<string | null>(null);

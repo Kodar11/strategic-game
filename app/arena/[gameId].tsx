@@ -12,7 +12,7 @@ import { ArrowLeft, ChevronDown, CircleHelp, Lock, Play } from '@/src/components
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { Segmented } from '@/src/components/ui/Segmented';
 import { ARENA, LENGTH_LABEL, LEVEL_HINT, LEVEL_LABEL, opponentName } from '@/src/arena/catalog';
-import { ARENA_IDS, LENGTHS, LEVELS, type Level, type MatchLength, isArenaId } from '@/src/arena/core';
+import { ARENA_IDS, LENGTHS, LEVELS, type Level, type MatchLength, isArenaId, isLevel } from '@/src/arena/core';
 import { COOP_PAYOFFS, type CoopMove, coopPayoff } from '@/src/arena/cooperation';
 import { MYSTERY, READ_RULES } from '@/src/arena/reads';
 import { TEAM_GAMES } from '@/src/features/arena/ui/library';
@@ -36,14 +36,15 @@ export function generateStaticParams() {
  */
 export default function ArenaGameScreen() {
   const insets = useSafeAreaInsets();
-  const { gameId } = useLocalSearchParams<{ gameId: string }>();
+  // `level` presets the difficulty, e.g. from a lesson's "try it against an opponent" card; it wins over saved prefs.
+  const { gameId, level: preset } = useLocalSearchParams<{ gameId: string; level?: string }>();
   const loaded = useArenaRecords((s) => s.loaded);
   const record = useArenaRecords((s) => (isArenaId(gameId) ? s.games[gameId] : undefined));
   const prefs = useArenaRecords((s) => (isArenaId(gameId) ? s.prefs[gameId] : undefined));
   const coached = useArenaRecords((s) => (isArenaId(gameId) ? s.coached[gameId] : undefined));
   const reads = useArenaRecords((s) => (isArenaId(gameId) ? s.reads[gameId] : undefined));
   const [chosen, setPersona] = useState<string | null>(null);
-  const [level, setLevel] = useState<Level>('easy');
+  const [level, setLevel] = useState<Level>(isLevel(preset) ? preset : 'easy');
   const [length, setLength] = useState<MatchLength>('standard');
   const [variant, setVariant] = useState<string | null>(null);
   const [rulesOpen, setRulesOpen] = useState<boolean | null>(null);
@@ -59,7 +60,7 @@ export default function ArenaGameScreen() {
     setApplied(true);
     if (prefs) {
       setPersona(prefs.persona);
-      setLevel(prefs.level);
+      if (!isLevel(preset)) setLevel(prefs.level);
       setLength(prefs.length);
       setVariant(prefs.variant);
     }
