@@ -32,3 +32,24 @@ export function playMatch(stage: Stage, m: TournamentMatch, level: Level = m.lev
     router.push({ pathname: '/games/play', params: { game: m.game.id, opponent: 'mystery', difficulty: level === 'normal' ? 'medium' : level, t: m.id } });
   }
 }
+
+/** The game's first challenge variant, used by the Hard Replay (arena games only). */
+function challengeOf(m: TournamentMatch) {
+  return m.game.system === 'arena' ? ARENA[m.game.id as ArenaGameId]?.variants.find((v) => v.challenge) : undefined;
+}
+
+/** The Hard Replay's rules for a match, in words: "Hard", or "Hard · Fog". */
+export const replayRules = (m: TournamentMatch) => {
+  const v = challengeOf(m);
+  return v ? `Hard · ${v.name}` : 'Hard';
+};
+
+/** Opens a match in the Hard Replay (`r=1`): Hard, with the challenge variant where the game has one. */
+export function playReplay(stage: Stage, m: TournamentMatch) {
+  const r = resolveMatch(stage, m);
+  if (m.game.system === 'arena') {
+    router.push({ pathname: '/arena/play', params: { game: m.game.id, persona: 'mystery', level: 'hard', length: r.length, variant: challengeOf(m)?.id ?? r.variant, t: m.id, r: '1' } });
+  } else {
+    router.push({ pathname: '/games/play', params: { game: m.game.id, opponent: 'mystery', difficulty: 'hard', t: m.id, r: '1' } });
+  }
+}

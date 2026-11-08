@@ -25,6 +25,7 @@ import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 import { useArenaRecords } from '../records';
 import { useGameTelemetry } from '@/src/observability';
 import { TournamentHint } from '@/src/features/tournament/ui/TournamentHint';
+import { TournamentThought } from '@/src/features/tournament/ui/TournamentThought';
 import { TournamentResult } from '@/src/features/tournament/ui/TournamentResult';
 import { useArenaMatch } from '../useArenaMatch';
 import { useOpponentRead } from '../useOpponentRead';
@@ -59,6 +60,7 @@ export function CooperationMatch({
   server,
   resultSlot,
   tournament,
+  replay = false,
 }: {
   persona: CoopOpponent;
   /** The personality is hidden until the end, with an optional prediction (src/arena/reads.ts). */
@@ -77,6 +79,8 @@ export function CooperationMatch({
   resultSlot?: ReactNode;
   /** A tournament match id: the result is recorded there and its reveal or debrief shown above the results. */
   tournament?: string;
+  /** The tournament match is played in the Hard Replay. */
+  replay?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const setup: CoopSetup = { persona, level, length, variant, seed };
@@ -184,13 +188,14 @@ export function CooperationMatch({
             resultSlot
           ) : view === 'results' && result ? (
             <>
-              {tournament ? <TournamentResult matchId={tournament} outcome={result.outcome} level={level} readCorrect={read.verdict === 'correct'} debrief={cooperation.debrief(state)} onRematch={onPlayAgain} /> : null}
+              {tournament ? <TournamentResult matchId={tournament} outcome={result.outcome} level={level} readCorrect={read.verdict === 'correct'} debrief={cooperation.debrief(state)} onRematch={onPlayAgain} replay={replay} /> : null}
               <CoopResults state={state} result={result} newBest={newBest} onRematch={onPlayAgain} onChange={change} onLibrary={() => router.navigate('/games')} read={mystery && read.verdict ? { guess: read.guess, verdict: read.verdict } : null} practice={!tournament} />
             </>
           ) : (
             <>
               {rulesOpen ? <RulesCard variant={variant} total={state.total} /> : null}
               <ScoreHeader state={state} view={view} name={name} round={shownRound} />
+              {tournament ? <TournamentThought matchId={tournament} played={h.length} total={state.total} over={over} /> : null}
               {tournament && !over ? <TournamentHint matchId={tournament} /> : null}
               <Timeline h={h} total={state.total} current={view === 'decide' ? h.length : -1} />
               <TrustLine h={h} total={state.total} />

@@ -31,6 +31,7 @@ import { ClassicReveal } from '@/src/features/games/ui/ClassicReveal';
 import { WhatIfPanel } from '@/src/features/games/ui/WhatIfPanel';
 import { ReadOpponentPanel } from '@/src/features/games/ui/ReadOpponentPanel';
 import { TournamentHint } from '@/src/features/tournament/ui/TournamentHint';
+import { TournamentThought } from '@/src/features/tournament/ui/TournamentThought';
 import { TournamentResult } from '@/src/features/tournament/ui/TournamentResult';
 import { RepeatDone, RepeatPanel } from '@/src/features/repeat/RepeatPanel';
 import { useRepeat } from '@/src/features/repeat/useRepeat';
@@ -39,7 +40,7 @@ import { NO_REPEAT } from '@/src/repeat/plan';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
 /** `t`: a tournament match id (src/features/tournament): the result is recorded there and its reveal shown. */
-type Params = { game?: string; bot?: string; difficulty?: string; opponent?: string; mode?: string; competitionId?: string; token?: string; n?: string; t?: string };
+type Params = { game?: string; bot?: string; difficulty?: string; opponent?: string; mode?: string; competitionId?: string; token?: string; n?: string; t?: string; r?: string };
 
 /**
  * Playing a match. Practice (`game`, `bot`, `difficulty`) runs on the device; any game with
@@ -65,16 +66,16 @@ export default function PlayScreen() {
   }
   const bot = mystery ? null : p.bot!;
   const tournament = typeof p.t === 'string' && p.t ? p.t : undefined;
-  return <Practice key={`${p.game}:${bot ?? 'mystery'}:${p.difficulty}`} game={p.game} bot={bot} difficulty={p.difficulty} tournament={tournament} />;
+  return <Practice key={`${p.game}:${bot ?? 'mystery'}:${p.difficulty}`} game={p.game} bot={bot} difficulty={p.difficulty} tournament={tournament} replay={p.r === '1'} />;
 }
 
 /** `bot` null: a mystery opponent. */
-function Practice({ game, bot, difficulty, tournament }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; tournament?: string }) {
+function Practice({ game, bot, difficulty, tournament, replay }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; tournament?: string; replay?: boolean }) {
   const [round, setRound] = useState(0);
-  return <PracticeSession key={round} game={game} bot={bot} difficulty={difficulty} tournament={tournament} onPlayAgain={() => setRound((n) => n + 1)} />;
+  return <PracticeSession key={round} game={game} bot={bot} difficulty={difficulty} tournament={tournament} replay={replay} onPlayAgain={() => setRound((n) => n + 1)} />;
 }
 
-function PracticeSession({ game, bot, difficulty, tournament, onPlayAgain }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; tournament?: string; onPlayAgain: () => void }) {
+function PracticeSession({ game, bot, difficulty, tournament, replay, onPlayAgain }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; tournament?: string; replay?: boolean; onPlayAgain: () => void }) {
   const view = usePracticeMatch(game, bot, difficulty);
   const practise = (b: string) => (bot === b ? onPlayAgain() : router.replace({ pathname: '/games/play', params: { game, bot: b, difficulty } }));
   return (
@@ -83,7 +84,7 @@ function PracticeSession({ game, bot, difficulty, tournament, onPlayAgain }: { g
       tournament={tournament}
       result={
         <>
-        {tournament && view.outcome ? <TournamentResult matchId={tournament} outcome={view.outcome} level={difficulty === 'medium' ? 'normal' : difficulty} readCorrect={view.read?.current?.guess === view.bot} onRematch={onPlayAgain} /> : null}
+        {tournament && view.outcome ? <TournamentResult matchId={tournament} outcome={view.outcome} level={difficulty === 'medium' ? 'normal' : difficulty} readCorrect={view.read?.current?.guess === view.bot} onRematch={onPlayAgain} replay={replay} /> : null}
         <ResultPanel
           view={view}
           onPlayAgain={tournament ? undefined : onPlayAgain}
@@ -258,8 +259,9 @@ function MatchLayout({ view, result, tournament }: { view: MatchView; result: Re
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: insets.top + space.xs, paddingBottom: insets.bottom + space.huge }} keyboardShouldPersistTaps="handled">
         <View style={styles.column}>
           {view.mode === 'practice' ? <LeaveGuard started={view.rounds.length > 0} over={view.done} /> : null}
-          <MatchHeader title={g.title} meta={`${hidden ? MYSTERY_NAME : (personality(view.game, view.bot)?.name ?? view.bot)} · ${DIFFICULTY_LABEL[view.difficulty]} · ${view.mode === 'competition' ? 'Game of the Week' : view.mode === 'challenge' ? 'Friend challenge' : 'Practice'}`} progress={`Round ${Math.min(view.rounds.length + (view.done ? 0 : 1), view.totalRounds)}/${view.totalRounds}`} backLabel={view.mode === 'practice' || view.done ? 'Back' : 'Leave — you can resume this match later'} onBack={close} />
+          <MatchHeader title={g.title} meta={`${hidden ? MYSTERY_NAME : (personality(view.game, view.bot)?.name ?? view.bot)} · ${DIFFICULTY_LABEL[view.difficulty]} · ${view.mode === 'competition' ? 'Game of the Week' : view.mode === 'challenge' ? 'Friend challenge' : tournament ? 'Tournament' : 'Practice'}`} progress={`Round ${Math.min(view.rounds.length + (view.done ? 0 : 1), view.totalRounds)}/${view.totalRounds}`} backLabel={view.mode === 'practice' || view.done ? 'Back' : 'Leave — you can resume this match later'} onBack={close} />
           {view.done ? null : <ScoreLine you={view.totals.player} rival={view.totals.bot} rivalName={botName} />}
+          {tournament ? <TournamentThought matchId={tournament} played={view.rounds.length} total={view.totalRounds} over={view.done} /> : null}
           {tournament && !view.done ? <TournamentHint matchId={tournament} /> : null}
           {view.mode !== 'practice' && !view.done ? (
             <AppText variant="caption" color={colors.textMuted}>

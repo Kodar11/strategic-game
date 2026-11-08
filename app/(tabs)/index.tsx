@@ -15,6 +15,7 @@ import { SignInInvite } from '@/src/features/account/SignInInvite';
 import { DailyRow } from '@/src/features/daily/DailyRow';
 import { UsageConsentCard } from '@/src/features/settings/UsageConsentCard';
 import { TournamentHome } from '@/src/features/tournament/ui/TournamentHome';
+import { WeeklyRival } from '@/src/features/tournament/ui/WeeklyRival';
 import { useLoadTournament } from '@/src/features/tournament/useStatus';
 import { useTournament } from '@/src/features/tournament/store';
 import { useProgress } from '@/src/store/progress';
@@ -57,6 +58,7 @@ export default function Home() {
               Today
             </AppText>
             <DailyRow />
+            <WeeklyRival />
           </Animated.View>
 
           <UsageConsentCard />

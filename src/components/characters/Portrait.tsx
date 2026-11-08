@@ -6,10 +6,10 @@ import Svg, { Circle, ClipPath, Defs, Ellipse, G, LinearGradient, Path, RadialGr
 
 import { useMotionReduced } from '@/src/utils/feedback';
 import { palette } from '@/src/theme/tokens';
-import { CAST, type CharacterId, type CharacterSpec, type Expression } from './cast';
+import { CAST, type CharacterSpec, type Expression, type PortraitId } from './cast';
 
 export interface PortraitProps {
-  character: CharacterId;
+  character: PortraitId;
   expression?: Expression;
   size?: number;
   /** Ring colour; defaults to none. */

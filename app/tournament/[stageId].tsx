@@ -128,6 +128,7 @@ export default function StageScreen() {
                           <AppText variant="caption" color={colors.textMuted}>
                             {LEVEL_NAME[m.level]}
                             {rec.skipped && !rec.won ? ' · skipped' : ''}
+                            {rec.replay ? ' · Hard Replay cleared' : ''}
                           </AppText>
                         </View>
                       </View>

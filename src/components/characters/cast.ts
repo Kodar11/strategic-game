@@ -10,6 +10,12 @@ import type { ImageSourcePropType } from 'react-native';
  */
 export type CharacterId = 'aarav' | 'maya' | 'rohan' | 'meera' | 'sen' | 'kavya' | 'arjun' | 'nina';
 
+/** The Tournament's cast: portraits only, never narrated (src/tournament/season1.ts names them as rivals' portraits). */
+export type TournamentRivalId = 'host' | 'vesper' | 'kade' | 'mirelle' | 'osric' | 'tamsin';
+
+/** Anyone with a portrait. */
+export type PortraitId = CharacterId | TournamentRivalId;
+
 export type Expression =
   | 'neutral'
   | 'curious'
@@ -28,7 +34,7 @@ export type HairStyle = 'tousled' | 'long' | 'longSide' | 'short' | 'bun' | 'rec
 export type Outfit = 'hoodie' | 'blouse' | 'jacket' | 'blazer' | 'sweater' | 'cardigan' | 'shirt' | 'top';
 
 export interface CharacterSpec {
-  id: CharacterId;
+  id: PortraitId;
   name: string;
   role: string;
   skin: string;
@@ -45,7 +51,7 @@ export interface CharacterSpec {
   images?: Partial<Record<Expression, ImageSourcePropType>> & { neutral?: ImageSourcePropType };
 }
 
-export const CAST: Record<CharacterId, CharacterSpec> = {
+export const CAST: Record<PortraitId, CharacterSpec> = {
   aarav: {
     id: 'aarav',
     name: 'Aarav',
@@ -152,5 +158,87 @@ export const CAST: Record<CharacterId, CharacterSpec> = {
     clothing: '#9C5B4A',
     clothingShade: '#7C4537',
     accent: '#FDBA74',
+  },
+  // ── The Tournament ─────────────────────────────────────────────────────────────────────────────────────────────
+  host: {
+    id: 'host',
+    name: 'The Host',
+    role: 'Runs the Tournament',
+    skin: '#B47E5E',
+    skinShade: '#956347',
+    hair: '#C9CCD3',
+    hairStyle: 'receding',
+    outfit: 'blazer',
+    clothing: '#3A2E22',
+    clothingShade: '#2A2118',
+    glasses: true,
+    accent: '#FDBA74',
+  },
+  vesper: {
+    id: 'vesper',
+    name: 'Vesper',
+    role: 'The Liar',
+    skin: '#C48E6C',
+    skinShade: '#A57152',
+    hair: '#2A1414',
+    hairStyle: 'longSide',
+    outfit: 'blouse',
+    clothing: '#C2410C',
+    clothingShade: '#9A3412',
+    accent: '#FDA766',
+  },
+  kade: {
+    id: 'kade',
+    name: 'Kade',
+    role: 'The Traitor',
+    skin: '#9E6A4B',
+    skinShade: '#80523A',
+    hair: '#14100E',
+    hairStyle: 'tousled',
+    outfit: 'jacket',
+    clothing: '#1D4ED8',
+    clothingShade: '#1E3A8A',
+    accent: '#93B4F8',
+  },
+  mirelle: {
+    id: 'mirelle',
+    name: 'Mirelle',
+    role: 'The Puppeteer',
+    skin: '#C99A7A',
+    skinShade: '#AA7D5E',
+    hair: '#0F0B0A',
+    hairStyle: 'bob',
+    outfit: 'top',
+    clothing: '#0E7490',
+    clothingShade: '#155E75',
+    accent: '#22D3EE',
+  },
+  osric: {
+    id: 'osric',
+    name: 'Osric',
+    role: 'The Kingmaker',
+    skin: '#A97352',
+    skinShade: '#8B5A3D',
+    hair: '#2B211C',
+    hairStyle: 'short',
+    outfit: 'blazer',
+    clothing: '#166534',
+    clothingShade: '#14532D',
+    beard: true,
+    accent: '#4ADE80',
+  },
+  tamsin: {
+    id: 'tamsin',
+    name: 'Tamsin',
+    role: 'The Architect',
+    skin: '#B9805E',
+    skinShade: '#9A6646',
+    hair: '#3B2A22',
+    hairStyle: 'bun',
+    outfit: 'cardigan',
+    clothing: '#334155',
+    clothingShade: '#1E293B',
+    glasses: true,
+    accent: '#93B4F8',
   },
 };

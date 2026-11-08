@@ -1,3 +1,4 @@
+import { SEASON_ONE_MONOLOGUES } from './monologues.ts';
 import { SEASON_ONE_QUESTIONS } from './questions.ts';
 import type { TournamentDoc } from './schema.ts';
 
@@ -9,11 +10,12 @@ import type { TournamentDoc } from './schema.ts';
  * Every opponent in a tournament match is hidden: the rival plays one of the game's styles, and reading which one is
  * a star. Intel lines describe the game's trap, never which style the rival picked.
  */
-export const SEASON_ONE: TournamentDoc = {
+const DRAFT: TournamentDoc = {
   schemaVersion: 1,
   id: 'main',
   // 2: question bank, Host welcome, Codebreaker side trial, Market and Power Play retuned.
-  revision: 2,
+  // 3: rival portraits and taunts, a third reaction line each, inner monologue.
+  revision: 3,
   title: 'The Tournament',
   tagline: 'Five rivals. Every trick is real. Outthink them one at a time.',
   host: 'host',
@@ -31,9 +33,11 @@ export const SEASON_ONE: TournamentDoc = {
       epithet: 'Runs the Tournament',
       tone: 'amber',
       bio: 'Calm, polite, and always one move ahead. Watches every match.',
+      portrait: 'host',
       lines: {
-        onPlayerWin: ['Good. You read the room.', 'That is how it is done.'],
-        onPlayerLoss: ['Everyone falls for that once.', 'Look again at what they showed you.'],
+        taunt: ['Show me how you think.', 'Every match tells me something about you.'],
+        onPlayerWin: ['Good. You read the room.', 'That is how it is done.', 'You are learning faster than most.'],
+        onPlayerLoss: ['Everyone falls for that once.', 'Look again at what they showed you.', 'Patience. The pattern was there.'],
         defeated: 'So you were watching me all along. Well played.',
       },
     },
@@ -43,9 +47,11 @@ export const SEASON_ONE: TournamentDoc = {
       epithet: 'The Liar',
       tone: 'orange',
       bio: 'Says everything with the same calm face, true or not.',
+      portrait: 'vesper',
       lines: {
-        onPlayerWin: ['You called it. Annoying.', 'Fine. You saw through that one.'],
-        onPlayerLoss: ['You believed me. They always do.', 'Confidence is cheap. You paid for it.'],
+        taunt: ['Believe me. Everyone else does.', 'I never lie. Ask anyone I have beaten.'],
+        onPlayerWin: ['You called it. Annoying.', 'Fine. You saw through that one.', 'Lucky read. Do it again.'],
+        onPlayerLoss: ['You believed me. They always do.', 'Confidence is cheap. You paid for it.', 'I did not even have to try.'],
         defeated: 'No more bluffs left. You win this one.',
       },
     },
@@ -55,9 +61,11 @@ export const SEASON_ONE: TournamentDoc = {
       epithet: 'The Traitor',
       tone: 'blue',
       bio: 'Friendly until the moment it pays not to be.',
+      portrait: 'kade',
       lines: {
-        onPlayerWin: ['You did not trust me. Smart.', 'You kept me honest. I hate that.'],
-        onPlayerLoss: ['Nothing personal. It just paid more.', 'You trusted me one round too long.'],
+        taunt: ['We are on the same side. For now.', 'Trust me. What could go wrong?'],
+        onPlayerWin: ['You did not trust me. Smart.', 'You kept me honest. I hate that.', 'Fine. You make betrayal expensive.'],
+        onPlayerLoss: ['Nothing personal. It just paid more.', 'You trusted me one round too long.', 'Friendship ends where the payoff starts.'],
         defeated: 'You made betrayal cost more than it paid. I am out.',
       },
     },
@@ -67,9 +75,11 @@ export const SEASON_ONE: TournamentDoc = {
       epithet: 'The Puppeteer',
       tone: 'cyan',
       bio: 'Never in the spotlight. Always the one moving the pieces.',
+      portrait: 'mirelle',
       lines: {
-        onPlayerWin: ['You followed the evidence, not the crowd.', 'So you can see the strings.'],
-        onPlayerLoss: ['You looked where I wanted you to look.', 'The loudest voice is rarely the guilty one.'],
+        taunt: ['Look over there. No, over there.', 'You will never see me coming.'],
+        onPlayerWin: ['You followed the evidence, not the crowd.', 'So you can see the strings.', 'Interesting. You do not scare easily.'],
+        onPlayerLoss: ['You looked where I wanted you to look.', 'The loudest voice is rarely the guilty one.', 'Everyone suspected the wrong person. Including you.'],
         defeated: 'You found me. Nobody finds me.',
       },
     },
@@ -79,9 +89,11 @@ export const SEASON_ONE: TournamentDoc = {
       epithet: 'The Kingmaker',
       tone: 'success',
       bio: 'Buys power cheap and sells it dear. Every deal has a price.',
+      portrait: 'osric',
       lines: {
-        onPlayerWin: ['You knew your worth. Rare.', 'A fair deal. I did not want one.'],
-        onPlayerLoss: ['You took the first offer. Never take the first offer.', 'I needed you less than you needed me.'],
+        taunt: ['Everyone has a price. Let us find yours.', 'Sit down. I make the offers here.'],
+        onPlayerWin: ['You knew your worth. Rare.', 'A fair deal. I did not want one.', 'You priced that well. I will remember.'],
+        onPlayerLoss: ['You took the first offer. Never take the first offer.', 'I needed you less than you needed me.', 'A seat at my table is never free.'],
         defeated: 'You priced me out of my own market.',
       },
     },
@@ -91,9 +103,11 @@ export const SEASON_ONE: TournamentDoc = {
       epithet: 'The Architect',
       tone: 'blue',
       bio: 'Plays long games. Forces you to choose between winning now and winning at all.',
+      portrait: 'tamsin',
       lines: {
-        onPlayerWin: ['You thought past this round.', 'Patience. Good.'],
-        onPlayerLoss: ['You grabbed today and lost tomorrow.', 'Some games you only win together.'],
+        taunt: ['Not yet. First, let us see if you can wait.', 'The best move is rarely the obvious one.'],
+        onPlayerWin: ['You thought past this round.', 'Patience. Good.', 'You built that win slowly. That is the only way.'],
+        onPlayerLoss: ['You grabbed today and lost tomorrow.', 'Some games you only win together.', 'You played the round. I played the game.'],
         defeated: 'You built something that lasts. I can respect that.',
       },
     },
@@ -383,4 +397,13 @@ export const SEASON_ONE: TournamentDoc = {
       ],
     },
   ],
+};
+
+/** Season 1 with each match's inner-monologue lines (src/tournament/monologues.ts) merged in. */
+export const SEASON_ONE: TournamentDoc = {
+  ...DRAFT,
+  seasons: DRAFT.seasons.map((season) => ({
+    ...season,
+    stages: season.stages.map((stage) => ({ ...stage, matches: stage.matches.map((m) => (SEASON_ONE_MONOLOGUES[m.id] ? { ...m, monologue: SEASON_ONE_MONOLOGUES[m.id] } : m)) })),
+  })),
 };

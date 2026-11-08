@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { ARENA_ENGINES } from '../arena/registry.ts';
+import { CAST } from '../components/characters/cast.ts';
 import { isArenaId } from '../arena/core.ts';
 import { LESSON_IDS, type LessonId } from '../content/lessons.ts';
 import { isGameId } from '../games/core.ts';
@@ -33,7 +34,11 @@ const rival = z.object({
   tone: z.enum(TONES),
   /** One line on how they play: shown on the stage screen. */
   bio: text,
+  /** A character from the app's cast (src/components/characters/cast.ts) drawn as their portrait. */
+  portrait: z.string().optional(),
   lines: z.object({
+    /** Said before a match, on the intel screen. */
+    taunt: lines.default([]),
     /** Said when the player beats them in a match. */
     onPlayerWin: lines.min(1),
     /** Said when the player loses to them. */
@@ -60,6 +65,11 @@ const match = z.object({
     /** The lesson the idea comes from. */
     lesson: z.string().optional(),
   }),
+  /**
+   * The player's inner voice at three moments of a game: as it starts, around the middle, and before the last round.
+   * One short line each; any can be left out.
+   */
+  monologue: z.object({ start: text.optional(), mid: text.optional(), late: text.optional() }).optional(),
 });
 
 const stage = z.object({
@@ -137,6 +147,7 @@ export interface ResolvedMatch extends TournamentMatch {
 }
 
 const isLesson = (x: string): x is LessonId => (LESSON_IDS as readonly string[]).includes(x);
+const isCastMember = (x: string) => Object.prototype.hasOwnProperty.call(CAST, x);
 
 /** Problems with the document's meaning (the shape has already passed). Empty = usable. */
 export function validateTournament(doc: TournamentDoc): string[] {
@@ -144,6 +155,7 @@ export function validateTournament(doc: TournamentDoc): string[] {
   const rivals = new Set<string>();
   for (const r of doc.rivals) {
     if (rivals.has(r.id)) problems.push(`rival ${r.id}: duplicate id`);
+    if (r.portrait !== undefined && !isCastMember(r.portrait)) problems.push(`rival ${r.id}: unknown portrait ${r.portrait}`);
     rivals.add(r.id);
   }
   if (!rivals.has(doc.host)) problems.push(`host ${doc.host}: not a rival`);

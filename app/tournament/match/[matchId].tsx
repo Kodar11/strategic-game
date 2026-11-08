@@ -9,12 +9,12 @@ import { ArrowLeft, Check, ChevronRight, Lightbulb, Play, Swords } from '@/src/c
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { getLesson } from '@/src/content/lessons';
 import { rivalOf } from '@/src/features/tournament/content';
-import { GameIcon, LEVEL_NAME, gameTitle, playMatch } from '@/src/features/tournament/games';
+import { GameIcon, LEVEL_NAME, gameTitle, playMatch, playReplay, replayRules } from '@/src/features/tournament/games';
 import { useTournament } from '@/src/features/tournament/store';
-import { Kicker, StarRow, toneColors } from '@/src/features/tournament/ui/parts';
+import { Kicker, RivalMark, StarRow, toneColors } from '@/src/features/tournament/ui/parts';
 import { useLoadTournament, useTournamentStatus } from '@/src/features/tournament/useStatus';
 import { useTournamentStats } from '@/src/features/tournament/sync';
-import { SKIP_AFTER, canSkip, findMatch, matchOpen, recordOf, share, stars } from '@/src/tournament/progress';
+import { SKIP_AFTER, canSkip, findMatch, matchOpen, recordOf, replayStatus, share, stars } from '@/src/tournament/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
 /** Before a tournament match: what the rival does in this game, what beats it, and the stars still to earn. */
@@ -39,6 +39,8 @@ export default function MatchIntelScreen() {
   const lesson = match.intel.lesson ? getLesson(match.intel.lesson) : undefined;
   const close = () => (router.canGoBack() ? router.back() : router.replace({ pathname: '/tournament/[stageId]', params: { stageId: stage.id } }));
   const hardLeft = rec.won && !rec.hard && match.level !== 'hard';
+  // The Hard Replay opens once the season is cleared, for bracket matches (not side trials).
+  const replayOpen = replayStatus(t.season, t.progress).open && stage.kind !== 'side';
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -70,6 +72,15 @@ export default function MatchIntelScreen() {
             </View>
           </View>
 
+          {rival.lines.taunt.length ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+              <RivalMark rival={rival} size={48} expression="confident" />
+              <AppText color={colors.textBody} style={{ flex: 1, fontStyle: 'italic' }}>
+                “{rival.lines.taunt[(rec.wins + rec.losses + rec.draws) % rival.lines.taunt.length]}”
+              </AppText>
+            </View>
+          ) : null}
+
           <View style={[styles.intel, { borderColor: tone.solid }]}>
             <AppText variant="overline" color={tone.fg}>
               Intel
@@ -99,6 +110,7 @@ export default function MatchIntelScreen() {
             <Goal done={rec.won} label="Win the match" />
             <Goal done={rec.read} label="Read the hidden style correctly" />
             <Goal done={rec.hard} label="Win on Hard" />
+            {replayOpen ? <Goal done={rec.replay} label={`Clear the Hard Replay (${replayRules(match)})`} /> : null}
             {stats ? (
               <AppText variant="caption" color={colors.textMuted} tabular>
                 {share(stats.won, stats.players)}% of {stats.players.toLocaleString('en-IN')} players have beaten it · {share(stats.read, stats.players)}% read the style
@@ -110,6 +122,7 @@ export default function MatchIntelScreen() {
             <View style={{ gap: space.sm }}>
               <Button label={rec.wins + rec.losses + rec.draws === 0 ? 'Play' : rec.won ? 'Play again' : 'Try again'} icon={Play} iconPosition="left" onPress={() => playMatch(stage, match)} />
               {hardLeft ? <Button label="Play on Hard for the last star" variant="secondary" onPress={() => playMatch(stage, match, 'hard')} /> : null}
+              {replayOpen ? <Button label={rec.replay ? `Hard Replay again · ${replayRules(match)}` : `Play the Hard Replay · ${replayRules(match)}`} variant={rec.replay ? 'secondary' : 'primary'} onPress={() => playReplay(stage, match)} /> : null}
               {canSkip(match, rec) ? (
                 <Button
                   label="Skip this match (no stars)"

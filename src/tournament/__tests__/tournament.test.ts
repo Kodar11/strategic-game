@@ -17,6 +17,8 @@ import {
   findMatch,
   hasKeyCard,
   mergeProgress,
+  replayStatus,
+  thoughtMoment,
   mindCheckOffer,
   mindForm,
   nextMatch,
@@ -330,5 +332,73 @@ describe('saved progress', () => {
     assert.deepEqual(junk.seen, ['s1.kade']);
     assert.equal(junk.mind.length, 1);
     assert.deepEqual(sanitizeProgress('nonsense'), EMPTY_PROGRESS);
+  });
+});
+
+describe('characters and voice', () => {
+  it('gives every rival a portrait from the cast, taunts and three reaction lines each way', () => {
+    for (const r of SEASON_ONE.rivals) {
+      assert.ok(r.portrait, r.id);
+      assert.ok(r.lines.taunt.length >= 2, r.id);
+      assert.equal(r.lines.onPlayerWin.length, 3, r.id);
+      assert.equal(r.lines.onPlayerLoss.length, 3, r.id);
+    }
+    const d = clone();
+    d.rivals[1].portrait = 'nobody';
+    assert.equal(parseTournament(d), null, 'an unknown portrait is refused');
+  });
+
+  it('has an inner monologue for every match: a start, a middle and a late line', () => {
+    for (const s of season.stages)
+      for (const m of s.matches) {
+        assert.ok(m.monologue?.start && m.monologue.mid && m.monologue.late, m.id);
+        for (const line of Object.values(m.monologue!)) assert.ok(line!.length <= 90, `${m.id}: keep it short`);
+      }
+  });
+
+  it('speaks at three moments only: the start, from halfway, and before the last round', () => {
+    const moments = Array.from({ length: 9 }, (_, played) => thoughtMoment(played, 8));
+    assert.deepEqual(moments, ['start', null, null, null, 'mid', 'mid', 'mid', 'late', 'late']);
+    assert.equal(thoughtMoment(0, 0), null);
+  });
+});
+
+describe('Hard Replay', () => {
+  const clearAll = () => {
+    let p = EMPTY_PROGRESS;
+    for (let i = 0; i < season.stages.length; i++) p = clearStage(p, i);
+    return p;
+  };
+
+  it('opens only once the season is cleared, and counts bracket matches won in it', () => {
+    assert.equal(replayStatus(season, clearStage(EMPTY_PROGRESS, 0)).open, false);
+    const p = clearAll();
+    const r = replayStatus(season, p);
+    assert.equal(r.open, true);
+    assert.equal(r.cleared, 0);
+    assert.equal(r.total, season.stages.filter((s) => s.kind !== 'side').reduce((n, s) => n + s.matches.length, 0));
+    assert.equal(r.next?.match.id, 's1.q.rps');
+  });
+
+  it('records a replay clear only for a win played in the replay, once', () => {
+    const p = clearAll();
+    const f = findMatch(season, 's1.q.rps')!;
+    const normal = recordGame(p, f.stage, f.match, { outcome: 'win', level: 'hard', read: false }, 9);
+    assert.equal(recordOf(normal.progress, 's1.q.rps').replay, false);
+    const lost = recordGame(p, f.stage, f.match, { outcome: 'loss', level: 'hard', read: false, replay: true }, 9);
+    assert.equal(recordOf(lost.progress, 's1.q.rps').replay, false);
+    const won = recordGame(p, f.stage, f.match, { outcome: 'win', level: 'hard', read: false, replay: true }, 9);
+    assert.equal(won.replayCleared, true);
+    assert.equal(replayStatus(season, won.progress).cleared, 1);
+    assert.equal(replayStatus(season, won.progress).next?.match.id, 's1.q.two-thirds');
+    assert.equal(recordGame(won.progress, f.stage, f.match, { outcome: 'win', level: 'hard', read: false, replay: true }, 10).replayCleared, false);
+    assert.equal(opponentRating(f.stage, f.match, 'hard', true), 1200, 'replay opponents rate higher');
+  });
+
+  it('survives saving and merging', () => {
+    const f = findMatch(season, 's1.q.rps')!;
+    const won = recordGame(EMPTY_PROGRESS, f.stage, f.match, { outcome: 'win', level: 'hard', read: false, replay: true }, 1).progress;
+    assert.equal(recordOf(sanitizeProgress(JSON.parse(JSON.stringify(won))), 's1.q.rps').replay, true);
+    assert.equal(recordOf(mergeProgress(EMPTY_PROGRESS, won), 's1.q.rps').replay, true);
   });
 });

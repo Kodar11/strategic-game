@@ -1,5 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
+import { Portrait } from '@/src/components/characters/Portrait';
+import { CAST, type Expression, type PortraitId } from '@/src/components/characters/cast';
 import { AppText } from '@/src/components/ui/AppText';
 import { Star } from '@/src/components/ui/icons';
 import type { Rival, RivalTone } from '@/src/tournament/schema';
@@ -21,9 +23,19 @@ export function toneColors(tone: RivalTone): { fg: string; soft: string; solid: 
   }
 }
 
-/** The rival's mark: their initial in a ringed disc. Dimmed while their stage is locked. */
-export function RivalMark({ rival, size = 44, dim = false, done = false }: { rival: Rival; size?: number; dim?: boolean; done?: boolean }) {
+/**
+ * The rival's mark: their portrait from the app's cast in a ring of their colour (their initial when the document
+ * names no portrait). Dimmed while their stage is locked; a green ring once beaten.
+ */
+export function RivalMark({ rival, size = 44, dim = false, done = false, expression = 'neutral' }: { rival: Rival; size?: number; dim?: boolean; done?: boolean; expression?: Expression }) {
   const t = toneColors(rival.tone);
+  if (rival.portrait && rival.portrait in CAST) {
+    return (
+      <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden style={{ opacity: dim ? 0.45 : 1 }}>
+        <Portrait character={rival.portrait as PortraitId} size={size} expression={expression} ring={done ? colors.success : dim ? colors.border : t.solid} />
+      </View>
+    );
+  }
   const initial = rival.name.replace(/^The\s+/i, '').charAt(0).toUpperCase();
   return (
     <View

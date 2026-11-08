@@ -138,7 +138,7 @@ export const EVENTS = {
   tournament_match_finished: {
     trigger: 'A tournament match’s result is recorded. Once per game played. Never which hidden opponent it was.',
     privacy: 'behaviour',
-    props: { season_id: 'id', stage_id: 'id', match_id: 'id', game_id: 'id', level: 'id', outcome: OUTCOME, stars: 'int', first_clear: 'bool', read_correct: 'bool', attempt_number: 'int' },
+    props: { season_id: 'id', stage_id: 'id', match_id: 'id', game_id: 'id', level: 'id', outcome: OUTCOME, stars: 'int', first_clear: 'bool', read_correct: 'bool', attempt_number: 'int', replay: 'bool' },
   },
   tournament_rival_defeated: {
     trigger: 'A stage’s duel is won for the first time.',

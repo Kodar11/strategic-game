@@ -12,7 +12,7 @@ import { colors, radius, space } from '@/src/theme/tokens';
 import { rivalOf, useTournamentContent } from '../content';
 import { useTournament } from '../store';
 import { useTournamentStats } from '../sync';
-import { Kicker, StarRow, toneColors } from './parts';
+import { Kicker, RivalMark, StarRow, toneColors } from './parts';
 
 export interface ResultDebrief {
   /** What actually happened in this match, from the engine's own analysis. */
@@ -25,7 +25,7 @@ export interface ResultDebrief {
  * reveal (a win: how the rival was beaten) or the debrief (a loss: the trap, the idea, a rematch). The play screen's
  * own result stays below it with the full score.
  */
-export function TournamentResult({ matchId, outcome, level, readCorrect, debrief, onRematch }: { matchId: string; outcome: Outcome; level: Level; readCorrect: boolean; debrief?: ResultDebrief; onRematch: () => void }) {
+export function TournamentResult({ matchId, outcome, level, readCorrect, debrief, onRematch, replay = false }: { matchId: string; outcome: Outcome; level: Level; readCorrect: boolean; debrief?: ResultDebrief; onRematch: () => void; replay?: boolean }) {
   const { doc, season } = useTournamentContent();
   const found = findMatch(season, matchId);
   const [recorded, setRecorded] = useState<Recorded | null>(null);
@@ -38,8 +38,8 @@ export function TournamentResult({ matchId, outcome, level, readCorrect, debrief
     void useTournament
       .getState()
       .load()
-      .then(() => setRecorded(useTournament.getState().record(matchId, { outcome, level, read: readCorrect })));
-  }, [matchId, outcome, level, readCorrect]);
+      .then(() => setRecorded(useTournament.getState().record(matchId, { outcome, level, read: readCorrect, replay })));
+  }, [matchId, outcome, level, readCorrect, replay]);
 
   if (!found) return null;
   const { stage, match } = found;
@@ -62,14 +62,19 @@ export function TournamentResult({ matchId, outcome, level, readCorrect, debrief
     <View style={[styles.panel, { borderColor: win ? tone.solid : colors.borderStrong }]} accessibilityLiveRegion="polite">
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
         {match.duel ? <Swords size={14} color={tone.fg} /> : null}
-        <Kicker tone={rival.tone}>{`${stage.title} · ${rival.name}`}</Kicker>
+        <Kicker tone={rival.tone}>{`${replay ? 'Hard Replay · ' : ''}${stage.title} · ${rival.name}`}</Kicker>
       </View>
-      <AppText variant="title" accessibilityRole="header">
-        {recorded?.rivalDefeated ? `${rival.name} is out` : win ? 'You won' : outcome === 'draw' ? 'Not quite a win' : `${rival.name} won this one`}
-      </AppText>
-      <AppText color={colors.textBody} style={{ fontStyle: 'italic' }}>
-        “{recorded?.rivalDefeated ? rival.lines.defeated : line}”
-      </AppText>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+        <RivalMark rival={rival} size={56} expression={recorded?.rivalDefeated ? 'surprised' : win ? 'frustrated' : 'satisfied'} />
+        <View style={{ flex: 1, gap: space.xs }}>
+          <AppText variant="title" accessibilityRole="header">
+            {recorded?.rivalDefeated ? `${rival.name} is out` : win ? 'You won' : outcome === 'draw' ? 'Not quite a win' : `${rival.name} won this one`}
+          </AppText>
+          <AppText color={colors.textBody} style={{ fontStyle: 'italic' }}>
+            “{recorded?.rivalDefeated ? rival.lines.defeated : line}”
+          </AppText>
+        </View>
+      </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
         <StarRow count={rec ? stars(rec) : 0} size={18} />
@@ -121,6 +126,15 @@ export function TournamentResult({ matchId, outcome, level, readCorrect, debrief
           </AppText>
         </View>
       )}
+
+      {recorded?.replayCleared ? (
+        <View style={[styles.banner, { backgroundColor: colors.insightSoft }]}>
+          <Trophy size={16} color={colors.insight} />
+          <AppText variant="small" color={colors.insight} style={{ flex: 1 }}>
+            Cleared in the Hard Replay.
+          </AppText>
+        </View>
+      ) : null}
 
       {recorded?.stageCleared ? (
         <View style={[styles.banner, { backgroundColor: colors.successSoft }]}>

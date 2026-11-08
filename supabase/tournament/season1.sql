@@ -6,7 +6,7 @@ insert into public.tournament_documents (id, status, document)
 values ('main', 'published', $doc${
   "schemaVersion": 1,
   "id": "main",
-  "revision": 2,
+  "revision": 3,
   "title": "The Tournament",
   "tagline": "Five rivals. Every trick is real. Outthink them one at a time.",
   "host": "host",
@@ -1225,14 +1225,21 @@ values ('main', 'published', $doc${
       "epithet": "Runs the Tournament",
       "tone": "amber",
       "bio": "Calm, polite, and always one move ahead. Watches every match.",
+      "portrait": "host",
       "lines": {
+        "taunt": [
+          "Show me how you think.",
+          "Every match tells me something about you."
+        ],
         "onPlayerWin": [
           "Good. You read the room.",
-          "That is how it is done."
+          "That is how it is done.",
+          "You are learning faster than most."
         ],
         "onPlayerLoss": [
           "Everyone falls for that once.",
-          "Look again at what they showed you."
+          "Look again at what they showed you.",
+          "Patience. The pattern was there."
         ],
         "defeated": "So you were watching me all along. Well played."
       }
@@ -1243,14 +1250,21 @@ values ('main', 'published', $doc${
       "epithet": "The Liar",
       "tone": "orange",
       "bio": "Says everything with the same calm face, true or not.",
+      "portrait": "vesper",
       "lines": {
+        "taunt": [
+          "Believe me. Everyone else does.",
+          "I never lie. Ask anyone I have beaten."
+        ],
         "onPlayerWin": [
           "You called it. Annoying.",
-          "Fine. You saw through that one."
+          "Fine. You saw through that one.",
+          "Lucky read. Do it again."
         ],
         "onPlayerLoss": [
           "You believed me. They always do.",
-          "Confidence is cheap. You paid for it."
+          "Confidence is cheap. You paid for it.",
+          "I did not even have to try."
         ],
         "defeated": "No more bluffs left. You win this one."
       }
@@ -1261,14 +1275,21 @@ values ('main', 'published', $doc${
       "epithet": "The Traitor",
       "tone": "blue",
       "bio": "Friendly until the moment it pays not to be.",
+      "portrait": "kade",
       "lines": {
+        "taunt": [
+          "We are on the same side. For now.",
+          "Trust me. What could go wrong?"
+        ],
         "onPlayerWin": [
           "You did not trust me. Smart.",
-          "You kept me honest. I hate that."
+          "You kept me honest. I hate that.",
+          "Fine. You make betrayal expensive."
         ],
         "onPlayerLoss": [
           "Nothing personal. It just paid more.",
-          "You trusted me one round too long."
+          "You trusted me one round too long.",
+          "Friendship ends where the payoff starts."
         ],
         "defeated": "You made betrayal cost more than it paid. I am out."
       }
@@ -1279,14 +1300,21 @@ values ('main', 'published', $doc${
       "epithet": "The Puppeteer",
       "tone": "cyan",
       "bio": "Never in the spotlight. Always the one moving the pieces.",
+      "portrait": "mirelle",
       "lines": {
+        "taunt": [
+          "Look over there. No, over there.",
+          "You will never see me coming."
+        ],
         "onPlayerWin": [
           "You followed the evidence, not the crowd.",
-          "So you can see the strings."
+          "So you can see the strings.",
+          "Interesting. You do not scare easily."
         ],
         "onPlayerLoss": [
           "You looked where I wanted you to look.",
-          "The loudest voice is rarely the guilty one."
+          "The loudest voice is rarely the guilty one.",
+          "Everyone suspected the wrong person. Including you."
         ],
         "defeated": "You found me. Nobody finds me."
       }
@@ -1297,14 +1325,21 @@ values ('main', 'published', $doc${
       "epithet": "The Kingmaker",
       "tone": "success",
       "bio": "Buys power cheap and sells it dear. Every deal has a price.",
+      "portrait": "osric",
       "lines": {
+        "taunt": [
+          "Everyone has a price. Let us find yours.",
+          "Sit down. I make the offers here."
+        ],
         "onPlayerWin": [
           "You knew your worth. Rare.",
-          "A fair deal. I did not want one."
+          "A fair deal. I did not want one.",
+          "You priced that well. I will remember."
         ],
         "onPlayerLoss": [
           "You took the first offer. Never take the first offer.",
-          "I needed you less than you needed me."
+          "I needed you less than you needed me.",
+          "A seat at my table is never free."
         ],
         "defeated": "You priced me out of my own market."
       }
@@ -1315,14 +1350,21 @@ values ('main', 'published', $doc${
       "epithet": "The Architect",
       "tone": "blue",
       "bio": "Plays long games. Forces you to choose between winning now and winning at all.",
+      "portrait": "tamsin",
       "lines": {
+        "taunt": [
+          "Not yet. First, let us see if you can wait.",
+          "The best move is rarely the obvious one."
+        ],
         "onPlayerWin": [
           "You thought past this round.",
-          "Patience. Good."
+          "Patience. Good.",
+          "You built that win slowly. That is the only way."
         ],
         "onPlayerLoss": [
           "You grabbed today and lost tomorrow.",
-          "Some games you only win together."
+          "Some games you only win together.",
+          "You played the round. I played the game."
         ],
         "defeated": "You built something that lasts. I can respect that."
       }
@@ -1359,6 +1401,11 @@ values ('main', 'published', $doc${
                 "tendency": "Every player has a habit, even when they think they are random.",
                 "counter": "Track what they did after a win and after a loss. Habits show up fast.",
                 "lesson": "predictability-trap"
+              },
+              "monologue": {
+                "start": "Nobody is truly random. Watch what comes after a win.",
+                "mid": "Is that a pattern, or am I seeing faces in clouds?",
+                "late": "Last throws. Do they repeat when they are ahead?"
               }
             },
             {
@@ -1372,6 +1419,11 @@ values ('main', 'published', $doc${
                 "tendency": "The crowd guesses how deeply everyone else is thinking.",
                 "counter": "Aim one step deeper than the room, not ten. Too clever loses too.",
                 "lesson": "strategy-detective"
+              },
+              "monologue": {
+                "start": "Everyone is guessing what everyone else will guess.",
+                "mid": "The room drifted lower. Did they all think one step more?",
+                "late": "One step deeper than the crowd. Not ten."
               }
             },
             {
@@ -1385,6 +1437,11 @@ values ('main', 'published', $doc${
                 "tendency": "Offers that look unfair get refused, even when refusing costs.",
                 "counter": "Offer what they will accept, not the least they could. Test their line.",
                 "lesson": "best-response"
+              },
+              "monologue": {
+                "start": "An offer is only good if they will take it.",
+                "mid": "Where is their line? Every answer tells me a little more.",
+                "late": "Last split. Greed now could cost me everything."
               }
             }
           ]
@@ -1417,6 +1474,11 @@ values ('main', 'published', $doc${
                 "tendency": "Bids climb until someone blinks.",
                 "counter": "Count what you can see. Call when a bid needs more than the hidden dice can plausibly hold.",
                 "lesson": "credibility"
+              },
+              "monologue": {
+                "start": "Count the dice I can see before I believe a word.",
+                "mid": "That bid needs a lot of hidden dice. Does she have them?",
+                "late": "Plausible is not certain. Is this the moment to call?"
               }
             },
             {
@@ -1430,6 +1492,11 @@ values ('main', 'published', $doc${
                 "tendency": "A signal only means something if faking it would cost too much.",
                 "counter": "Trust signals that are expensive to send. Test the cheap ones.",
                 "lesson": "signaling"
+              },
+              "monologue": {
+                "start": "Cheap words prove nothing. What would a lie cost her?",
+                "mid": "She sent a strong signal. Was it expensive, or just loud?",
+                "late": "One more choice. Trust the costly signals, test the rest."
               }
             },
             {
@@ -1444,6 +1511,11 @@ values ('main', 'published', $doc${
                 "tendency": "She claims roles she does not hold and dares you to call it.",
                 "counter": "A threat is only credible if carrying it out pays. Challenge the ones that would not.",
                 "lesson": "brinkmanship"
+              },
+              "monologue": {
+                "start": "She will claim roles she does not hold. Which threats would she carry out?",
+                "mid": "Calling a bluff costs me too. Is this one worth it?",
+                "late": "Last turns. A threat that would not pay is just noise."
               }
             },
             {
@@ -1458,6 +1530,11 @@ values ('main', 'published', $doc${
                 "tendency": "Her claims come out with the same confidence, strong or weak.",
                 "counter": "Confidence is not evidence. Challenge a claim when the odds say it is unlikely.",
                 "lesson": "signaling"
+              },
+              "monologue": {
+                "start": "She claimed big twice. Either she has it, or she wants me to think so.",
+                "mid": "Same calm face for strong and weak. The odds have to decide.",
+                "late": "Final claim. Does what I have seen make it likely?"
               }
             }
           ]
@@ -1491,6 +1568,11 @@ values ('main', 'published', $doc${
                 "tendency": "Stealing always pays more in a single round.",
                 "counter": "Over many rounds, answer betrayal fast and forgive once trust returns.",
                 "lesson": "cooperation-trap"
+              },
+              "monologue": {
+                "start": "He smiles a lot. Smiles are free.",
+                "mid": "He stole once. Was it a slip, or a test of my reply?",
+                "late": "Last rounds. Does he think the future has stopped mattering?"
               }
             },
             {
@@ -1504,6 +1586,11 @@ values ('main', 'published', $doc${
                 "tendency": "The big prize needs both of you. The safe prize needs nobody.",
                 "counter": "Signal you are going for the stag, and watch whether they follow.",
                 "lesson": "coordination-problem"
+              },
+              "monologue": {
+                "start": "The stag needs both of us. The hare needs nobody.",
+                "mid": "He went for the hare. Fear, or a habit?",
+                "late": "Do I signal the stag one more time, or take the safe catch?"
               }
             },
             {
@@ -1517,6 +1604,11 @@ values ('main', 'published', $doc${
                 "tendency": "Claiming one less always looks smarter, until both of you are at the bottom.",
                 "counter": "Undercutting is a race to zero. Hold a high claim when they do.",
                 "lesson": "evolution"
+              },
+              "monologue": {
+                "start": "One less always looks smarter. Until we are both at the bottom.",
+                "mid": "Are we racing down? Someone has to stop first.",
+                "late": "A high claim only pays if he holds his too."
               }
             },
             {
@@ -1531,6 +1623,11 @@ values ('main', 'published', $doc${
                 "tendency": "Kade cooperates until he thinks you will not punish a defection.",
                 "counter": "Make betrayal cost more than it pays: answer it every time, then let trust back in.",
                 "lesson": "repeated-cooperation"
+              },
+              "monologue": {
+                "start": "He will cooperate until he thinks I will not answer.",
+                "mid": "Did I make betrayal cost him, or did I let it slide?",
+                "late": "The end is close. This is when traitors stop pretending."
               }
             }
           ]
@@ -1562,6 +1659,11 @@ values ('main', 'published', $doc${
                 "tendency": "Cheating rises when checks look rare, and falls when they look certain.",
                 "counter": "Mix your checks. Predictable inspection invites cheating at the gaps.",
                 "lesson": "incentive-shift"
+              },
+              "monologue": {
+                "start": "If my checks are predictable, the cheating moves to the gaps.",
+                "mid": "Is she cheating more when I have not checked for a while?",
+                "late": "Mix it up. Certainty is what she is waiting for."
               }
             },
             {
@@ -1575,6 +1677,11 @@ values ('main', 'published', $doc${
                 "tendency": "Accusations spread through the room faster than evidence.",
                 "counter": "Update on the clues, not the crowd. Ask how likely each clue is if each suspect were guilty.",
                 "lesson": "bayesian-uncertainty"
+              },
+              "monologue": {
+                "start": "The loudest accusation is rarely the guilty one.",
+                "mid": "Everyone is pointing the same way. Is that evidence, or an echo?",
+                "late": "Weigh the clues, not the crowd. Who fits all of them?"
               }
             },
             {
@@ -1589,6 +1696,11 @@ values ('main', 'published', $doc${
                 "tendency": "The saboteur stays quiet and lets missions fail around others.",
                 "counter": "Track who was on every failed mission. The overlap points at the saboteur.",
                 "lesson": "bayesian-uncertainty"
+              },
+              "monologue": {
+                "start": "The saboteur stays quiet and lets missions fail around others.",
+                "mid": "Who was on every failed mission? Start there.",
+                "late": "One overlap is chance. Two is a pattern."
               }
             }
           ]
@@ -1624,6 +1736,11 @@ values ('main', 'published', $doc${
                 "tendency": "He opens low and waits to see if you take it.",
                 "counter": "Your walk-away value is your power. Refuse offers below what rejecting costs them.",
                 "lesson": "bargaining"
+              },
+              "monologue": {
+                "start": "His first offer is a test. My walk-away is my power.",
+                "mid": "He raised it once I refused. So refusing works.",
+                "late": "Last split. Take a fair deal, refuse an insult."
               }
             },
             {
@@ -1637,6 +1754,11 @@ values ('main', 'published', $doc${
                 "tendency": "The highest estimate usually wins, and usually overpays.",
                 "counter": "Bid below your estimate. Winning the lot is not the same as winning money.",
                 "lesson": "auctions"
+              },
+              "monologue": {
+                "start": "The highest estimate wins, and usually overpays.",
+                "mid": "Did I win that lot, or did I just lose money politely?",
+                "late": "Bid below my estimate. Winning is not the goal. Profit is."
               }
             },
             {
@@ -1651,6 +1773,11 @@ values ('main', 'published', $doc${
                 "tendency": "A price cut wins customers for one round and starts a war.",
                 "counter": "Match the market, punish undercuts, and avoid racing to the floor.",
                 "lesson": "market-competition"
+              },
+              "monologue": {
+                "start": "A price cut wins one round and starts a war.",
+                "mid": "He undercut me. Answer it, or start a race to zero?",
+                "late": "Steady prices beat a war neither of us can win."
               }
             },
             {
@@ -1665,6 +1792,11 @@ values ('main', 'published', $doc${
                 "tendency": "He builds the cheapest winning coalition and keeps the rest.",
                 "counter": "Be the partner he cannot replace cheaply. Your price is what you add to a majority.",
                 "lesson": "coalitions"
+              },
+              "monologue": {
+                "start": "He builds the cheapest majority. How do I become expensive?",
+                "mid": "Who does he need, and who can he replace?",
+                "late": "My price is what I add to a majority. Not a seat more."
               }
             }
           ]
@@ -1696,6 +1828,11 @@ values ('main', 'published', $doc${
                 "tendency": "Everyone takes a little more, and the lake runs dry.",
                 "counter": "Take less while the lake is low. Tomorrow’s catch depends on today’s restraint.",
                 "lesson": "war-of-attrition"
+              },
+              "monologue": {
+                "start": "Every boat takes a little more. The lake notices.",
+                "mid": "The lake is lower. Do I hold back while others grab?",
+                "late": "Last seasons. Is there any future left to protect?"
               }
             },
             {
@@ -1709,6 +1846,11 @@ values ('main', 'published', $doc${
                 "tendency": "Neither of you has the whole answer.",
                 "counter": "Share what you know before you act. Information is worth more combined.",
                 "lesson": "sequential-moves"
+              },
+              "monologue": {
+                "start": "Neither of us has the whole answer. Share before acting.",
+                "mid": "What does she know that I do not? Ask with the next clue.",
+                "late": "One wrong cut ends it. Combine what we both saw."
               }
             },
             {
@@ -1722,6 +1864,11 @@ values ('main', 'published', $doc${
                 "tendency": "Fires break out everywhere. You cannot cover them all alone.",
                 "counter": "Plan where your teammate is going, then cover what they will not.",
                 "lesson": "sequential-moves"
+              },
+              "monologue": {
+                "start": "Fires everywhere. I cannot cover them all alone.",
+                "mid": "Where is she going next? Cover what she will not.",
+                "late": "Hold the line together. Nobody wins alone here."
               }
             },
             {
@@ -1736,6 +1883,11 @@ values ('main', 'published', $doc${
                 "tendency": "She trades a safe move now for a winning position later.",
                 "counter": "Look ahead and reason back. The best move now depends on the reply it invites.",
                 "lesson": "sequential-moves"
+              },
+              "monologue": {
+                "start": "Every move invites a reply. Think about the reply first.",
+                "mid": "She gave up something safe. What is she setting up?",
+                "late": "Look ahead, reason back. Which move leaves her nothing?"
               }
             }
           ]
@@ -1766,6 +1918,11 @@ values ('main', 'published', $doc${
                 "tendency": "Vesper’s bluffs, with better odds behind them.",
                 "counter": "Count, then call. Plausible is not certain.",
                 "lesson": "credibility"
+              },
+              "monologue": {
+                "start": "Vesper’s bluffs, but better odds behind them. Count first.",
+                "mid": "Every bid is a story. Does the arithmetic agree?",
+                "late": "Call only when the hidden dice cannot carry the claim."
               }
             },
             {
@@ -1780,6 +1937,11 @@ values ('main', 'published', $doc${
                 "tendency": "Kade’s betrayals, hidden in honest mistakes.",
                 "counter": "In a noisy world, forgive one slip. Punish a pattern.",
                 "lesson": "repeated-cooperation"
+              },
+              "monologue": {
+                "start": "Kade’s betrayals, hidden in honest mistakes.",
+                "mid": "Was that a slip or a plan? One slip is forgivable.",
+                "late": "Punish a pattern, not an accident."
               }
             },
             {
@@ -1794,6 +1956,11 @@ values ('main', 'published', $doc${
                 "tendency": "Mirelle’s misdirection, with blurrier clues.",
                 "counter": "Weak evidence still adds up. Weigh every clue by how reliable it is.",
                 "lesson": "bayesian-uncertainty"
+              },
+              "monologue": {
+                "start": "Mirelle’s misdirection, through blurry footage.",
+                "mid": "Weak clues still add up. Which way do they all lean?",
+                "late": "Trust the weight of evidence, not the loudest voice."
               }
             },
             {
@@ -1807,6 +1974,11 @@ values ('main', 'published', $doc${
                 "tendency": "Osric’s deals, at harder prices.",
                 "counter": "Know your value to every majority before you accept a seat.",
                 "lesson": "coalitions"
+              },
+              "monologue": {
+                "start": "Osric’s deals, at harder prices.",
+                "mid": "Who needs me most right now? That is my leverage.",
+                "late": "Know my value before I take a seat."
               }
             },
             {
@@ -1821,6 +1993,11 @@ values ('main', 'published', $doc${
                 "tendency": "Tamsin’s patience, all at once.",
                 "counter": "Think several moves ahead, and use every idea you have learned.",
                 "lesson": "strategic-practice"
+              },
+              "monologue": {
+                "start": "Everything I have learned, all at once.",
+                "mid": "The Host is patient. So am I.",
+                "late": "Last moves. Think one step past the obvious."
               }
             }
           ]
@@ -1849,6 +2026,11 @@ values ('main', 'published', $doc${
                 "tendency": "A clue can point at more than one word.",
                 "counter": "Think about how your partner reads it, not how you meant it. Pick the clue only one answer fits.",
                 "lesson": "coordination-problem"
+              },
+              "monologue": {
+                "start": "One word. It has to point at only one answer.",
+                "mid": "How would they read that clue, not how did I mean it?",
+                "late": "Pick the clue nothing else fits."
               }
             }
           ]

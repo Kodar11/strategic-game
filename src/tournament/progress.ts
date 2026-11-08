@@ -25,6 +25,8 @@ export interface MatchRecord {
   /** Won on Hard. */
   hard: boolean;
   skipped: boolean;
+  /** Won in the Hard Replay, after the season is cleared. */
+  replay: boolean;
 }
 
 export interface HistoryEntry {
@@ -62,7 +64,7 @@ export interface TournamentProgress {
 }
 
 export const EMPTY_PROGRESS: TournamentProgress = { matches: {}, history: [], checks: {}, seen: [], mind: [] };
-export const EMPTY_RECORD: MatchRecord = { wins: 0, losses: 0, draws: 0, won: false, read: false, hard: false, skipped: false };
+export const EMPTY_RECORD: MatchRecord = { wins: 0, losses: 0, draws: 0, won: false, read: false, hard: false, skipped: false, replay: false };
 export const HISTORY_MAX = 400;
 export const SKIP_AFTER = 3;
 
@@ -132,6 +134,16 @@ export function currentStage(season: Season, p: TournamentProgress, completed: r
 /** Every bracket stage cleared. Side trials don't count. */
 export const seasonCleared = (season: Season, p: TournamentProgress) => mainStages(season).every((s) => stageCleared(s, p));
 
+/**
+ * The Hard Replay: once the season is cleared, every bracket match can be played again on Hard (with the game's
+ * challenge rules where it has them). Its progress is the matches won there; the next one is the first not won yet.
+ */
+export function replayStatus(season: Season, p: TournamentProgress): { open: boolean; cleared: number; total: number; next: { stage: Stage; match: TournamentMatch } | null } {
+  const all = mainStages(season).flatMap((stage) => stage.matches.map((match) => ({ stage, match })));
+  const left = all.filter((x) => !recordOf(p, x.match.id).replay);
+  return { open: seasonCleared(season, p), cleared: all.length - left.length, total: all.length, next: left[0] ?? null };
+}
+
 export function matchOpen(status: StageStatus, m: TournamentMatch): boolean {
   return status.unlocked && (!m.duel || status.duelOpen);
 }
@@ -151,10 +163,10 @@ export function findMatch(season: Season, id: string): { stage: Stage; index: nu
 
 // ── Recording ───────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** The opponent's rating for one game: by level, more for a duel and for the Final. */
-export function opponentRating(stage: Stage, m: TournamentMatch, level: Level): number {
+/** The opponent's rating for one game: by level, more for a duel, the Final and the Hard Replay. */
+export function opponentRating(stage: Stage, m: TournamentMatch, level: Level, replay = false): number {
   const base = level === 'easy' ? 700 : level === 'normal' ? 900 : 1100;
-  return base + (m.duel ? 100 : 0) + (stage.kind === 'final' ? 100 : 0);
+  return base + (m.duel ? 100 : 0) + (stage.kind === 'final' ? 100 : 0) + (replay ? 100 : 0);
 }
 
 export interface Played {
@@ -162,6 +174,8 @@ export interface Played {
   level: Level;
   /** The hidden opponent was named correctly. */
   read: boolean;
+  /** Played in the Hard Replay. */
+  replay?: boolean;
 }
 
 export interface Recorded {
@@ -174,6 +188,8 @@ export interface Recorded {
   stageCleared: boolean;
   starsBefore: number;
   starsAfter: number;
+  /** The match was won in the Hard Replay for the first time by this game. */
+  replayCleared: boolean;
 }
 
 export function recordGame(p: TournamentProgress, stage: Stage, m: TournamentMatch, g: Played, now: number): Recorded {
@@ -187,9 +203,10 @@ export function recordGame(p: TournamentProgress, stage: Stage, m: TournamentMat
     read: prev.read || g.read,
     hard: prev.hard || (win && g.level === 'hard'),
     skipped: prev.skipped,
+    replay: prev.replay || (win && g.replay === true),
   };
   const wasCleared = stageCleared(stage, p);
-  const entry: HistoryEntry = { match: m.id, outcome: g.outcome, opp: opponentRating(stage, m, g.level), read: g.read, at: now };
+  const entry: HistoryEntry = { match: m.id, outcome: g.outcome, opp: opponentRating(stage, m, g.level, g.replay === true), read: g.read, at: now };
   const progress: TournamentProgress = { ...p, matches: { ...p.matches, [m.id]: next }, history: [...p.history, entry].slice(-HISTORY_MAX) };
   return {
     progress,
@@ -198,6 +215,7 @@ export function recordGame(p: TournamentProgress, stage: Stage, m: TournamentMat
     stageCleared: !wasCleared && stageCleared(stage, progress),
     starsBefore: stars(prev),
     starsAfter: stars(next),
+    replayCleared: !prev.replay && next.replay,
   };
 }
 
@@ -339,7 +357,7 @@ export function sanitizeProgress(raw: unknown): TournamentProgress {
   for (const [id, v] of Object.entries(matches)) {
     if (!isId(id) || !v || typeof v !== 'object') continue;
     const r = v as Record<string, unknown>;
-    out.matches[id] = { wins: int(r.wins), losses: int(r.losses), draws: int(r.draws), won: bool(r.won), read: bool(r.read), hard: bool(r.hard), skipped: bool(r.skipped) };
+    out.matches[id] = { wins: int(r.wins), losses: int(r.losses), draws: int(r.draws), won: bool(r.won), read: bool(r.read), hard: bool(r.hard), skipped: bool(r.skipped), replay: bool(r.replay) };
   }
   for (const h of Array.isArray(o.history) ? o.history : []) {
     const e = (h ?? {}) as Record<string, unknown>;
@@ -373,7 +391,7 @@ export function mergeProgress(a: TournamentProgress, b: TournamentProgress): Tou
   for (const [id, r] of Object.entries(b.matches)) {
     const x = matches[id];
     matches[id] = x
-      ? { wins: Math.max(x.wins, r.wins), losses: Math.max(x.losses, r.losses), draws: Math.max(x.draws, r.draws), won: x.won || r.won, read: x.read || r.read, hard: x.hard || r.hard, skipped: x.skipped || r.skipped }
+      ? { wins: Math.max(x.wins, r.wins), losses: Math.max(x.losses, r.losses), draws: Math.max(x.draws, r.draws), won: x.won || r.won, read: x.read || r.read, hard: x.hard || r.hard, skipped: x.skipped || r.skipped, replay: x.replay || r.replay }
       : r;
   }
   const key = (h: HistoryEntry) => `${h.match}|${h.at}|${h.outcome}|${h.opp}`;
@@ -404,4 +422,15 @@ export interface MatchStats {
 /** "Only 9%" from the stats, rounded to a whole percent, or null when there are no published stats. */
 export function share(n: number, of: number): number | null {
   return of > 0 ? Math.round((n / of) * 100) : null;
+}
+
+// ── Inner monologue ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Which of the three moments a game is at: before the first round, from halfway, and before the last round. */
+export function thoughtMoment(played: number, total: number): 'start' | 'mid' | 'late' | null {
+  if (total <= 0) return null;
+  if (played === 0) return 'start';
+  if (played >= total - 1) return 'late';
+  if (played >= Math.floor(total / 2)) return 'mid';
+  return null;
 }

@@ -75,6 +75,7 @@ export const useTournament = create<TournamentState>()((set, get) => ({
       first_clear: out.firstClear,
       read_correct: game.read,
       attempt_number: attempt,
+      replay: game.replay === true,
     });
     if (out.rivalDefeated) track('tournament_rival_defeated', { ...base, rival_id: found.stage.rival, attempts: attempt });
     return out;

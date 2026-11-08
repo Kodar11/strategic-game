@@ -5,7 +5,7 @@ import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { ArrowRight, Brain, ChevronRight, CircleCheck, Layers, Lock } from '@/src/components/ui/icons';
 import { LESSON_IDS, allLessons } from '@/src/content/lessons';
-import { cardSet, mindCheckOffer, nextMatch, type StageStatus } from '@/src/tournament/progress';
+import { cardSet, mindCheckOffer, nextMatch, replayStatus, type StageStatus } from '@/src/tournament/progress';
 import { colors, radius, space } from '@/src/theme/tokens';
 import { rivalOf } from '../content';
 import { useTournamentStatus } from '../useStatus';
@@ -26,7 +26,8 @@ export function TournamentHome() {
   const cards = cardSet(season, LESSON_IDS, t.completed, progress);
   const owned = cards.filter((c) => c.owned).length;
   const offer = mindCheckOffer(season, progress);
-  const label = !t.started ? 'Play your first match' : done ? 'Replay on Hard' : next ? (next.duel ? `Face ${rival.name}` : 'Next match') : 'Open the stage';
+  const replay = replayStatus(season, progress);
+  const label = !t.started ? 'Play your first match' : done ? (replay.next ? 'Next Hard Replay match' : 'Open the bracket') : next ? (next.duel ? `Face ${rival.name}` : 'Next match') : 'Open the stage';
 
   return (
     <View style={{ gap: space.md }}>
@@ -56,17 +57,17 @@ export function TournamentHome() {
             <Kicker tone={rival.tone}>{done ? `${season.title} complete` : `${current.stage.title} · ${current.stage.theme}`}</Kicker>
             <AppText variant="heading">{rival.name}</AppText>
             <AppText variant="small" color={colors.textMuted} numberOfLines={2}>
-              {done ? 'Every rival beaten. Replay any match on Hard for its last star.' : `${rival.epithet} · ${rival.bio}`}
+              {done ? (replay.next ? 'Every rival beaten. The Hard Replay is open: every match again, on Hard, with harder rules.' : 'Every rival beaten, twice. You have finished the Hard Replay.') : `${rival.epithet} · ${rival.bio}`}
             </AppText>
           </View>
         </Pressable>
         <View>
-          <ProgressBar value={current.clearedCount} max={current.stage.matches.length} color={tone.solid} />
+          <ProgressBar value={done ? replay.cleared : current.clearedCount} max={done ? replay.total : current.stage.matches.length} color={tone.solid} />
           <AppText variant="caption" color={colors.textMuted} tabular style={{ marginTop: space.xs }}>
-            {current.clearedCount} of {current.stage.matches.length} matches cleared · {current.stars} of {current.maxStars} stars
+            {done ? `Hard Replay: ${replay.cleared} of ${replay.total} cleared` : `${current.clearedCount} of ${current.stage.matches.length} matches cleared · ${current.stars} of ${current.maxStars} stars`}
           </AppText>
         </View>
-        <Button label={label} icon={ArrowRight} onPress={() => (next && !done ? openMatch(next.id) : openStage(current.stage.id))} />
+        <Button label={label} icon={ArrowRight} onPress={() => (done ? (replay.next ? openMatch(replay.next.match.id) : openStage(current.stage.id)) : next ? openMatch(next.id) : openStage(current.stage.id))} />
       </View>
 
       {offer ? (
