@@ -24,6 +24,7 @@ import { haptic, useMotionReduced } from '@/src/utils/feedback';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 import { useArenaRecords } from '../records';
 import { useGameTelemetry } from '@/src/observability';
+import { TournamentHint } from '@/src/features/tournament/ui/TournamentHint';
 import { TournamentResult } from '@/src/features/tournament/ui/TournamentResult';
 import { useArenaMatch } from '../useArenaMatch';
 import { useOpponentRead } from '../useOpponentRead';
@@ -184,12 +185,13 @@ export function CooperationMatch({
           ) : view === 'results' && result ? (
             <>
               {tournament ? <TournamentResult matchId={tournament} outcome={result.outcome} level={level} readCorrect={read.verdict === 'correct'} debrief={cooperation.debrief(state)} onRematch={onPlayAgain} /> : null}
-              <CoopResults state={state} result={result} newBest={newBest} onRematch={onPlayAgain} onChange={change} onLibrary={() => router.navigate('/games')} read={mystery && read.verdict ? { guess: read.guess, verdict: read.verdict } : null} />
+              <CoopResults state={state} result={result} newBest={newBest} onRematch={onPlayAgain} onChange={change} onLibrary={() => router.navigate('/games')} read={mystery && read.verdict ? { guess: read.guess, verdict: read.verdict } : null} practice={!tournament} />
             </>
           ) : (
             <>
               {rulesOpen ? <RulesCard variant={variant} total={state.total} /> : null}
               <ScoreHeader state={state} view={view} name={name} round={shownRound} />
+              {tournament && !over ? <TournamentHint matchId={tournament} /> : null}
               <Timeline h={h} total={state.total} current={view === 'decide' ? h.length : -1} />
               <TrustLine h={h} total={state.total} />
               {tip ? <CoachTip text={tip} onDismiss={() => setTipHidden(true)} /> : null}

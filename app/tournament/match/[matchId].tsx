@@ -13,7 +13,8 @@ import { GameIcon, LEVEL_NAME, gameTitle, playMatch } from '@/src/features/tourn
 import { useTournament } from '@/src/features/tournament/store';
 import { Kicker, StarRow, toneColors } from '@/src/features/tournament/ui/parts';
 import { useLoadTournament, useTournamentStatus } from '@/src/features/tournament/useStatus';
-import { SKIP_AFTER, canSkip, findMatch, matchOpen, recordOf, stars } from '@/src/tournament/progress';
+import { useTournamentStats } from '@/src/features/tournament/sync';
+import { SKIP_AFTER, canSkip, findMatch, matchOpen, recordOf, share, stars } from '@/src/tournament/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
 /** Before a tournament match: what the rival does in this game, what beats it, and the stars still to earn. */
@@ -24,6 +25,7 @@ export default function MatchIntelScreen() {
   const t = useTournamentStatus();
   const loaded = useTournament((s) => s.loaded);
   const found = matchId ? findMatch(t.season, matchId) : null;
+  const stats = useTournamentStats((s) => (matchId ? s.stats[matchId] : undefined));
 
   if (!loaded) return <MessageScreen loading />;
   if (!found) return <MessageScreen title="Match not found" body="This match isn’t part of the current Tournament." />;
@@ -97,6 +99,11 @@ export default function MatchIntelScreen() {
             <Goal done={rec.won} label="Win the match" />
             <Goal done={rec.read} label="Read the hidden style correctly" />
             <Goal done={rec.hard} label="Win on Hard" />
+            {stats ? (
+              <AppText variant="caption" color={colors.textMuted} tabular>
+                {share(stats.won, stats.players)}% of {stats.players.toLocaleString('en-IN')} players have beaten it · {share(stats.read, stats.players)}% read the style
+              </AppText>
+            ) : null}
           </View>
 
           {open ? (

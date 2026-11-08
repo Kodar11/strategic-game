@@ -30,6 +30,7 @@ import { RpsReveal, RpsRounds } from '@/src/features/games/ui/RpsReveal';
 import { ClassicReveal } from '@/src/features/games/ui/ClassicReveal';
 import { WhatIfPanel } from '@/src/features/games/ui/WhatIfPanel';
 import { ReadOpponentPanel } from '@/src/features/games/ui/ReadOpponentPanel';
+import { TournamentHint } from '@/src/features/tournament/ui/TournamentHint';
 import { TournamentResult } from '@/src/features/tournament/ui/TournamentResult';
 import { RepeatDone, RepeatPanel } from '@/src/features/repeat/RepeatPanel';
 import { useRepeat } from '@/src/features/repeat/useRepeat';
@@ -79,16 +80,16 @@ function PracticeSession({ game, bot, difficulty, tournament, onPlayAgain }: { g
   return (
     <MatchLayout
       view={view}
-      tournament={!!tournament}
+      tournament={tournament}
       result={
         <>
         {tournament && view.outcome ? <TournamentResult matchId={tournament} outcome={view.outcome} level={difficulty === 'medium' ? 'normal' : difficulty} readCorrect={view.read?.current?.guess === view.bot} onRematch={onPlayAgain} /> : null}
         <ResultPanel
           view={view}
-          onPlayAgain={onPlayAgain}
+          onPlayAgain={tournament ? undefined : onPlayAgain}
           playAgainLabel={view.opponent === 'mystery' ? 'Play again · new mystery bot' : 'Play again'}
           detail={game === 'rps' ? <RpsRounds rounds={view.rounds as RpsRound[]} /> : undefined}
-          insight={game === 'rps' ? <RpsReveal view={view} onPractise={practise} /> : <ClassicReveal view={view} onPractise={practise} />}>
+          insight={game === 'rps' ? <RpsReveal view={view} onPractise={tournament ? undefined : practise} /> : <ClassicReveal view={view} onPractise={tournament ? undefined : practise} />}>
           <WhatIfPanel view={view} />
         </ResultPanel>
         </>
@@ -225,7 +226,7 @@ function ChallengeResult({ view, token }: { view: MatchView; token: string }) {
   );
 }
 
-function MatchLayout({ view, result, tournament = false }: { view: MatchView; result: React.ReactNode; tournament?: boolean }) {
+function MatchLayout({ view, result, tournament }: { view: MatchView; result: React.ReactNode; tournament?: string }) {
   const insets = useSafeAreaInsets();
   // One match per mount: practice rematches and each server match get a new key (see the screens above).
   useGameTelemetry(
@@ -259,6 +260,7 @@ function MatchLayout({ view, result, tournament = false }: { view: MatchView; re
           {view.mode === 'practice' ? <LeaveGuard started={view.rounds.length > 0} over={view.done} /> : null}
           <MatchHeader title={g.title} meta={`${hidden ? MYSTERY_NAME : (personality(view.game, view.bot)?.name ?? view.bot)} · ${DIFFICULTY_LABEL[view.difficulty]} · ${view.mode === 'competition' ? 'Game of the Week' : view.mode === 'challenge' ? 'Friend challenge' : 'Practice'}`} progress={`Round ${Math.min(view.rounds.length + (view.done ? 0 : 1), view.totalRounds)}/${view.totalRounds}`} backLabel={view.mode === 'practice' || view.done ? 'Back' : 'Leave — you can resume this match later'} onBack={close} />
           {view.done ? null : <ScoreLine you={view.totals.player} rival={view.totals.bot} rivalName={botName} />}
+          {tournament && !view.done ? <TournamentHint matchId={tournament} /> : null}
           {view.mode !== 'practice' && !view.done ? (
             <AppText variant="caption" color={colors.textMuted}>
               Played on the server: each move is sent and the bot answers there. {view.mode === 'competition' ? 'You can leave and resume until the week ends.' : 'You can leave and resume from the link.'}

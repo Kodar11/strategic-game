@@ -9,7 +9,8 @@ import { Button, IconButton } from '@/src/components/ui/Button';
 import { ArrowLeft } from '@/src/components/ui/icons';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { useTournament } from '@/src/features/tournament/store';
-import { Quiz, quizPool } from '@/src/features/tournament/ui/Quiz';
+import { Quiz, mindQuestions } from '@/src/features/tournament/ui/Quiz';
+import { useTournamentContent } from '@/src/features/tournament/content';
 import { useLoadTournament } from '@/src/features/tournament/useStatus';
 import { type MindForm, mindForm } from '@/src/tournament/progress';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
@@ -26,7 +27,8 @@ export default function MindCheckScreen() {
   const insets = useSafeAreaInsets();
   useLoadTournament();
   const mind = useTournament((s) => s.mind);
-  const items = useMemo(() => (isForm(form) ? mindForm(quizPool(), form) : []), [form]);
+  const doc = useTournamentContent((s) => s.doc);
+  const items = useMemo(() => (isForm(form) ? mindForm(mindQuestions(doc), form) : []), [form, doc]);
   const [done, setDone] = useState<{ correct: number; total: number } | null>(null);
 
   if (!isForm(form) || items.length === 0) return <MessageScreen title="Mind Check not found" body="This form isn’t available." />;
@@ -53,7 +55,7 @@ export default function MindCheckScreen() {
                 {pct(shown.correct, shown.total)}%
               </AppText>
               <AppText color={colors.textBody}>
-                {shown.correct} of {shown.total} answered as the model predicts.
+                {shown.correct} of {shown.total} right.
                 {first ? ` Your first Mind Check: ${pct(first.correct, first.total)}%.` : ' Take another after more of the Tournament to see how far you’ve come.'}
               </AppText>
               <AppText variant="caption" color={colors.textMuted}>

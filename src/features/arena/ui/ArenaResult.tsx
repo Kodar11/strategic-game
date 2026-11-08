@@ -69,6 +69,7 @@ export function ArenaResult({
   read,
   reflection,
   unmasked,
+  practice = true,
 }: {
   game: ArenaGameId;
   result: MatchResult;
@@ -85,6 +86,8 @@ export function ArenaResult({
   reflection?: React.ReactNode;
   /** The game's own final reveal, such as who the Mole was. */
   unmasked?: string | null;
+  /** False in a tournament match: no rematch, opponent, difficulty or library controls (the tournament panel has its own). */
+  practice?: boolean;
 }) {
   const enter = useEnter();
   useEffect(() => haptic.success(), []);
@@ -128,7 +131,7 @@ export function ArenaResult({
 
       {reflection}
 
-      <Button label={read ? 'Play again · new mystery opponent' : 'Play again'} icon={read ? Shuffle : RotateCcw} iconPosition="left" onPress={onPlayAgain} />
+      {practice ? <Button label={read ? 'Play again · new mystery opponent' : 'Play again'} icon={read ? Shuffle : RotateCcw} iconPosition="left" onPress={onPlayAgain} /> : null}
 
       <MatchLog title="What happened" summary={`${debrief.moments.length} moment${debrief.moments.length === 1 ? '' : 's'} from this match`}>
         {result.standings.length > 2
@@ -172,8 +175,12 @@ export function ArenaResult({
         )}
       </MatchLog>
 
-      <RematchOptions game={game} persona={persona} level={level} onChange={onChange} onPlayAgain={onPlayAgain} />
-      <Button label="Game library" variant="ghost" icon={Gamepad2} iconPosition="left" onPress={onLibrary} />
+      {practice ? (
+        <>
+          <RematchOptions game={game} persona={persona} level={level} onChange={onChange} onPlayAgain={onPlayAgain} />
+          <Button label="Game library" variant="ghost" icon={Gamepad2} iconPosition="left" onPress={onLibrary} />
+        </>
+      ) : null}
     </Animated.View>
   );
 }

@@ -8,6 +8,7 @@ export const PUBLIC_RPCS: ReadonlySet<string> = new Set([
   'get_published_content',
   'get_lesson_categories',
   'get_tournament_content',
+  'get_tournament_stats',
   'daily_challenge_today',
   'get_games_overview',
   'get_leaderboard',

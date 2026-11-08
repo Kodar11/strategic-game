@@ -27,7 +27,7 @@ export interface EventSpec {
   readonly props: Readonly<Record<string, PropSpec>>;
 }
 
-const ONBOARDING_STEP = ['welcome', 'decision', 'reveal', 'map'] as const;
+const ONBOARDING_STEP = ['welcome', 'decision', 'reveal', 'map', 'host'] as const;
 const GAME_SYSTEM = ['classic', 'arena'] as const;
 /** Every way a match is played today: on the device, Game of the Week (server), a friend's challenge link (server). */
 const GAME_MODE = ['practice', 'ranked', 'friend', 'tournament'] as const;
@@ -56,19 +56,19 @@ const LESSON = { lesson_id: 'id', lesson_number: 'int', module: 'id' } as const 
 export const EVENTS = {
   // ── Onboarding ──────────────────────────────────────────────────────────────────────────────────────────────────
   onboarding_step: {
-    trigger: 'A stage of the welcome flow is shown (welcome, the decision against Maya, the reveal, the map of the app).',
+    trigger: 'A stage of the welcome flow is shown. Since the Tournament: the Host intro (`host`); before it: welcome, the decision against Maya, the reveal, the map.',
     privacy: 'behaviour',
     props: { step: ONBOARDING_STEP, replay: 'bool' },
   },
   onboarding_finished: {
-    trigger: 'The welcome flow ends: completed from the map, or skipped at any stage.',
+    trigger: 'The welcome flow ends: completed (the first match opens, `next: match`) or skipped.',
     privacy: 'behaviour',
     props: {
       result: ['completed', 'skipped'],
       at_step: ONBOARDING_STEP,
       /** The first decision's move. A move in a toy game, not a learning record. */
       choice: ['share', 'take'],
-      next: ['lesson', 'explore'],
+      next: ['lesson', 'explore', 'match'],
       replay: 'bool',
     },
   },

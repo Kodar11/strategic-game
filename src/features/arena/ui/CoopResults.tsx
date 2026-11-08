@@ -26,7 +26,8 @@ const pct = (k: number, n: number) => (n ? `${Math.round((k / n) * 100)}%` : '�
  * The end of a Cooperation Game match. The winner is decided by score alone (equal is a draw); everything else on the
  * screen — counts, rates, the strongest pattern, insights, lessons — is computed from the recorded rounds.
  */
-export function CoopResults({ state, result, newBest, onRematch, onChange, onLibrary, read }: { state: CoopState; result: MatchResult; newBest: boolean; onRematch: () => void; onChange: (n: { persona?: string; level?: Level }) => void; onLibrary: () => void; read?: { guess: string | null; verdict: ReadVerdict } | null }) {
+/** `practice` false (a tournament match): no rematch, opponent, difficulty or library controls. */
+export function CoopResults({ state, result, newBest, onRematch, onChange, onLibrary, read, practice = true }: { state: CoopState; result: MatchResult; newBest: boolean; onRematch: () => void; onChange: (n: { persona?: string; level?: Level }) => void; onLibrary: () => void; read?: { guess: string | null; verdict: ReadVerdict } | null; practice?: boolean }) {
   const enter = useEnter();
   useEffect(() => haptic.success(), []);
   const { persona, level } = state.setup;
@@ -83,7 +84,7 @@ export function CoopResults({ state, result, newBest, onRematch, onChange, onLib
 
       <MatchReflection game="cooperation" record={state} />
 
-      <Button label={read ? 'Play again · new mystery opponent' : 'Play again'} icon={RotateCcw} iconPosition="left" onPress={onRematch} />
+      {practice ? <Button label={read ? 'Play again · new mystery opponent' : 'Play again'} icon={RotateCcw} iconPosition="left" onPress={onRematch} /> : null}
 
       <MatchLog title="Full match analysis" summary={st.pattern}>
       <View style={styles.grid}>
@@ -148,7 +149,7 @@ export function CoopResults({ state, result, newBest, onRematch, onChange, onLib
 
       </MatchLog>
 
-      <View style={{ gap: space.md }}>
+      {practice ? <View style={{ gap: space.md }}>
         <View style={{ gap: space.xs }}>
           <AppText variant="caption" color={colors.textMuted}>
             Try another personality
@@ -190,7 +191,7 @@ export function CoopResults({ state, result, newBest, onRematch, onChange, onLib
           </View>
         </View>
         <Button label="Game library" variant="ghost" icon={Gamepad2} iconPosition="left" onPress={onLibrary} />
-      </View>
+      </View> : null}
     </Animated.View>
   );
 }

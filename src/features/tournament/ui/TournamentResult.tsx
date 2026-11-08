@@ -7,10 +7,11 @@ import { Button } from '@/src/components/ui/Button';
 import { ArrowRight, RotateCcw, Swords, Trophy } from '@/src/components/ui/icons';
 import { getLesson } from '@/src/content/lessons';
 import type { Outcome } from '@/src/games/core';
-import { type Level, type Recorded, findMatch, recordOf, stars } from '@/src/tournament/progress';
+import { type Level, type Recorded, findMatch, recordOf, share, stars } from '@/src/tournament/progress';
 import { colors, radius, space } from '@/src/theme/tokens';
 import { rivalOf, useTournamentContent } from '../content';
 import { useTournament } from '../store';
+import { useTournamentStats } from '../sync';
 import { Kicker, StarRow, toneColors } from './parts';
 
 export interface ResultDebrief {
@@ -29,6 +30,7 @@ export function TournamentResult({ matchId, outcome, level, readCorrect, debrief
   const found = findMatch(season, matchId);
   const [recorded, setRecorded] = useState<Recorded | null>(null);
   const once = useRef(false);
+  const stats = useTournamentStats((st) => st.stats[matchId]);
 
   useEffect(() => {
     if (once.current) return;
@@ -52,6 +54,9 @@ export function TournamentResult({ matchId, outcome, level, readCorrect, debrief
   const lesson = match.intel.lesson ? getLesson(match.intel.lesson) : undefined;
   const toStage = () => router.dismissTo({ pathname: '/tournament/[stageId]', params: { stageId: stage.id } });
   const moments = (debrief?.moments ?? []).slice(0, 3);
+  const beatenShare = stats ? share(stats.won, stats.players) : null;
+  const readShare = stats ? share(stats.read, stats.players) : null;
+  const rare = readCorrect && readShare !== null && readShare <= 35 ? `Only ${readShare}% of players have read ${rival.name}’s style here.` : win && beatenShare !== null && beatenShare <= 50 ? `Only ${beatenShare}% of players have beaten this match.` : null;
 
   return (
     <View style={[styles.panel, { borderColor: win ? tone.solid : colors.borderStrong }]} accessibilityLiveRegion="polite">
@@ -79,6 +84,12 @@ export function TournamentResult({ matchId, outcome, level, readCorrect, debrief
           </AppText>
         ) : null}
       </View>
+
+      {rare ? (
+        <AppText variant="small" color={colors.insight}>
+          {rare}
+        </AppText>
+      ) : null}
 
       {win ? (
         <View style={styles.section}>

@@ -10,7 +10,7 @@ import { ArrowLeft, KeyRound } from '@/src/components/ui/icons';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { rivalOf } from '@/src/features/tournament/content';
 import { useTournament } from '@/src/features/tournament/store';
-import { Quiz, quizPool } from '@/src/features/tournament/ui/Quiz';
+import { Quiz, keyQuestions } from '@/src/features/tournament/ui/Quiz';
 import { useLoadTournament, useTournamentStatus } from '@/src/features/tournament/useStatus';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
@@ -25,7 +25,7 @@ export default function KeyCheckScreen() {
   useLoadTournament();
   const t = useTournamentStatus();
   const stage = t.season.stages.find((s) => s.id === stageId);
-  const items = useMemo(() => (stage ? quizPool(stage.lessons).slice(0, ITEMS) : []), [stage]);
+  const items = useMemo(() => (stage ? keyQuestions(t.doc, stage.id).slice(0, ITEMS) : []), [stage, t.doc]);
   const [result, setResult] = useState<{ correct: number; total: number; passed: boolean } | null>(null);
 
   if (!stage || stage.lessons.length === 0) return <MessageScreen title="No check here" body="This stage doesn’t need a key card." />;

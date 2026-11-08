@@ -28,6 +28,7 @@ import { CoachTip } from '@/src/features/arena/ui/parts';
 import { suspectName, type MoleState } from '@/src/arena/mole';
 import { crewName, type SaboteurState } from '@/src/arena/saboteur';
 import { ReadPanel } from '@/src/features/arena/ui/ReadPanel';
+import { TournamentHint } from '@/src/features/tournament/ui/TournamentHint';
 import { TournamentResult } from '@/src/features/tournament/ui/TournamentResult';
 import { SignalBoard } from '@/src/features/arena/ui/SignalBoard';
 import { UltimatumGameBoard } from '@/src/features/arena/ui/UltimatumGameBoard';
@@ -152,6 +153,7 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
           <MatchHeader title={g.title} meta={[hidden ? (team ? 'Mystery teammate' : 'Mystery opponent') : name, LEVEL_LABEL[level], LENGTH_LABEL[length], challenge?.name].filter(Boolean).join(' · ')} progress={engine.endsEarly ? `${roundLabel} ${Math.min(playedRounds + (over ? 0 : 1), total)} · up to ${total}` : `${roundLabel} ${Math.min(playedRounds + (over ? 0 : 1), total)}/${total}`} onBack={close} />
           {NO_STRIP.has(game) || finished ? null : <ScoreLine you={live.player} rival={field ? live.rival : live.standings.find((s) => !s.isPlayer)!.score} rivalName={field ? 'Best rival' : hidden ? (team ? 'Teammate' : 'Opponent') : name} unit={g.unit} />}
           {showTip ? <CoachTip text={tip} onDismiss={() => setTipHidden(true)} /> : null}
+          {tournament && !over ? <TournamentHint matchId={tournament} /> : null}
           {refusal ? (
             <AppText variant="small" color={colors.danger} accessibilityLiveRegion="assertive">
               {refusal}
@@ -177,6 +179,7 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
                 onLibrary={() => router.navigate('/games')}
                 read={mystery && read.verdict ? { guess: read.guess, verdict: read.verdict } : null}
                 reflection={<MatchReflection game={game} record={state} />}
+                practice={!tournament}
               />
               <MatchLog title="Final board" summary="How the match ended">
                 {board}

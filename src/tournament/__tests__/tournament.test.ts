@@ -16,6 +16,7 @@ import {
   currentStage,
   findMatch,
   hasKeyCard,
+  mergeProgress,
   mindCheckOffer,
   mindForm,
   nextMatch,
@@ -57,11 +58,11 @@ describe('Season 1 content', () => {
     assert.deepEqual(validateTournament(SEASON_ONE), []);
   });
 
-  it('uses 22 of the 23 games, each against its real variants', () => {
+  it('uses all 23 games (Codebreaker as a side trial), each against its real variants', () => {
     const used = new Set(season.stages.flatMap((s) => s.matches.map((m) => m.game.id)));
     const all = [...ARENA_IDS, ...GAME_IDS];
     assert.equal(all.length, 23);
-    assert.deepEqual(all.filter((g) => !used.has(g)), ['codebreaker']);
+    assert.deepEqual(all.filter((g) => !used.has(g)), []);
     for (const s of season.stages)
       for (const m of s.matches) {
         const r = resolveMatch(s, m);
@@ -79,7 +80,7 @@ describe('Season 1 content', () => {
   it('ends every stage but the Qualifiers in a single duel, played on Hard', () => {
     for (const s of season.stages) {
       const duels = s.matches.filter((m) => m.duel);
-      assert.equal(duels.length, s.kind === 'qualifiers' ? 0 : 1, s.id);
+      assert.equal(duels.length, s.kind === 'qualifiers' || s.kind === 'side' ? 0 : 1, s.id);
       if (duels.length) assert.equal(duels[0].level, 'hard', s.id);
     }
   });
@@ -95,6 +96,9 @@ describe('documents that must be refused', () => {
       (d) => (d.seasons[0].stages[1].rival = 'nobody'),
       (d) => (d.seasons[0].stages[1].matches[0].duel = true),
       (d) => (d.seasons[0].stages[0].matches[0].variant = 'standard'),
+      (d) => (d.questions[0].options[0].correct = true),
+      (d) => (d.questions[0].stage = 's9.nowhere'),
+      (d) => (d.seasons[0].stages = d.seasons[0].stages.map((s) => ({ ...s, kind: 'side' as const }))),
     ];
     for (const change of cases) {
       const d = clone();
@@ -109,6 +113,13 @@ describe('documents that must be refused', () => {
     assert.equal(parseTournament({ ...clone(), seasons: [] }), null);
   });
 
+  it('a document without a revision reads as revision 1, older than the bundled Season 1', () => {
+    const old = clone() as Record<string, unknown>;
+    delete old.revision;
+    assert.equal(parseTournament(old)?.revision, 1);
+    assert.ok(SEASON_ONE.revision > 1);
+  });
+
   it('a draft season is never the one played', () => {
     const d = clone();
     d.seasons.unshift({ ...d.seasons[0], id: 's0', status: 'draft', stages: d.seasons[0].stages.map((s) => ({ ...s, id: `x${s.id}`, matches: s.matches.map((m) => ({ ...m, id: `x${m.id}` })) })) });
@@ -120,7 +131,7 @@ describe('documents that must be refused', () => {
 describe('progression', () => {
   it('opens with the Qualifiers only', () => {
     const all = allStages(season, EMPTY_PROGRESS, []);
-    assert.deepEqual(all.map((s) => s.unlocked), [true, false, false, false, false, false, false]);
+    assert.deepEqual(all.map((s) => s.unlocked), [true, false, false, false, false, false, false, false]);
     assert.equal(currentStage(season, EMPTY_PROGRESS, []).stage.id, 's1.qualifiers');
     assert.equal(nextMatch(all[0], EMPTY_PROGRESS)?.id, 's1.q.rps');
   });
@@ -192,6 +203,17 @@ describe('progression', () => {
     assert.equal(canSkip(duel, recordOf(d, duel.id)), false);
   });
 
+  it('opens the side trial after the Qualifiers, and never needs it for the season', () => {
+    const side = season.stages.findIndex((s) => s.kind === 'side');
+    assert.equal(stageStatus(season, side, EMPTY_PROGRESS, []).unlocked, false);
+    let p = clearStage(EMPTY_PROGRESS, 0);
+    assert.equal(stageStatus(season, side, p, []).unlocked, true);
+    assert.equal(stageStatus(season, 1, p, []).unlocked, true, 'Arc 1 opens without the side trial');
+    for (let i = 1; i < season.stages.length; i++) if (i !== side) p = clearStage(p, i);
+    assert.equal(seasonCleared(season, p), true);
+    assert.notEqual(currentStage(season, p, []).stage.kind, 'side');
+  });
+
   it('can clear the whole season', () => {
     let p = EMPTY_PROGRESS;
     for (let i = 0; i < season.stages.length; i++) p = clearStage(p, i);
@@ -252,11 +274,48 @@ describe('Mind Check', () => {
     assert.equal(mindCheckOffer(season, p), 'c');
   });
 
+  it('has its own questions: three per key card, thirty for the Mind Check, two per theme in every form', () => {
+    for (const s of season.stages.filter((x) => x.lessons.length)) assert.equal(SEASON_ONE.questions.filter((q) => q.use === 'key' && q.stage === s.id).length, 3, s.id);
+    const mind = SEASON_ONE.questions.filter((q) => q.use === 'mind');
+    assert.equal(mind.length, 30);
+    for (const f of ['a', 'b', 'c'] as const) {
+      const form = mindForm(mind, f);
+      assert.equal(form.length, 10);
+      const themes = new Map<string, number>();
+      for (const q of form) themes.set(q.theme!, (themes.get(q.theme!) ?? 0) + 1);
+      assert.deepEqual([...themes.values()], [2, 2, 2, 2, 2], f);
+    }
+    for (const q of SEASON_ONE.questions) assert.equal(q.options.filter((o) => o.correct).length, 1, q.id);
+  });
+
   it('splits a pool into forms that share no item', () => {
     const pool = Array.from({ length: 33 }, (_, i) => i);
     const [a, b, c] = (['a', 'b', 'c'] as const).map((f) => mindForm(pool, f));
     assert.equal(a.length, 10);
     assert.equal(new Set([...a, ...b, ...c]).size, a.length + b.length + c.length);
+  });
+});
+
+describe('merging two copies', () => {
+  it('keeps everything either copy earned, and is order-free and repeatable', () => {
+    const phone = play(play(EMPTY_PROGRESS, 's1.q.rps', { outcome: 'win', level: 'easy', read: true }), 's1.q.two-thirds', loss);
+    let server = play(EMPTY_PROGRESS, 's1.q.rps', { outcome: 'win', level: 'hard', read: false });
+    server = { ...server, checks: { 's1.vesper': { passed: true, correct: 2, total: 3, at: 4 } }, mind: [{ form: 'a', correct: 6, total: 10, at: 3 }], seen: ['s1.qualifiers'] };
+    const m = mergeProgress(phone, server);
+    assert.deepEqual(m, mergeProgress(server, phone));
+    assert.deepEqual(mergeProgress(m, m), m);
+    assert.equal(stars(recordOf(m, 's1.q.rps')), 3, 'win and read from the phone, the Hard win from the server');
+    assert.equal(recordOf(m, 's1.q.two-thirds').losses, 1);
+    assert.equal(m.checks['s1.vesper'].passed, true);
+    assert.deepEqual(m.seen, ['s1.qualifiers']);
+    assert.equal(m.mind.length, 1);
+    assert.equal(m.history.length, 3, 'every game from both copies, none twice');
+  });
+
+  it('keeps the first score of each Mind Check form', () => {
+    const a = { ...EMPTY_PROGRESS, mind: [{ form: 'a' as const, correct: 4, total: 10, at: 1 }] };
+    const b = { ...EMPTY_PROGRESS, mind: [{ form: 'a' as const, correct: 9, total: 10, at: 5 }] };
+    assert.equal(mergeProgress(a, b).mind[0].correct, 4);
   });
 });
 

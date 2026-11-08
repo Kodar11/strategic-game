@@ -64,7 +64,8 @@ const match = z.object({
 
 const stage = z.object({
   id,
-  kind: z.enum(['qualifiers', 'arc', 'final']),
+  /** `side`: an optional trial, open once the first stage is cleared; it never blocks the bracket. */
+  kind: z.enum(['qualifiers', 'arc', 'final', 'side']),
   title: z.string().min(1).max(60),
   /** What the stage is about: "Bluffing and signals". */
   theme: z.string().min(1).max(60),
@@ -78,6 +79,22 @@ const stage = z.object({
   matches: z.array(match).min(1).max(8),
 });
 
+/** Mind Check themes: every form draws two questions from each. */
+export const MIND_THEMES = ['signals', 'trust', 'evidence', 'deals', 'long'] as const;
+
+const question = z.object({
+  id,
+  /** `key`: one of a stage's key-card check questions. `mind`: a Mind Check question. */
+  use: z.enum(['key', 'mind']),
+  stage: id.optional(),
+  theme: z.enum(MIND_THEMES).optional(),
+  situation: text.optional(),
+  question: text,
+  options: z.array(z.object({ id: z.string().min(1).max(8), label: text, correct: z.boolean() })).min(2).max(5),
+  /** Shown after answering. */
+  explanation: text,
+});
+
 const season = z.object({
   id,
   title: z.string().min(1).max(60),
@@ -88,12 +105,21 @@ const season = z.object({
 export const tournamentSchema = z.object({
   schemaVersion: z.literal(1),
   id,
+  /**
+   * Content revision. Raise it with every published change. The app never installs a document older than the one it
+   * ships with, so an outdated server copy can't replace newer bundled content.
+   */
+  revision: z.number().int().min(1).default(1),
   title: z.string().min(1).max(60),
   tagline: text,
   /** The Host: introduces the tournament; may also be a stage rival. */
   host: id,
+  /** What the Host says on a player's first launch, before the first match. */
+  welcome: lines.default([]),
   rivals: z.array(rival).min(1).max(24),
   seasons: z.array(season).min(1).max(12),
+  /** The Tournament's own questions (key-card checks and the Mind Check), separate from the lesson checkpoints. */
+  questions: z.array(question).max(300).default([]),
 });
 
 export type TournamentDoc = z.infer<typeof tournamentSchema>;
@@ -101,6 +127,7 @@ export type Rival = z.infer<typeof rival>;
 export type Season = z.infer<typeof season>;
 export type Stage = z.infer<typeof stage>;
 export type TournamentMatch = z.infer<typeof match>;
+export type TournamentQuestion = z.input<typeof question>;
 
 /** What a stage's match resolves to: the screen to open and the setup to open it with. */
 export interface ResolvedMatch extends TournamentMatch {
@@ -127,6 +154,7 @@ export function validateTournament(doc: TournamentDoc): string[] {
   };
   for (const s of doc.seasons) {
     seen(s.id, 'season');
+    if (!s.stages.some((st) => st.kind !== 'side')) problems.push(`season ${s.id}: no bracket stage`);
     for (const st of s.stages) {
       seen(st.id, 'stage');
       if (!rivals.has(st.rival)) problems.push(`stage ${st.id}: unknown rival ${st.rival}`);
@@ -150,6 +178,13 @@ export function validateTournament(doc: TournamentDoc): string[] {
         }
       }
     }
+  }
+  const stageIds = new Set(doc.seasons.flatMap((s) => s.stages.map((st) => st.id)));
+  for (const q of doc.questions) {
+    seen(q.id, 'question');
+    if (q.options.filter((o) => o.correct).length !== 1) problems.push(`question ${q.id}: needs exactly one correct option`);
+    if (q.use === 'key' && (!q.stage || !stageIds.has(q.stage))) problems.push(`question ${q.id}: unknown stage ${q.stage}`);
+    if (q.use === 'mind' && !q.theme) problems.push(`question ${q.id}: a Mind Check question needs a theme`);
   }
   return problems;
 }

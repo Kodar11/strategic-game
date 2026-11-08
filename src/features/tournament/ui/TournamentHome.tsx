@@ -21,7 +21,8 @@ export function TournamentHome() {
   const rival = rivalOf(doc, current.stage.rival);
   const tone = toneColors(rival.tone);
   const next = nextMatch(current, progress);
-  const done = stages.every((s) => s.cleared);
+  const done = stages.every((s) => s.cleared || s.stage.kind === 'side');
+  const sides = stages.filter((s) => s.stage.kind === 'side');
   const cards = cardSet(season, LESSON_IDS, t.completed, progress);
   const owned = cards.filter((c) => c.owned).length;
   const offer = mindCheckOffer(season, progress);
@@ -84,10 +85,23 @@ export function TournamentHome() {
       ) : null}
 
       <View style={{ gap: space.xs }}>
-        {stages.map((s) => (
-          <StageRow key={s.stage.id} status={s} current={s.stage.id === current.stage.id && !done} />
-        ))}
+        {stages
+          .filter((s) => s.stage.kind !== 'side')
+          .map((s) => (
+            <StageRow key={s.stage.id} status={s} current={s.stage.id === current.stage.id && !done} />
+          ))}
       </View>
+
+      {sides.length ? (
+        <View style={{ gap: space.xs }}>
+          <AppText variant="overline" color={colors.textMuted}>
+            Side trials
+          </AppText>
+          {sides.map((s) => (
+            <StageRow key={s.stage.id} status={s} current={false} />
+          ))}
+        </View>
+      ) : null}
 
       <Pressable onPress={() => router.push('/tournament/cards')} accessibilityRole="button" accessibilityLabel={`Strategy cards. ${owned} of ${cards.length} collected.`} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
         <View style={[styles.icon, { backgroundColor: colors.insightSoft }]}>

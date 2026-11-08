@@ -16,7 +16,9 @@ const bundled = parseTournament(SEASON_ONE) ?? SEASON_ONE;
 
 export const useTournamentContent = create<TournamentContent>(() => ({ doc: bundled, season: liveSeason(bundled) ?? bundled.seasons[0] }));
 
+/** Installs a downloaded or cached document, unless it is older than the copy bundled with this app. */
 export function installTournament(doc: TournamentDoc): void {
+  if (doc.revision < bundled.revision) return;
   const season = liveSeason(doc);
   if (season) useTournamentContent.setState({ doc, season });
 }

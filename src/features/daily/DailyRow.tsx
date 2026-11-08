@@ -10,7 +10,8 @@ import { ArrowRight, CalendarDays, CircleCheck } from '@/src/components/ui/icons
 import { useDaily } from '@/src/data/daily-session';
 import { colors, radius, space } from '@/src/theme/tokens';
 import { DIFFICULTY_NAME } from './content';
-import { type Day, dayNumber, formatDay, fromDayNumber, monthKey, monthOf } from './dates';
+import { addMonths, formatDay, monthKey, monthOf } from './dates';
+import { streakFrom } from './streak';
 
 /**
  * Daily challenge entry point. Shows today's real state from the server-backed daily store (the same month cache the
@@ -21,11 +22,16 @@ export function DailyRow() {
   const today = useDaily((s) => s.today);
   const loadMonth = useDaily((s) => s.loadMonth);
   const month = useDaily((s) => s.months[monthKey(monthOf(s.today))]);
+  const previous = useDaily((s) => s.months[monthKey(addMonths(monthOf(s.today), -1))]);
   const guest = useIsGuest();
 
   useFocusEffect(
     useCallback(() => {
-      if (!guest) void loadMonth(monthOf(today));
+      if (!guest) {
+        void loadMonth(monthOf(today));
+        // The streak can run back across the 1st, so last month is needed too.
+        void loadMonth(addMonths(monthOf(today), -1));
+      }
     }, [guest, loadMonth, today]),
   );
 
@@ -35,7 +41,8 @@ export function DailyRow() {
   const challenge = entry?.ok ? entry.challenge : null;
   const answered = !!attempt;
   const open = !answered && !!challenge;
-  const streak = data ? streakFrom(today, (d) => data.attempts.has(formatDay(d))) : 0;
+  const before = previous?.status === 'ready' && !guest ? previous.data : null;
+  const streak = data ? streakFrom(today, (d) => (d.m === today.m && d.y === today.y ? data : before)?.attempts.has(formatDay(d)) ?? false) : 0;
   const status = guest ? 'One decision a day · sign in to take part' : !data ? 'One decision a day' : answered ? 'Completed today' : open ? 'Start today’s challenge' : 'No challenge today · past ones stay open';
   const scored = attempt && attempt.score !== null && attempt.score !== undefined;
 
@@ -83,18 +90,6 @@ export function DailyRow() {
       ) : null}
     </View>
   );
-}
-
-/**
- * Consecutive days taken part, ending today (or yesterday, when today isn't done yet). Counts within the loaded
- * month only, so a streak that started last month shows from the 1st: it never claims days it hasn't seen.
- */
-function streakFrom(today: Day, took: (d: Day) => boolean): number {
-  let k = dayNumber(today);
-  if (!took(today)) k--;
-  let n = 0;
-  for (let day = fromDayNumber(k); day.m === today.m && day.y === today.y && took(day); day = fromDayNumber(--k)) n++;
-  return n;
 }
 
 const styles = StyleSheet.create({

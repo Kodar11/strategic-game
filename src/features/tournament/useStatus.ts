@@ -5,12 +5,17 @@ import { useProgress } from '@/src/store/progress';
 import { type StageStatus, allStages, currentStage, playStyle, strategistRating, titleFor } from '@/src/tournament/progress';
 import { useTournamentContent } from './content';
 import { useTournament } from './store';
+import { loadTournamentStats, syncSoon } from './sync';
 
 /** Loads saved progress when a screen gains focus (once per app run). */
 export function useLoadTournament() {
   useFocusEffect(
     useCallback(() => {
-      void useTournament.getState().load();
+      void useTournament
+        .getState()
+        .load()
+        .then(syncSoon);
+      void loadTournamentStats();
     }, []),
   );
 }

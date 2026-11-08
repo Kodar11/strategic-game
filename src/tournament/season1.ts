@@ -1,3 +1,4 @@
+import { SEASON_ONE_QUESTIONS } from './questions.ts';
 import type { TournamentDoc } from './schema.ts';
 
 /**
@@ -11,9 +12,18 @@ import type { TournamentDoc } from './schema.ts';
 export const SEASON_ONE: TournamentDoc = {
   schemaVersion: 1,
   id: 'main',
+  // 2: question bank, Host welcome, Codebreaker side trial, Market and Power Play retuned.
+  revision: 2,
   title: 'The Tournament',
   tagline: 'Five rivals. Every trick is real. Outthink them one at a time.',
   host: 'host',
+  welcome: [
+    'Welcome to the Tournament.',
+    'Five rivals are waiting: a liar, a traitor, a puppeteer, a kingmaker and an architect.',
+    'Each one plays a trick you can learn to beat. Read them, outthink them, and climb.',
+    'First, three quick matches to qualify. Let’s see how you play.',
+  ],
+  questions: SEASON_ONE_QUESTIONS,
   rivals: [
     {
       id: 'host',
@@ -135,12 +145,6 @@ export const SEASON_ONE: TournamentDoc = {
           intro: ['Vesper never raises her voice. She never needs to.', '“Everything I tell you will sound true,” she says. “Your problem is deciding which parts are.”'],
           matches: [
             {
-              id: 's1.vesper.bluff',
-              game: { system: 'arena', id: 'bluff' },
-              level: 'normal',
-              intel: { tendency: 'Claims come out with the same confidence, strong or weak.', counter: 'Confidence is not evidence. Challenge a claim when the odds say it is unlikely.', lesson: 'signaling' },
-            },
-            {
               id: 's1.vesper.liars-dice',
               game: { system: 'arena', id: 'liars-dice' },
               level: 'normal',
@@ -153,11 +157,19 @@ export const SEASON_ONE: TournamentDoc = {
               intel: { tendency: 'A signal only means something if faking it would cost too much.', counter: 'Trust signals that are expensive to send. Test the cheap ones.', lesson: 'signaling' },
             },
             {
+              // A short match: in simulations Power Play is the hardest game to win at any level, so it is not a duel.
               id: 's1.vesper.power-play',
               game: { system: 'arena', id: 'power-play' },
+              level: 'normal',
+              length: 'short',
+              intel: { tendency: 'She claims roles she does not hold and dares you to call it.', counter: 'A threat is only credible if carrying it out pays. Challenge the ones that would not.', lesson: 'brinkmanship' },
+            },
+            {
+              id: 's1.vesper.bluff',
+              game: { system: 'arena', id: 'bluff' },
               level: 'hard',
               duel: true,
-              intel: { tendency: 'She claims roles she does not hold and dares you to call it.', counter: 'A threat is only credible if carrying it out pays. Challenge the ones that would not.', lesson: 'brinkmanship' },
+              intel: { tendency: 'Her claims come out with the same confidence, strong or weak.', counter: 'Confidence is not evidence. Challenge a claim when the odds say it is unlikely.', lesson: 'signaling' },
             },
           ],
         },
@@ -252,9 +264,11 @@ export const SEASON_ONE: TournamentDoc = {
               intel: { tendency: 'The highest estimate usually wins, and usually overpays.', counter: 'Bid below your estimate. Winning the lot is not the same as winning money.', lesson: 'auctions' },
             },
             {
+              // Short: a steady pricing plan wins about one match in seven at Normal, random pricing almost never.
               id: 's1.osric.market',
               game: { system: 'arena', id: 'market' },
               level: 'normal',
+              length: 'short',
               intel: { tendency: 'A price cut wins customers for one round and starts a war.', counter: 'Match the market, punish undercuts, and avoid racing to the floor.', lesson: 'market-competition' },
             },
             {
@@ -345,6 +359,24 @@ export const SEASON_ONE: TournamentDoc = {
               level: 'hard',
               duel: true,
               intel: { tendency: 'Tamsin’s patience, all at once.', counter: 'Think several moves ahead, and use every idea you have learned.', lesson: 'strategic-practice' },
+            },
+          ],
+        },
+        {
+          id: 's1.side',
+          kind: 'side',
+          title: 'Side trial',
+          theme: 'Saying exactly what you mean',
+          rival: 'host',
+          style: 'reader',
+          lessons: [],
+          intro: ['A trial off the bracket. Nothing rides on it but your pride.', '“One word,” the Host says. “Make your partner hear what you meant.”'],
+          matches: [
+            {
+              id: 's1.side.codebreaker',
+              game: { system: 'arena', id: 'codebreaker' },
+              level: 'normal',
+              intel: { tendency: 'A clue can point at more than one word.', counter: 'Think about how your partner reads it, not how you meant it. Pick the clue only one answer fits.', lesson: 'coordination-problem' },
             },
           ],
         },

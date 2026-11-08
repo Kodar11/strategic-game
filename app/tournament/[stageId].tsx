@@ -16,7 +16,7 @@ import { useTournament } from '@/src/features/tournament/store';
 import { Kicker, ProgressBar, RivalMark, StarRow, toneColors } from '@/src/features/tournament/ui/parts';
 import { useLoadTournament, useTournamentStatus } from '@/src/features/tournament/useStatus';
 import { track } from '@/src/observability';
-import { cleared, matchOpen, recordOf, stars } from '@/src/tournament/progress';
+import { cleared, mainStages, matchOpen, recordOf, stars } from '@/src/tournament/progress';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
 /** One stage of the bracket: its rival, the intro scene the first time, the key card, and its matches. */
@@ -42,7 +42,8 @@ export default function StageScreen() {
   const { stage } = status;
   const rival = rivalOf(t.doc, stage.rival);
   const tone = toneColors(rival.tone);
-  const previous = status.index > 0 ? t.season.stages[status.index - 1] : null;
+  const main = mainStages(t.season);
+  const previous = stage.kind === 'side' ? main[0] : (main[main.indexOf(stage) - 1] ?? null);
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
   return (

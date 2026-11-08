@@ -33,10 +33,12 @@ interface TournamentState extends TournamentProgress {
   markSeen: (stageId: string) => void;
   saveCheck: (stageId: string, correct: number, total: number, passed: boolean) => void;
   saveMindCheck: (form: MindForm, correct: number, total: number) => void;
+  /** Replace progress with a merged copy (src/features/tournament/sync.ts). */
+  adopt: (p: TournamentProgress) => void;
   reset: () => Promise<void>;
 }
 
-const snapshot = (s: TournamentProgress): TournamentProgress => ({ matches: s.matches, history: s.history, checks: s.checks, seen: s.seen, mind: s.mind });
+export const snapshot = (s: TournamentProgress): TournamentProgress => ({ matches: s.matches, history: s.history, checks: s.checks, seen: s.seen, mind: s.mind });
 const persist = (s: TournamentProgress) => AsyncStorage.setItem(TOURNAMENT_KEY, JSON.stringify(snapshot(s))).catch(() => undefined);
 
 export const useTournament = create<TournamentState>()((set, get) => ({
@@ -108,6 +110,10 @@ export const useTournament = create<TournamentState>()((set, get) => ({
     set(next);
     persist(next);
     track('mind_check_completed', { form, correct, total });
+  },
+  adopt: (p) => {
+    set({ ...p, loaded: true });
+    persist(p);
   },
   reset: async () => {
     set({ ...EMPTY_PROGRESS, loaded: true });

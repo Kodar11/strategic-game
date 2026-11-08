@@ -25,6 +25,7 @@ from (values
   ('20261106120100', 'account_deletions',      to_regclass('public.account_deletions') is not null),
   ('20261107120000', 'progress_sync_ops',      to_regclass('public.progress_sync_ops') is not null),
   ('20261108120000', 'nickname_limit_details', exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'set_nickname' and p.prosrc like '%retryAfterSeconds%')),
-  ('20261109120000', 'tournament_content',     to_regclass('public.tournament_documents') is not null)
+  ('20261109120000', 'tournament_content',     to_regclass('public.tournament_documents') is not null),
+  ('20261109120100', 'tournament_progress',    to_regclass('public.tournament_progress') is not null)
 ) as m(version, name, present)
 order by version;

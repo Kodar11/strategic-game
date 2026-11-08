@@ -2,6 +2,9 @@
 -- Run). Every statement here runs against the real migrations in supabase/__tests__/tournament.test.ts, after
 -- season1.sql, so the names and paths are real.
 --
+-- Every change also raises the document's own "revision" (section 3 shows how): the app ignores a document whose
+-- revision is lower than the copy it ships with.
+--
 -- The document is checked by the app before use (src/tournament/schema.ts). A document that fails — an unknown game,
 -- variant or lesson, a duplicate id — is ignored and players keep their cached copy, so a typo can't break the app.
 -- Devices pick up a change at their next start after a background refresh (at most every 30 minutes).
@@ -25,7 +28,7 @@ order by stage_index, match_index;
 -- ── 3. Change one match (here: make Vesper's Bluff match Hard) ─────────────
 -- Finds the match by its id, wherever it sits, and sets one field. Change the id, the field and the value.
 update public.tournament_documents d
-set document = jsonb_set(d.document, array['seasons', p.si::text, 'stages', p.sti::text, 'matches', p.mi::text, 'level'], '"hard"'::jsonb),
+set document = jsonb_set(jsonb_set(d.document, array['seasons', p.si::text, 'stages', p.sti::text, 'matches', p.mi::text, 'level'], '"hard"'::jsonb), '{revision}', to_jsonb(coalesce((d.document ->> 'revision')::int, 1) + 1)),
     revision = d.revision + 1
 from (
   select s.ordinality - 1 as si, st.ordinality - 1 as sti, m.ordinality - 1 as mi

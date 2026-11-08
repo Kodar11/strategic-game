@@ -6,9 +6,1218 @@ insert into public.tournament_documents (id, status, document)
 values ('main', 'published', $doc${
   "schemaVersion": 1,
   "id": "main",
+  "revision": 2,
   "title": "The Tournament",
   "tagline": "Five rivals. Every trick is real. Outthink them one at a time.",
   "host": "host",
+  "welcome": [
+    "Welcome to the Tournament.",
+    "Five rivals are waiting: a liar, a traitor, a puppeteer, a kingmaker and an architect.",
+    "Each one plays a trick you can learn to beat. Read them, outthink them, and climb.",
+    "First, three quick matches to qualify. Let’s see how you play."
+  ],
+  "questions": [
+    {
+      "id": "k.vesper.1",
+      "use": "key",
+      "stage": "s1.vesper",
+      "situation": "A seller says “this car has never been in an accident”. Saying it costs nothing, whether it is true or not.",
+      "question": "How much should the claim change your mind?",
+      "options": [
+        {
+          "id": "a",
+          "label": "A lot: they said it clearly",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Very little: a cheap claim is made by honest and dishonest sellers alike",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Not at all, and you should assume the opposite",
+          "correct": false
+        }
+      ],
+      "explanation": "A signal informs only when it would cost a liar more to send than an honest sender. Free talk is sent by both, so it separates neither."
+    },
+    {
+      "id": "k.vesper.2",
+      "use": "key",
+      "stage": "s1.vesper",
+      "situation": "One seller offers a two-year warranty on the same car. Fixing a bad car under warranty would cost them far more than they earn.",
+      "question": "Why is the warranty more believable than the promise?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Warranties are always honest",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Only a seller with a good car can afford to offer it",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "It sounds more official",
+          "correct": false
+        }
+      ],
+      "explanation": "The warranty is a costly signal: a seller of a bad car would lose money offering it, so offering it reveals the car is good."
+    },
+    {
+      "id": "k.vesper.3",
+      "use": "key",
+      "stage": "s1.vesper",
+      "situation": "A rival says “cut your price and I will start a price war that ruins us both”. A war would hurt them more than accepting your cut.",
+      "question": "Is the threat credible?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Yes: they said it out loud",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "No: once you cut, carrying it out would not pay for them",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Yes, because threats always work",
+          "correct": false
+        }
+      ],
+      "explanation": "A threat is credible only if carrying it out is in the threatener’s interest when the moment comes. Here it is not, so it is cheap talk."
+    },
+    {
+      "id": "k.kade.1",
+      "use": "key",
+      "stage": "s1.kade",
+      "situation": "Two partners each choose to share or keep. Keeping pays more whatever the other does, but both sharing beats both keeping.",
+      "question": "In a single round with a stranger, what tends to happen?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Both share, because it is best for both",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Both keep, and both end up worse off",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "One shares and one keeps, always",
+          "correct": false
+        }
+      ],
+      "explanation": "This is the cooperation trap: the individually best move leads both to an outcome worse than cooperating."
+    },
+    {
+      "id": "k.kade.2",
+      "use": "key",
+      "stage": "s1.kade",
+      "situation": "Now the same two partners meet every week for a year, and each remembers the last round.",
+      "question": "What makes sharing sustainable?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Trusting blindly every round",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Answering a betrayal with a betrayal, then returning to sharing",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Never sharing first",
+          "correct": false
+        }
+      ],
+      "explanation": "In repeated games, a credible response to betrayal (like tit-for-tat) makes keeping unprofitable over time, so sharing can last."
+    },
+    {
+      "id": "k.kade.3",
+      "use": "key",
+      "stage": "s1.kade",
+      "situation": "Two hunters can chase a stag together (big prize, needs both) or a hare alone (small, safe).",
+      "question": "What decides whether they get the stag?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Whether each expects the other to go for the stag",
+          "correct": true
+        },
+        {
+          "id": "b",
+          "label": "Who is the stronger hunter",
+          "correct": false
+        },
+        {
+          "id": "c",
+          "label": "Nothing: the stag is always chosen",
+          "correct": false
+        }
+      ],
+      "explanation": "Both outcomes are stable. Which one happens depends on expectations, so signalling and trust matter more than payoffs alone."
+    },
+    {
+      "id": "k.mirelle.1",
+      "use": "key",
+      "stage": "s1.mirelle",
+      "situation": "A test catches a cheater 90% of the time, but also wrongly flags 10% of honest people. Only 1 in 20 players cheats.",
+      "question": "Someone is flagged. Are they probably a cheater?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Yes, the test is 90% accurate",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "No: with so few cheaters, most flags are honest people",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Exactly 50% either way",
+          "correct": false
+        }
+      ],
+      "explanation": "Out of 200 people: 10 cheaters (9 flagged) and 190 honest (19 flagged). Only 9 of 28 flags are cheaters, about a third."
+    },
+    {
+      "id": "k.mirelle.2",
+      "use": "key",
+      "stage": "s1.mirelle",
+      "situation": "Everyone in the room accuses the same suspect, but each person is only repeating the last accusation they heard.",
+      "question": "How much should the crowd change your view?",
+      "options": [
+        {
+          "id": "a",
+          "label": "A lot: everyone agrees",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Little: repeated opinions are not independent evidence",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Not at all, and you should accuse someone else",
+          "correct": false
+        }
+      ],
+      "explanation": "Evidence that copies other evidence adds no new information. Weigh independent clues, not the volume of agreement."
+    },
+    {
+      "id": "k.mirelle.3",
+      "use": "key",
+      "stage": "s1.mirelle",
+      "situation": "An inspector checks every Monday and never on other days.",
+      "question": "What do rule-breakers learn?",
+      "options": [
+        {
+          "id": "a",
+          "label": "To behave on Mondays and cheat the rest of the week",
+          "correct": true
+        },
+        {
+          "id": "b",
+          "label": "To behave every day",
+          "correct": false
+        },
+        {
+          "id": "c",
+          "label": "Nothing: the schedule does not matter",
+          "correct": false
+        }
+      ],
+      "explanation": "Predictable inspection invites cheating in the gaps. Unpredictable, mixed checks keep everyone honest at lower cost."
+    },
+    {
+      "id": "k.osric.1",
+      "use": "key",
+      "stage": "s1.osric",
+      "situation": "You and a buyer split ₹100. If no deal is made, you get ₹40 elsewhere and the buyer gets nothing.",
+      "question": "What is the least you should accept?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Anything above ₹0",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Nothing below ₹40",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Exactly ₹50",
+          "correct": false
+        }
+      ],
+      "explanation": "Your walk-away value sets your floor. Accepting less than your outside option makes you worse off than no deal."
+    },
+    {
+      "id": "k.osric.2",
+      "use": "key",
+      "stage": "s1.osric",
+      "situation": "Five bidders each estimate a lot’s value with some error. The highest bid wins.",
+      "question": "Why does the winner often overpay?",
+      "options": [
+        {
+          "id": "a",
+          "label": "They bid carelessly",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Winning usually means having the most optimistic estimate",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Auctions are rigged",
+          "correct": false
+        }
+      ],
+      "explanation": "This is the winner’s curse: the highest estimate tends to be too high. Bid below your estimate to allow for it."
+    },
+    {
+      "id": "k.osric.3",
+      "use": "key",
+      "stage": "s1.osric",
+      "situation": "Three parties hold 45, 40 and 15 seats out of 100. A majority needs 51.",
+      "question": "How much power does the 15-seat party have?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Little: it is the smallest",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "As much as either big party: any two of the three make a majority",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "None: the big parties will always pair up",
+          "correct": false
+        }
+      ],
+      "explanation": "Power comes from being needed, not from size. Every pair reaches 51 (85, 60 or 55 seats), so each party is equally able to make or break a majority."
+    },
+    {
+      "id": "k.tamsin.1",
+      "use": "key",
+      "stage": "s1.tamsin",
+      "situation": "Fishers share a lake that regrows a little each season. Each takes more when others hold back.",
+      "question": "What happens if everyone follows that habit?",
+      "options": [
+        {
+          "id": "a",
+          "label": "The lake stays full",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "The lake runs dry and everyone loses future catches",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Only the greedy fishers lose",
+          "correct": false
+        }
+      ],
+      "explanation": "The tragedy of the commons: each individually rational grab drains the shared resource for all."
+    },
+    {
+      "id": "k.tamsin.2",
+      "use": "key",
+      "stage": "s1.tamsin",
+      "situation": "You move first, then your rival answers, knowing your move.",
+      "question": "How should you choose your first move?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Pick what looks best right now",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Work out the rival’s best reply to each option, then choose",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Choose at random",
+          "correct": false
+        }
+      ],
+      "explanation": "In sequential games, look ahead and reason back: your move is only as good as the reply it invites."
+    },
+    {
+      "id": "k.tamsin.3",
+      "use": "key",
+      "stage": "s1.tamsin",
+      "situation": "Two firms keep spending to outlast each other for a prize. Whoever stops first gets nothing back.",
+      "question": "What is the main danger?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Stopping too early",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Both spending more than the prize is worth",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Winning too fast",
+          "correct": false
+        }
+      ],
+      "explanation": "In a war of attrition, sunk costs pull both sides on. Decide your limit in advance and do not chase what is already spent."
+    },
+    {
+      "id": "k.final.1",
+      "use": "key",
+      "stage": "s1.final",
+      "situation": "A new rival’s first three moves were friendly. You cannot see their plan.",
+      "question": "What is the best starting stance?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Exploit them before they exploit you",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Cooperate, but answer clearly if they defect",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Ignore their moves and play randomly",
+          "correct": false
+        }
+      ],
+      "explanation": "Start friendly, respond firmly, forgive when they return: it builds trust without being a pushover."
+    },
+    {
+      "id": "k.final.2",
+      "use": "key",
+      "stage": "s1.final",
+      "situation": "A negotiator makes a public promise to their team never to go below a price.",
+      "question": "Why might this strengthen their position?",
+      "options": [
+        {
+          "id": "a",
+          "label": "It makes backing down costly, so their stance is credible",
+          "correct": true
+        },
+        {
+          "id": "b",
+          "label": "Public promises are always kept",
+          "correct": false
+        },
+        {
+          "id": "c",
+          "label": "It weakens them: they lose flexibility",
+          "correct": false
+        }
+      ],
+      "explanation": "Commitment works by removing options. When retreat is costly, the other side has to take the stance seriously."
+    },
+    {
+      "id": "k.final.3",
+      "use": "key",
+      "stage": "s1.final",
+      "situation": "A clue makes a suspect three times more likely than before, but they started very unlikely.",
+      "question": "What should you conclude?",
+      "options": [
+        {
+          "id": "a",
+          "label": "They are now almost certainly guilty",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "They are more likely than before, but still possibly unlikely",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "The clue is meaningless",
+          "correct": false
+        }
+      ],
+      "explanation": "Update in proportion: a strong clue raises a low starting chance, but may not make it a likely one."
+    },
+    {
+      "id": "m.signal.1",
+      "use": "mind",
+      "theme": "signals",
+      "situation": "A job applicant mentions a hard certification that takes a year of study.",
+      "question": "Why might an employer value it even if the job does not use it?",
+      "options": [
+        {
+          "id": "a",
+          "label": "It is expensive to fake, so it shows ability or commitment",
+          "correct": true
+        },
+        {
+          "id": "b",
+          "label": "Employers like long CVs",
+          "correct": false
+        },
+        {
+          "id": "c",
+          "label": "It guarantees good work",
+          "correct": false
+        }
+      ],
+      "explanation": "Costly signals separate types: the effort is cheaper for capable applicants, so holding it says something about them."
+    },
+    {
+      "id": "m.trust.1",
+      "use": "mind",
+      "theme": "trust",
+      "situation": "Two neighbours can each keep their shared hallway clean or leave it. Cleaning costs effort; a clean hallway helps both.",
+      "question": "Without any agreement, what often happens?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Both clean every day",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Each waits for the other, and the hallway stays messy",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "They take turns automatically",
+          "correct": false
+        }
+      ],
+      "explanation": "When effort is private and benefit is shared, each is tempted to free-ride, leaving both worse off."
+    },
+    {
+      "id": "m.evidence.1",
+      "use": "mind",
+      "theme": "evidence",
+      "situation": "A rare illness affects 1 in 1,000 people. A test is 99% accurate.",
+      "question": "After one positive test, the chance of illness is closest to…",
+      "options": [
+        {
+          "id": "a",
+          "label": "99%",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "About 9%",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "About 50%",
+          "correct": false
+        }
+      ],
+      "explanation": "Of 100,000 people, 100 are ill (99 test positive) and 999 healthy people test positive. 99 of 1,098 positives is about 9%."
+    },
+    {
+      "id": "m.deals.1",
+      "use": "mind",
+      "theme": "deals",
+      "situation": "You are offered ₹30 out of ₹100. Rejecting leaves you both with nothing.",
+      "question": "In purely money terms, what should you do?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Reject, it is unfair",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Accept: ₹30 beats ₹0",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Counter-offer, always",
+          "correct": false
+        }
+      ],
+      "explanation": "Money-wise any positive offer beats nothing. Real people often reject unfair offers, which is why fair offers are safer to make."
+    },
+    {
+      "id": "m.long.1",
+      "use": "mind",
+      "theme": "long",
+      "situation": "You can take ₹100 today, or invest it with a partner who returns ₹150 next month if you both keep investing.",
+      "question": "What matters most for choosing to invest?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Whether the partner will still be there and cooperating",
+          "correct": true
+        },
+        {
+          "id": "b",
+          "label": "Whether ₹100 is a round number",
+          "correct": false
+        },
+        {
+          "id": "c",
+          "label": "Nothing: always take the money now",
+          "correct": false
+        }
+      ],
+      "explanation": "Long games reward patience only if the future is likely enough. The shadow of the future makes cooperation worthwhile."
+    },
+    {
+      "id": "m.signal.2",
+      "use": "mind",
+      "theme": "signals",
+      "situation": "A poker player always bets big with strong hands and checks with weak ones.",
+      "question": "What is their problem?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Nothing, it is safe play",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Their bets reveal their hand, so opponents fold to big bets",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "They bet too little",
+          "correct": false
+        }
+      ],
+      "explanation": "A fully predictable signal gives information away. Good players mix bluffs in so their bets stay informative only to themselves."
+    },
+    {
+      "id": "m.trust.2",
+      "use": "mind",
+      "theme": "trust",
+      "situation": "Two players repeat a trust game. One player makes a single mistake that looks like a betrayal.",
+      "question": "In a noisy world, what response works best over time?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Punish forever",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Punish once, then forgive if cooperation returns",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Never react to anything",
+          "correct": false
+        }
+      ],
+      "explanation": "With mistakes, permanent punishment destroys cooperation. A measured response plus forgiveness keeps it going."
+    },
+    {
+      "id": "m.evidence.2",
+      "use": "mind",
+      "theme": "evidence",
+      "situation": "Three witnesses describe a suspect. Later you learn two of them only repeated what the first said.",
+      "question": "How many independent pieces of evidence do you have?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Three",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "One",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Two",
+          "correct": false
+        }
+      ],
+      "explanation": "Copied testimony is not new evidence. You have one independent account, heard three times."
+    },
+    {
+      "id": "m.deals.2",
+      "use": "mind",
+      "theme": "deals",
+      "situation": "Two stores sell the same product. Each can price high or low; low wins the other’s customers.",
+      "question": "Without coordination, where do prices tend to go?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Up, over time",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Down, towards cost",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "They stay random",
+          "correct": false
+        }
+      ],
+      "explanation": "Undercutting pays for each store individually, so competition pushes prices down towards cost."
+    },
+    {
+      "id": "m.long.2",
+      "use": "mind",
+      "theme": "long",
+      "situation": "A chess move wins a pawn now but lets the opponent trap your queen in two moves.",
+      "question": "What does this show?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Material now is all that matters",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "A move must be judged by the replies it allows",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "The opponent got lucky",
+          "correct": false
+        }
+      ],
+      "explanation": "Look ahead and reason back: a gain that invites a stronger reply is a loss."
+    },
+    {
+      "id": "m.signal.3",
+      "use": "mind",
+      "theme": "signals",
+      "situation": "A restaurant pays for a very expensive location with a long lease.",
+      "question": "What might customers reasonably infer?",
+      "options": [
+        {
+          "id": "a",
+          "label": "The owners expect to stay and be good enough to pay for it",
+          "correct": true
+        },
+        {
+          "id": "b",
+          "label": "The food must be bad",
+          "correct": false
+        },
+        {
+          "id": "c",
+          "label": "Nothing at all",
+          "correct": false
+        }
+      ],
+      "explanation": "Large, hard-to-recover investments signal confidence: a business expecting to fail would not commit to them."
+    },
+    {
+      "id": "m.trust.3",
+      "use": "mind",
+      "theme": "trust",
+      "situation": "A team will split a bonus only if everyone hits their target. Each person can slack and hope others carry them.",
+      "question": "What design keeps everyone working?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Pay everyone the same no matter what",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Make each person’s part visible and their reward depend on it",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Remove the bonus",
+          "correct": false
+        }
+      ],
+      "explanation": "Free-riding thrives when effort is hidden. Visibility and individual stakes realign incentives."
+    },
+    {
+      "id": "m.evidence.3",
+      "use": "mind",
+      "theme": "evidence",
+      "situation": "A suspect looks nervous. Innocent people are often nervous when questioned too.",
+      "question": "How strong is nervousness as evidence?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Very strong",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Weak: it is almost as likely for innocent people",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "It proves innocence",
+          "correct": false
+        }
+      ],
+      "explanation": "Evidence is strong only if it is much more likely under one explanation than the other."
+    },
+    {
+      "id": "m.deals.3",
+      "use": "mind",
+      "theme": "deals",
+      "situation": "Three friends must agree on one restaurant by majority. Two prefer pizza to sushi; one prefers sushi.",
+      "question": "Who can the sushi lover win over?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Nobody: the majority is already there",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Whoever is less attached to pizza, by offering something in return",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Both, by insisting",
+          "correct": false
+        }
+      ],
+      "explanation": "In coalitions, the cheapest partner to win over is the one with the weakest attachment. Trades decide close votes."
+    },
+    {
+      "id": "m.long.3",
+      "use": "mind",
+      "theme": "long",
+      "situation": "Two businesses compete every year in the same town forever.",
+      "question": "Why might they avoid a damaging price war?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Price wars are illegal",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "They know the other can retaliate next year, so both hold back",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "They never think about prices",
+          "correct": false
+        }
+      ],
+      "explanation": "Repeated interaction lets future retaliation discipline today’s choices."
+    },
+    {
+      "id": "m.signal.4",
+      "use": "mind",
+      "theme": "signals",
+      "situation": "A friend says “I am totally fine with whatever you choose”, then sighs at every option.",
+      "question": "Which signal should you trust more?",
+      "options": [
+        {
+          "id": "a",
+          "label": "The words",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "The behaviour, which is harder to fake consistently",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Neither",
+          "correct": false
+        }
+      ],
+      "explanation": "Costly or involuntary behaviour usually carries more information than free words."
+    },
+    {
+      "id": "m.trust.4",
+      "use": "mind",
+      "theme": "trust",
+      "situation": "In a group project, one member says they will do the hardest part, then misses the first deadline.",
+      "question": "What is the most useful response?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Ignore it to keep the peace",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Name it early and agree a visible next step",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Quietly do their part yourself forever",
+          "correct": false
+        }
+      ],
+      "explanation": "Answering a lapse early and clearly keeps cooperation going; silent absorption teaches that lapses are free."
+    },
+    {
+      "id": "m.evidence.4",
+      "use": "mind",
+      "theme": "evidence",
+      "situation": "Your first guess about a rival’s style was “aggressive”. Their next five moves were all cautious.",
+      "question": "What should you do?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Keep your guess: first impressions matter",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Update towards “cautious” in proportion to the evidence",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Assume they are random",
+          "correct": false
+        }
+      ],
+      "explanation": "Good reasoners revise beliefs as evidence arrives instead of defending the first guess."
+    },
+    {
+      "id": "m.deals.4",
+      "use": "mind",
+      "theme": "deals",
+      "situation": "You are buying a used phone. The seller says “someone else is coming to see it in an hour”.",
+      "question": "Why is this worth questioning?",
+      "options": [
+        {
+          "id": "a",
+          "label": "It is free to say, true or not",
+          "correct": true
+        },
+        {
+          "id": "b",
+          "label": "Sellers never lie",
+          "correct": false
+        },
+        {
+          "id": "c",
+          "label": "It proves the price is fair",
+          "correct": false
+        }
+      ],
+      "explanation": "An unverifiable outside option is cheap talk designed to raise urgency. Your own walk-away option matters more."
+    },
+    {
+      "id": "m.long.4",
+      "use": "mind",
+      "theme": "long",
+      "situation": "You have already spent ₹5,000 repairing an old scooter. Another repair costs ₹4,000; a new one costs ₹6,000.",
+      "question": "What should the ₹5,000 already spent change?",
+      "options": [
+        {
+          "id": "a",
+          "label": "A lot: you have invested so much",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Nothing: it is spent either way; compare only future costs and value",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Always buy new",
+          "correct": false
+        }
+      ],
+      "explanation": "Sunk costs cannot be recovered. Only the future costs and benefits of each choice matter."
+    },
+    {
+      "id": "m.signal.5",
+      "use": "mind",
+      "theme": "signals",
+      "situation": "A startup gives a big discount to its first customers.",
+      "question": "What might competitors read into it?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Confidence that customers will stay and pay later",
+          "correct": true
+        },
+        {
+          "id": "b",
+          "label": "That the product is free forever",
+          "correct": false
+        },
+        {
+          "id": "c",
+          "label": "Nothing",
+          "correct": false
+        }
+      ],
+      "explanation": "Losing money early only makes sense if you expect to keep customers, so the discount signals confidence (or deep pockets)."
+    },
+    {
+      "id": "m.trust.5",
+      "use": "mind",
+      "theme": "trust",
+      "situation": "Two countries can each build weapons or not. Each is safer if it builds and the other does not.",
+      "question": "Why do both often end up building?",
+      "options": [
+        {
+          "id": "a",
+          "label": "They both want war",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Each fears being the only one who did not",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Weapons are cheap",
+          "correct": false
+        }
+      ],
+      "explanation": "Arms races follow the cooperation trap: fear of being exploited drives both to an outcome neither wants."
+    },
+    {
+      "id": "m.evidence.5",
+      "use": "mind",
+      "theme": "evidence",
+      "situation": "In a hidden-role game, one player has been on every mission that failed.",
+      "question": "What does this overlap suggest?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Nothing: it is coincidence",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "They are a strong suspect, more so the more failures there are",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "They must be innocent",
+          "correct": false
+        }
+      ],
+      "explanation": "Overlap across independent failures is strong evidence; each failure makes chance a weaker explanation."
+    },
+    {
+      "id": "m.deals.5",
+      "use": "mind",
+      "theme": "deals",
+      "situation": "In an auction you value a painting at ₹10,000 and everyone bids openly, raising in small steps.",
+      "question": "When should you stop?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Once the price passes ₹10,000",
+          "correct": true
+        },
+        {
+          "id": "b",
+          "label": "Never: winning is what matters",
+          "correct": false
+        },
+        {
+          "id": "c",
+          "label": "At the first bid",
+          "correct": false
+        }
+      ],
+      "explanation": "Bid up to your value and no further; winning above it is a loss."
+    },
+    {
+      "id": "m.long.5",
+      "use": "mind",
+      "theme": "long",
+      "situation": "You and a teammate must defend two gates. You cannot both cover everything alone.",
+      "question": "What gives the best chance of holding both?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Each guesses independently",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Agree who covers which gate and stick to it",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Both guard the same gate",
+          "correct": false
+        }
+      ],
+      "explanation": "Coordination problems are solved by shared expectations: a clear split beats two good guesses that collide."
+    },
+    {
+      "id": "m.signal.6",
+      "use": "mind",
+      "theme": "signals",
+      "situation": "A player in a bluffing game always hesitates before lying.",
+      "question": "What should observant opponents do?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Ignore the hesitation",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Treat it as a tell and challenge after hesitations",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Always challenge",
+          "correct": false
+        }
+      ],
+      "explanation": "Unintended signals leak information. Spotting and using tells is how bluffs get caught."
+    },
+    {
+      "id": "m.trust.6",
+      "use": "mind",
+      "theme": "trust",
+      "situation": "A roommate keeps shared groceries stocked only when you do too.",
+      "question": "What is the simplest way to keep the fridge full?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Stop buying to test them",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Keep contributing, and say clearly if they stop",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Buy everything yourself",
+          "correct": false
+        }
+      ],
+      "explanation": "Conditional cooperators follow the group. Steady contribution plus clear expectations keeps both in."
+    },
+    {
+      "id": "m.evidence.6",
+      "use": "mind",
+      "theme": "evidence",
+      "situation": "A camera clue is right only 60% of the time. You have three independent clues that all point to the same person.",
+      "question": "How should you treat the combined clues?",
+      "options": [
+        {
+          "id": "a",
+          "label": "As useless, because each is weak",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "As stronger together than any one alone",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "As certain proof",
+          "correct": false
+        }
+      ],
+      "explanation": "Independent weak evidence adds up. Several clues pointing the same way can be convincing even if none is alone."
+    },
+    {
+      "id": "m.deals.6",
+      "use": "mind",
+      "theme": "deals",
+      "situation": "You need one of two partners to form a deal. Both are equally useful to you.",
+      "question": "How does this affect your negotiating power?",
+      "options": [
+        {
+          "id": "a",
+          "label": "It weakens you",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "It strengthens you: each partner can be replaced by the other",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "It makes no difference",
+          "correct": false
+        }
+      ],
+      "explanation": "Having alternatives raises your walk-away value, so neither partner can demand too much."
+    },
+    {
+      "id": "m.long.6",
+      "use": "mind",
+      "theme": "long",
+      "situation": "You are ahead late in a match. A risky move could win big or lose your lead.",
+      "question": "What does a lead usually call for?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Take the risk to win bigger",
+          "correct": false
+        },
+        {
+          "id": "b",
+          "label": "Lower-risk moves that protect the lead",
+          "correct": true
+        },
+        {
+          "id": "c",
+          "label": "Random moves",
+          "correct": false
+        }
+      ],
+      "explanation": "When ahead, reduce variance; when behind, risk becomes more attractive. Strategy depends on where you stand."
+    }
+  ],
   "rivals": [
     {
       "id": "host",
@@ -198,19 +1407,6 @@ values ('main', 'published', $doc${
           ],
           "matches": [
             {
-              "id": "s1.vesper.bluff",
-              "game": {
-                "system": "arena",
-                "id": "bluff"
-              },
-              "level": "normal",
-              "intel": {
-                "tendency": "Claims come out with the same confidence, strong or weak.",
-                "counter": "Confidence is not evidence. Challenge a claim when the odds say it is unlikely.",
-                "lesson": "signaling"
-              }
-            },
-            {
               "id": "s1.vesper.liars-dice",
               "game": {
                 "system": "arena",
@@ -242,12 +1438,26 @@ values ('main', 'published', $doc${
                 "system": "arena",
                 "id": "power-play"
               },
-              "level": "hard",
-              "duel": true,
+              "level": "normal",
+              "length": "short",
               "intel": {
                 "tendency": "She claims roles she does not hold and dares you to call it.",
                 "counter": "A threat is only credible if carrying it out pays. Challenge the ones that would not.",
                 "lesson": "brinkmanship"
+              }
+            },
+            {
+              "id": "s1.vesper.bluff",
+              "game": {
+                "system": "arena",
+                "id": "bluff"
+              },
+              "level": "hard",
+              "duel": true,
+              "intel": {
+                "tendency": "Her claims come out with the same confidence, strong or weak.",
+                "counter": "Confidence is not evidence. Challenge a claim when the odds say it is unlikely.",
+                "lesson": "signaling"
               }
             }
           ]
@@ -436,6 +1646,7 @@ values ('main', 'published', $doc${
                 "id": "market"
               },
               "level": "normal",
+              "length": "short",
               "intel": {
                 "tendency": "A price cut wins customers for one round and starts a war.",
                 "counter": "Match the market, punish undercuts, and avoid racing to the floor.",
@@ -610,6 +1821,34 @@ values ('main', 'published', $doc${
                 "tendency": "Tamsin’s patience, all at once.",
                 "counter": "Think several moves ahead, and use every idea you have learned.",
                 "lesson": "strategic-practice"
+              }
+            }
+          ]
+        },
+        {
+          "id": "s1.side",
+          "kind": "side",
+          "title": "Side trial",
+          "theme": "Saying exactly what you mean",
+          "rival": "host",
+          "style": "reader",
+          "lessons": [],
+          "intro": [
+            "A trial off the bracket. Nothing rides on it but your pride.",
+            "“One word,” the Host says. “Make your partner hear what you meant.”"
+          ],
+          "matches": [
+            {
+              "id": "s1.side.codebreaker",
+              "game": {
+                "system": "arena",
+                "id": "codebreaker"
+              },
+              "level": "normal",
+              "intel": {
+                "tendency": "A clue can point at more than one word.",
+                "counter": "Think about how your partner reads it, not how you meant it. Pick the clue only one answer fits.",
+                "lesson": "coordination-problem"
               }
             }
           ]

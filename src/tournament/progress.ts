@@ -89,9 +89,23 @@ export interface StageStatus {
   clearedCount: number;
 }
 
+/** The bracket in order, without side trials. */
+export const mainStages = (season: Season) => season.stages.filter((s) => s.kind !== 'side');
+
+/**
+ * A main stage opens when the main stage before it is cleared (the first is always open). A side trial opens once the
+ * first main stage is cleared, and never blocks the bracket.
+ */
+function isUnlocked(season: Season, stage: Stage, p: TournamentProgress): boolean {
+  const main = mainStages(season);
+  if (stage.kind === 'side') return main.length > 0 && stageCleared(main[0], p);
+  const i = main.indexOf(stage);
+  return i <= 0 || stageCleared(main[i - 1], p);
+}
+
 export function stageStatus(season: Season, index: number, p: TournamentProgress, completed: readonly string[]): StageStatus {
   const stage = season.stages[index];
-  const unlocked = index === 0 || stageCleared(season.stages[index - 1], p);
+  const unlocked = isUnlocked(season, stage, p);
   const keyCard = hasKeyCard(stage, completed, p);
   const rest = stage.matches.filter((m) => !m.duel);
   return {
@@ -109,13 +123,14 @@ export function stageStatus(season: Season, index: number, p: TournamentProgress
 
 export const allStages = (season: Season, p: TournamentProgress, completed: readonly string[]) => season.stages.map((_, i) => stageStatus(season, i, p, completed));
 
-/** The stage the player is working on: the first unlocked one not cleared; the last one once all are cleared. */
+/** The bracket stage the player is working on: the first unlocked one not cleared; the last once all are cleared. */
 export function currentStage(season: Season, p: TournamentProgress, completed: readonly string[]): StageStatus {
-  const all = allStages(season, p, completed);
+  const all = allStages(season, p, completed).filter((s) => s.stage.kind !== 'side');
   return all.find((s) => s.unlocked && !s.cleared) ?? all[all.length - 1];
 }
 
-export const seasonCleared = (season: Season, p: TournamentProgress) => season.stages.every((s) => stageCleared(s, p));
+/** Every bracket stage cleared. Side trials don't count. */
+export const seasonCleared = (season: Season, p: TournamentProgress) => mainStages(season).every((s) => stageCleared(s, p));
 
 export function matchOpen(status: StageStatus, m: TournamentMatch): boolean {
   return status.unlocked && (!m.duel || status.duelOpen);
@@ -274,7 +289,7 @@ export function cardSet(season: Season, allLessons: readonly string[], completed
   allLessons.forEach(add);
   const lessons: CardRef[] = order.map((id) => ({ kind: 'lesson', id, owned: completed.includes(id) }));
   const lastStage = new Map<string, Stage>();
-  for (const s of season.stages) lastStage.set(s.rival, s);
+  for (const s of mainStages(season)) lastStage.set(s.rival, s);
   const rivals: CardRef[] = [...lastStage.entries()].map(([id, s]) => ({ kind: 'rival', id, owned: stageCleared(s, p) }));
   return [...lessons, ...rivals];
 }
@@ -284,13 +299,14 @@ export function cardSet(season: Season, allLessons: readonly string[], completed
 export const MIND_ITEMS = 10;
 
 /**
- * Which Mind Check to offer now: form A at any time until taken; B once the season's third stage is cleared; C once
- * its sixth is. Each form is offered until taken, never twice.
+ * Which Mind Check to offer now: form A at any time until taken; B once the third bracket stage is cleared; C once
+ * the sixth is (side trials don't count). Each form is offered until taken, never twice.
  */
 export function mindCheckOffer(season: Season, p: TournamentProgress): MindForm | null {
   const taken = new Set(p.mind.map((m) => m.form));
   if (!taken.has('a')) return 'a';
-  const after = (i: number) => i < season.stages.length && stageCleared(season.stages[i], p);
+  const main = mainStages(season);
+  const after = (i: number) => i < main.length && stageCleared(main[i], p);
   if (!taken.has('b') && after(2)) return 'b';
   if (!taken.has('c') && after(5)) return 'c';
   return null;
@@ -342,4 +358,50 @@ export function sanitizeProgress(raw: unknown): TournamentProgress {
     if (isForm(e.form) && !out.mind.some((x) => x.form === e.form)) out.mind.push({ form: e.form, correct: int(e.correct), total: int(e.total), at: int(e.at) });
   }
   return out;
+}
+
+// ── Merging copies ──────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Two copies of one player's progress (this phone and the server's) made into one. Nothing earned is ever lost:
+ * counts take the larger, wins, reads, Hard wins, skips and passed checks stay once achieved, games played are
+ * the union of both histories, and the first score for each Mind Check form is kept. Merging is order-free and
+ * merging a copy with itself changes nothing, so it can run as often as a sync does.
+ */
+export function mergeProgress(a: TournamentProgress, b: TournamentProgress): TournamentProgress {
+  const matches: Record<string, MatchRecord> = { ...a.matches };
+  for (const [id, r] of Object.entries(b.matches)) {
+    const x = matches[id];
+    matches[id] = x
+      ? { wins: Math.max(x.wins, r.wins), losses: Math.max(x.losses, r.losses), draws: Math.max(x.draws, r.draws), won: x.won || r.won, read: x.read || r.read, hard: x.hard || r.hard, skipped: x.skipped || r.skipped }
+      : r;
+  }
+  const key = (h: HistoryEntry) => `${h.match}|${h.at}|${h.outcome}|${h.opp}`;
+  const games = new Map<string, HistoryEntry>();
+  for (const h of [...a.history, ...b.history]) games.set(key(h), h);
+  const history = [...games.values()].sort((x, y) => x.at - y.at || key(x).localeCompare(key(y))).slice(-HISTORY_MAX);
+  const checks: Record<string, CheckRecord> = { ...a.checks };
+  for (const [id, c] of Object.entries(b.checks)) {
+    const x = checks[id];
+    checks[id] = x ? { passed: x.passed || c.passed, correct: Math.max(x.correct, c.correct), total: Math.max(x.total, c.total), at: Math.max(x.at, c.at) } : c;
+  }
+  const seen = [...new Set([...a.seen, ...b.seen])].sort();
+  const mind = new Map<MindForm, MindEntry>();
+  for (const m of [...a.mind, ...b.mind]) {
+    const x = mind.get(m.form);
+    if (!x || m.at < x.at) mind.set(m.form, m);
+  }
+  return { matches, history, checks, seen, mind: [...mind.values()].sort((x, y) => x.form.localeCompare(y.form)) };
+}
+
+/** Per-match counts across all players (published once a match has 200 players). */
+export interface MatchStats {
+  players: number;
+  won: number;
+  read: number;
+}
+
+/** "Only 9%" from the stats, rounded to a whole percent, or null when there are no published stats. */
+export function share(n: number, of: number): number | null {
+  return of > 0 ? Math.round((n / of) * 100) : null;
 }
