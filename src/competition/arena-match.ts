@@ -14,7 +14,8 @@ import { type CompetitionScore, arenaCompetitionScore } from './scoring.ts';
  * receives the seed or any hidden information until the match is over (src/competition/arena-views.ts).
  */
 
-export const ARENA_RULES_VERSION = 1;
+/** 2 (2026-11-09): difficulty fixes in the Ultimatum Game, Coalition, Saboteur and Mole (docs/DECISIONS.md). */
+export const ARENA_RULES_VERSION = 2;
 /** At most this many actions in one match (the longest Arena match needs well under 100). */
 export const MAX_ACTIONS = 200;
 /** An action is a small JSON value; anything bigger is refused before it reaches an engine. */

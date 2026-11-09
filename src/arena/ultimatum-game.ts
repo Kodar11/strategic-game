@@ -122,10 +122,13 @@ export function ultBotMinAccept(setup: Setup<UltVariant>, total: number, h: read
  * What the bot offers the player when it proposes in round `h.length`: the player's walk-away plus a share of the
  * surplus, learned from how the player answered earlier offers.
  *
- * - Investor: Easy 0.5, Normal 0.4. Hard starts at 0.4 and, after a rejection, offers 0.1 more than the share you
- *   turned down — it pays for a dependable deal rather than pushing its luck.
- * - Banker: Easy 0.5, Normal 0.45. Hard calibrates a safe offer: 0.1 above the largest share you rejected (0.3–0.5),
- *   0.4 if you have rejected nothing.
+ * - Investor: Easy 0.5, Normal 0.4. Hard starts at 0.35, offers 0.05 more after a rejection and 0.05 less after an
+ *   acceptance (0.25–0.4) — it pays for a dependable deal, but keeps testing how little you will take.
+ * - Banker: Easy 0.5, Normal 0.45. Hard calibrates a safe offer: 0.05 above the largest share you rejected (0.3–0.45),
+ *   0.35 if you have rejected nothing.
+ *
+ * Rules v2 (2026-11-09): Hard Investor and Banker used to raise without a ceiling after rejections, so a player who
+ * rejected at random did better on Hard than on Normal (35 % vs 29 % wins). Hard never offers more than Normal now.
  * - Deal Maker: Easy 0.55. Normal starts at 0.5 and adds 0.1 after a rejection; Hard also tries 0.05 less after an
  *   acceptance (0.35–0.6) — looking for the deal you both take.
  * - Opportunist: Easy 0.35. Normal starts at 0.2, +0.1 after a rejection, −0.05 after an acceptance (0.1–0.5). Hard
@@ -144,10 +147,10 @@ export function ultBotOffer(setup: Setup<UltVariant>, h: readonly UltRound[], t:
   let share: number;
   switch (persona) {
     case 'investor':
-      share = level === 'easy' ? 0.5 : level === 'normal' ? 0.4 : Math.max(0.4, rejected.length ? Math.max(...rejected) + 0.1 : 0);
+      share = level === 'easy' ? 0.5 : level === 'normal' ? 0.4 : adapt(0.35, 0.05, 0.05, 0.25, 0.4);
       break;
     case 'banker':
-      share = level === 'easy' ? 0.5 : level === 'normal' ? 0.45 : rejected.length ? clamp(Math.max(...rejected) + 0.1, 0.3, 0.5) : 0.4;
+      share = level === 'easy' ? 0.5 : level === 'normal' ? 0.45 : rejected.length ? clamp(Math.max(...rejected) + 0.05, 0.3, 0.45) : 0.35;
       break;
     case 'dealmaker':
       share = level === 'easy' ? 0.55 : level === 'normal' ? adapt(0.5, 0.1, 0, 0.35, 0.6) : adapt(0.5, 0.1, 0.05, 0.35, 0.6);
@@ -159,7 +162,7 @@ export function ultBotOffer(setup: Setup<UltVariant>, h: readonly UltRound[], t:
         const lo = rejected.length ? Math.max(...rejected) : null;
         const hi = accepted.length ? Math.min(...accepted) : null;
         share = lo === null && hi === null ? 0.25 : hi === null ? lo! + 0.1 : lo === null ? hi - 0.05 : Math.max(lo + 0.05, hi - 0.05);
-        share = clamp(share, 0.05, 0.6);
+        share = clamp(share, 0.05, 0.5);
       }
       break;
   }

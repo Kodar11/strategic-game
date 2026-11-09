@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
+import { RivalDossiers } from '@/src/features/mastery/RivalDossiers';
+import { ContinueMatchCard, discardPractice } from '@/src/features/resume/ContinueMatchCard';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
 import { ArrowLeft, ChevronDown, CircleHelp, Lock, Play } from '@/src/components/ui/icons';
@@ -83,6 +85,7 @@ export default function ArenaGameScreen() {
   const setupSummary = [LEVEL_LABEL[level], `${LENGTH_LABEL[length]} · ${g.rounds(length)} ${g.roundWord}`, g.variants.find((v) => v.id === mode)?.name].join(' · ');
   const play = () => {
     useArenaRecords.getState().savePrefs(gameId, { persona, level, length, variant: mode });
+    discardPractice('arena', gameId);
     router.push({ pathname: '/arena/play', params: { game: gameId, persona, level, length, variant: mode } });
   };
 
@@ -152,10 +155,12 @@ export default function ArenaGameScreen() {
               : null}
           </Card>
 
+          <ContinueMatchCard system="arena" game={gameId} roundWord={g.roundWord === 'lots' ? 'Lot' : g.roundWord === 'turns' ? 'Turn' : 'Round'} />
           <Button label={playLabel} icon={Play} onPress={play} />
           <AppText variant="caption" color={colors.textMuted} align="center">
             {setupSummary}
           </AppText>
+          <RivalDossiers system="arena" game={gameId} />
 
           <Pressable onPress={() => setCustomOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: customOpen }} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44 }}>
             <AppText variant="small" weight="semibold" color={colors.primaryText} style={{ flex: 1 }}>

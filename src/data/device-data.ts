@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ARENA_RECORDS_KEY, useArenaRecords } from '@/src/features/arena/records';
+import { RESUME_KEY, useResume } from '@/src/features/resume/store';
+import { MASTERY_KEY, useMastery } from '@/src/features/mastery/store';
 import { GAMES_SEEN_KEY, useSeenRules } from '@/src/features/games/seen';
 import { clearExportFiles } from '@/src/features/learning/shareFile';
 import { resetStoryAudioPrefs } from '@/src/features/stories/audio/session';
@@ -48,6 +50,8 @@ export const DEVICE_DATA = [
   { key: GAUNTLET_KEY, scope: 'account', what: 'The Gauntlet: the run in progress (bouts, results, lives, perks), best run and runs played' },
   { key: DAILY_MIX_KEY, scope: 'account', what: 'Daily Read Rush scores and Crowd answers of the last 120 days, and the best Rush score' },
   { key: STYLE_KEY, scope: 'account', what: 'How you play: counts of trust, forgiveness and offer decisions from finished matches (no moves)' },
+  { key: MASTERY_KEY, scope: 'account', what: 'Rival mastery: which stars (beat, beat on Hard, named in a mystery match) each opponent has given you' },
+  { key: RESUME_KEY, scope: 'account', what: 'Matches left mid-way: the setup, seed and moves so far (kept for a day, removed when finished)' },
   { key: ARENA_RECORDS_KEY, scope: 'account', what: 'Arena records: results per game and opponent, recent matches, reads, last setup, coach tips seen' },
   { key: 'tactiqo/stories/v1', scope: 'account', what: 'Stories progress: positions, choices, endings seen' },
   { key: 'tactiqo/story-audio/v1', scope: 'account', what: 'Story sound levels' },
@@ -80,6 +84,8 @@ export async function clearAccountDeviceData(): Promise<void> {
   clearExportFiles();
   await Promise.all([
     useArenaRecords.getState().reset(),
+    useResume.getState().reset(),
+    useMastery.getState().reset(),
     useTournament.getState().reset(),
     useStyle.getState().reset(),
     useDailyMix.getState().reset(),

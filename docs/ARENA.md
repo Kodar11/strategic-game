@@ -94,7 +94,7 @@ on the device, and each has its own four opponents (catalog copy: `src/arena/cat
 
 | Game | Engine | Core loop | Opponents | Difficulty changes |
 |---|---|---|---|---|
-| The Mole | `mole.ts` | 4 suspects, one Mole; camera pairs (75 % include it), private interrogations (nervous 75/25 %), everyone accuses; you accuse at the end | the Mole's cover style: Investigator, Social Reader, Deceiver, Opportunist | how well the Mole blends in |
+| The Mole | `mole.ts` | 4 suspects, one Mole; camera pairs (75 % include it), private interrogations (nervous 75/25 %), everyone accuses; you accuse at the end | the Mole's cover style: Investigator, Social Reader, Deceiver, Opportunist | the evidence: a careless Mole on Easy, a composed one on Hard (90 / 79 / 62 % for exact reasoning) |
 | The Commons | `commons.ts` | 4 boats request 0–10 fish; proportional rationing; logistic regrowth; collapse below 10; leftover fish shared as a dividend | Conservator, Free Rider, Conditional Contributor, Resource Maximizer | pool awareness, endgame grabbing, lookahead |
 | The Coalition | `coalition.ts` | seats 34/28/22/16 dealt at random; rotating proposer splits 12 points among a ≥51-seat coalition; unanimity among members | Loyal Ally, Power Broker, Opportunistic Switcher, Fair Negotiator | thresholds, use of the public record |
 | The Inspector | `inspector.ts` | alternating roles; comply/cut corners vs inspect/trust; one-round equilibrium 2/7 cheating, 1/3 inspecting | Strict Inspector, Calculated Inspector, Rule Follower, Risk Taker (a policy for each role) | history use, recency, mixing at equilibrium |

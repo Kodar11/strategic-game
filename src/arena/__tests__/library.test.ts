@@ -126,7 +126,9 @@ describe('the mole', () => {
   });
 
   it('Hard faces a composed Mole: published, weaker evidence that the camera and the questioning both obey', () => {
-    assert.deepEqual(moleEvidence({ variant: 'standard', level: 'easy' }), moleEvidence({ variant: 'standard', level: 'normal' }));
+    const easy = moleEvidence({ variant: 'standard', level: 'easy' });
+    const normal = moleEvidence({ variant: 'standard', level: 'normal' });
+    assert.ok(easy.camera > normal.camera && easy.nervousMole > normal.nervousMole && easy.camera <= 0.9, 'Easy: a careless Mole');
     const hard = moleEvidence({ variant: 'standard', level: 'hard' });
     assert.ok(hard.camera < 0.75 && hard.camera > 0.5 && hard.nervousMole < 0.75 && hard.nervousMole > hard.nervousInnocent);
     assert.ok(moleEvidence({ variant: 'blurry', level: 'hard' }).camera > 0.5, 'the camera still carries information');
@@ -142,7 +144,7 @@ describe('the mole', () => {
   });
 
   it('Hard is measurably harder for exact reasoning (it was 77% at every level)', () => {
-    const solve = (level: 'normal' | 'hard') => {
+    const solve = (level: 'easy' | 'normal' | 'hard') => {
       let solved = 0;
       for (const persona of MOLE_STYLES)
         for (let i = 0; i < 100; i++) {
@@ -157,9 +159,11 @@ describe('the mole', () => {
         }
       return solved / 400;
     };
+    const easy = solve('easy');
     const normal = solve('normal');
     const hard = solve('hard');
     assert.ok(hard < normal - 0.08 && hard > 0.45, `normal ${normal}, hard ${hard}`);
+    assert.ok(easy > normal + 0.04, `easy ${easy}, normal ${normal}`);
   });
 
   it('the posterior is a distribution and moves toward suspects caught on camera', () => {

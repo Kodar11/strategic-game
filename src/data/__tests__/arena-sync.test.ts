@@ -142,7 +142,7 @@ describe('device data inventory', () => {
       for (const m of readFileSync(f, 'utf8').matchAll(/['"`]((?:tactiqo|strategic-game)\/[a-z0-9/-]+)['"`]/g)) keys.add(m[1]);
     }
     assert.ok(keys.size >= 8, [...keys].join(', '));
-    const constants: Record<string, string> = { 'tactiqo/arena-uploads/v1': 'ARENA_UPLOADS_KEY', 'tactiqo/arena-records/v1': 'ARENA_RECORDS_KEY', 'strategic-game/games-seen': 'GAMES_SEEN_KEY', 'tactiqo/tournament/v1': 'TOURNAMENT_KEY', 'tactiqo/reminders/v1': 'REMINDERS_KEY', 'tactiqo/style/v1': 'STYLE_KEY', 'tactiqo/daily-mix/v1': 'DAILY_MIX_KEY', 'tactiqo/gauntlet/v1': 'GAUNTLET_KEY' };
+    const constants: Record<string, string> = { 'tactiqo/arena-uploads/v1': 'ARENA_UPLOADS_KEY', 'tactiqo/arena-records/v1': 'ARENA_RECORDS_KEY', 'strategic-game/games-seen': 'GAMES_SEEN_KEY', 'tactiqo/tournament/v1': 'TOURNAMENT_KEY', 'tactiqo/reminders/v1': 'REMINDERS_KEY', 'tactiqo/style/v1': 'STYLE_KEY', 'tactiqo/daily-mix/v1': 'DAILY_MIX_KEY', 'tactiqo/gauntlet/v1': 'GAUNTLET_KEY', 'tactiqo/resume/v1': 'RESUME_KEY', 'tactiqo/mastery/v1': 'MASTERY_KEY' };
     for (const k of keys) assert.ok(inventory.includes(`'${k}'`) || (constants[k] && inventory.includes(constants[k])), `${k} is not in DEVICE_DATA`);
   });
 });

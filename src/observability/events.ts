@@ -27,7 +27,7 @@ export interface EventSpec {
   readonly props: Readonly<Record<string, PropSpec>>;
 }
 
-const ONBOARDING_STEP = ['welcome', 'decision', 'reveal', 'map', 'host'] as const;
+const ONBOARDING_STEP = ['envelope', 'read', 'meaning', 'goal', 'table', 'plan'] as const;
 const GAME_SYSTEM = ['classic', 'arena'] as const;
 /** Every way a match is played today: on the device, Game of the Week (server), a friend's challenge link (server). */
 const GAME_MODE = ['practice', 'ranked', 'friend', 'tournament'] as const;
@@ -56,19 +56,24 @@ const LESSON = { lesson_id: 'id', lesson_number: 'int', module: 'id' } as const 
 export const EVENTS = {
   // ── Onboarding ──────────────────────────────────────────────────────────────────────────────────────────────────
   onboarding_step: {
-    trigger: 'A stage of the welcome flow is shown. Since the Tournament: the Host intro (`host`); before it: welcome, the decision against Maya, the reveal, the map.',
+    trigger: 'A part of the welcome ("The First Read") is shown: the sealed envelope and Maya round, the read of the Host, what it means, goal and pace, the rivals, the plan.',
     privacy: 'behaviour',
     props: { step: ONBOARDING_STEP, replay: 'bool' },
   },
   onboarding_finished: {
-    trigger: 'The welcome flow ends: completed (the first match opens, `next: match`) or skipped.',
+    trigger: 'The welcome ends on its last part: `next: match` opens the first Qualifier, `explore` goes to the app. `skipped` when Skip (or Android back from the first part) was used on the way.',
     privacy: 'behaviour',
     props: {
       result: ['completed', 'skipped'],
       at_step: ONBOARDING_STEP,
       /** The first decision's move. A move in a toy game, not a learning record. */
       choice: ['share', 'take'],
-      next: ['lesson', 'explore', 'match'],
+      /** The Host's habit was found (three wins) rather than given away. */
+      read_solved: 'bool',
+      /** The learning goal picked in the welcome (the same setting the Profile shows). */
+      goal: ['anticipating', 'incentives', 'coordination', 'uncertainty', 'none'],
+      daily_minutes: 'int',
+      next: ['explore', 'match'],
       replay: 'bool',
     },
   },

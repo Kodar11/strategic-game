@@ -159,8 +159,8 @@ describe('a scripted first session through the engine', () => {
     t.track('app_ready', { result: 'ready', total_ms: 2400, signed_in: false, onboarded: false });
     t.install(client);
     t.screen(screenOf(['onboarding'], {}));
-    t.track('onboarding_step', { step: 'welcome' });
-    t.track('onboarding_finished', { result: 'completed', at_step: 'map', choice: 'share', next: 'lesson' });
+    t.track('onboarding_step', { step: 'envelope' });
+    t.track('onboarding_finished', { result: 'completed', at_step: 'plan', choice: 'share', read_solved: true, goal: 'incentives', daily_minutes: 5, next: 'explore' });
     t.screen(screenOf(['lesson', '[lessonId]'], { lessonId: 'cooperation-trap' }));
     const lesson = new LessonTracker({ emit, info: { lesson_id: 'cooperation-trap' }, totalSteps: 3, completedBefore: () => false, source: () => 'onboarding' });
     lesson.update(0);

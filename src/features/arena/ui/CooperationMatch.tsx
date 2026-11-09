@@ -30,6 +30,9 @@ import { TournamentResult } from '@/src/features/tournament/ui/TournamentResult'
 import { GauntletResult } from '@/src/features/tournament/ui/GauntletResult';
 import { GameReview } from '@/src/features/review/GameReview';
 import { reviewArena } from '@/src/review/review';
+import { NewStars } from '@/src/features/mastery/RivalDossiers';
+import { ResumedNote } from '@/src/features/resume/ResumedNote';
+import { type SaveTarget, useMatchSaver } from '@/src/features/resume/useMatchSaver';
 import { useArenaMatch } from '../useArenaMatch';
 import { useOpponentRead } from '../useOpponentRead';
 import { CoopResults } from './CoopResults';
@@ -49,8 +52,8 @@ const REPEAT_REVEAL_MS = 1300;
 
 /**
  * A Cooperation Game match: briefing → secret decision → reveal → next round, then a results screen. The engine owns
- * every rule and score; this component only sequences what the player sees. Leaving the screen discards the match —
- * there is no half-resolved round to come back to.
+ * every rule and score; this component only sequences what the player sees. A device match is saved after every
+ * round (src/features/resume) and continues at the next decision when reopened.
  */
 export function CooperationMatch({
   persona,
@@ -65,6 +68,8 @@ export function CooperationMatch({
   tournament,
   replay = false,
   gauntlet,
+  save,
+  resume,
 }: {
   persona: CoopOpponent;
   /** The personality is hidden until the end, with an optional prediction (src/arena/reads.ts). */
@@ -87,10 +92,15 @@ export function CooperationMatch({
   replay?: boolean;
   /** A Gauntlet bout token: the result goes to the run. */
   gauntlet?: string;
+  /** Where a device match is saved while it runs (never for a server match). */
+  save?: SaveTarget;
+  /** A saved match to continue: its actions and locked guess. */
+  resume?: { inputs: unknown; guess: string | null };
 }) {
   const insets = useSafeAreaInsets();
   const setup: CoopSetup = { persona, level, length, variant, seed };
-  const local = useArenaMatch(cooperation, setup);
+  const local = useArenaMatch(cooperation, setup, server ? undefined : resume?.inputs);
+  const [openedAt] = useState(() => Date.now());
   const { state, act, result, newBest } = server ? { ...server, newBest: false } : local;
   // Game Review needs the seed, so practice and tournament matches only (a ranked match's seed stays on the server).
   const review = useMemo(() => (!server && result ? reviewArena(cooperation, setup, state.rounds.map((r, i) => ({ move: r.pi, round: i }))) : null), [server, result, state.rounds, seed]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -105,9 +115,10 @@ export function CooperationMatch({
   const scroll = useRef<ScrollView>(null);
   const g = ARENA.cooperation;
   const h = state.rounds;
-  const read = useOpponentRead('cooperation', persona, mystery, h.length, state.total, cooperation.isOver(state));
+  const read = useOpponentRead('cooperation', persona, mystery, h.length, state.total, cooperation.isOver(state), local.resumed && !server ? (resume?.guess ?? null) : null);
   const name = read.revealed ? COOP_NAME[persona] : 'Your opponent';
   const over = cooperation.isOver(state);
+  useMatchSaver(server ? undefined : save, { seed, inputs: local.actions, count: local.actions.length, guess: read.guess, played: h.length, total: state.total, over });
   // Practice matches only: a ranked match is reported by its own screen (app/games/ranked.tsx).
   useGameTelemetry(server ? null : { game_id: 'cooperation', system: 'arena', mode: tournament ? 'tournament' : 'practice', level, variant, length, mystery }, {
     round: h.length,
@@ -174,7 +185,8 @@ export function CooperationMatch({
       <Backdrop />
       <ScrollView ref={scroll} contentContainerStyle={{ padding: space.lg, paddingTop: insets.top + space.md, paddingBottom: insets.bottom + space.huge }}>
         <View style={styles.column}>
-          <LeaveGuard started={h.length > 0} over={over} />
+          {save && !server ? null : <LeaveGuard started={h.length > 0} over={over} />}
+          {local.resumed && !server && !over ? <ResumedNote /> : null}
           <Row>
             <IconButton icon={ArrowLeft} label="Back" onPress={close} />
             <AppText variant="heading" accessibilityRole="header" style={{ flex: 1 }} numberOfLines={1}>
@@ -198,6 +210,7 @@ export function CooperationMatch({
             <>
               {tournament ? <TournamentResult matchId={tournament} outcome={result.outcome} level={level} readCorrect={read.verdict === 'correct'} debrief={cooperation.debrief(state)} onRematch={onPlayAgain} replay={replay} /> : null}
               {gauntlet ? <GauntletResult token={gauntlet} outcome={result.outcome} /> : null}
+              {server ? null : <NewStars system="arena" game="cooperation" opponent={persona} since={openedAt} />}
               <CoopResults state={state} result={result} newBest={newBest} onRematch={onPlayAgain} onChange={change} onLibrary={() => router.navigate('/games')} read={mystery && read.verdict ? { guess: read.guess, verdict: read.verdict } : null} practice={!tournament && !gauntlet} />
               {review ? <GameReview review={review} /> : null}
             </>

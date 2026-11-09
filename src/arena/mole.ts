@@ -37,12 +37,16 @@ export const NERVOUS_INNOCENT = 0.25;
 export const clueTrue = (v: MoleVariant) => (v === 'blurry' ? 0.6 : 0.75);
 
 /**
- * How telling the evidence is in this match. Easy and Normal use the line's camera rate and the standard tells. Hard
+ * How telling the evidence is in this match. Normal uses the line's camera rate and the standard tells. Easy faces a
+ * careless Mole: the camera catches it EASY_CAMERA_GAIN more often (at most 90 %) and it looks nervous EASY_NERVOUS_MOLE
+ * of the time, so a few clues already point the right way (until 2026-11-09 Easy and Normal were identical). Hard
  * faces a composed Mole: it keeps out of the camera's way (HARD_CAMERA_DROP off the line's rate, never below 56 %) and holds its nerve
  * under questioning (nervous HARD_NERVOUS_MOLE of the time instead of NERVOUS_MOLE). Everyone — you, the innocents and
  * the board's numbers — reasons with these same published rates, so Hard asks for more evidence, not hidden facts.
  * (Until 2026-11-04 difficulty didn't touch the evidence, and exact reasoning won about 77 % at every level.)
  */
+export const EASY_CAMERA_GAIN = 0.08;
+export const EASY_NERVOUS_MOLE = 0.85;
 export const HARD_CAMERA_DROP = 0.08;
 export const HARD_NERVOUS_MOLE = 0.6;
 export interface MoleEvidence {
@@ -51,8 +55,10 @@ export interface MoleEvidence {
   nervousInnocent: number;
 }
 export function moleEvidence(setup: Pick<Setup<MoleVariant, MoleStyle>, 'variant' | 'level'>): MoleEvidence {
-  const hard = setup.level === 'hard';
-  return { camera: hard ? Math.max(0.56, clueTrue(setup.variant) - HARD_CAMERA_DROP) : clueTrue(setup.variant), nervousMole: hard ? HARD_NERVOUS_MOLE : NERVOUS_MOLE, nervousInnocent: NERVOUS_INNOCENT };
+  const base = clueTrue(setup.variant);
+  if (setup.level === 'hard') return { camera: Math.max(0.56, base - HARD_CAMERA_DROP), nervousMole: HARD_NERVOUS_MOLE, nervousInnocent: NERVOUS_INNOCENT };
+  if (setup.level === 'easy') return { camera: Math.min(0.9, base + EASY_CAMERA_GAIN), nervousMole: EASY_NERVOUS_MOLE, nervousInnocent: NERVOUS_INNOCENT };
+  return { camera: base, nervousMole: NERVOUS_MOLE, nervousInnocent: NERVOUS_INNOCENT };
 }
 const evidenceOf = (e: MoleEvidence | MoleVariant): MoleEvidence => (typeof e === 'string' ? { camera: clueTrue(e), nervousMole: NERVOUS_MOLE, nervousInnocent: NERVOUS_INNOCENT } : e);
 export const CASE_POINTS = 10;
@@ -224,10 +230,10 @@ function apply(s: MoleState, a: MoleAction): MoleState {
 
 export const suspectName = (i: number) => CODENAMES[i];
 
-/** Your evidence so far: P(Mole) per suspect from public clues and your interrogations (what a perfect detective would conclude). */
+/** Your evidence so far: P(Mole) per suspect from public clues and your interrogations (what a perfect detective would conclude), at this match's evidence rates. */
 export const playerPosterior = (s: MoleState) =>
   molePosterior(
-    s.setup.variant,
+    moleEvidence(s.setup),
     s.rounds.map((r) => r.clue),
     s.rounds.map((r) => ({ suspect: r.interrogated, nervous: r.nervous })),
   );

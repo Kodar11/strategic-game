@@ -28,6 +28,8 @@ Status words: **Rejected** (not doing it) · **Postponed** (maybe later, after a
 | The Gauntlet as its own top-level mode | Lives inside the Tournament instead (see Reshaped) | 2026-11-09 | — |
 | Copying scripts, characters or scenes from films, games or Nicky Case's work | Copyright. Stories and modes are original works that are only inspired by those sources | 2026-10-30 | — |
 | Mixkit stock music | Its licence excludes video games; Story music is composed in code | 2026-10-30 | — |
+| "Ghost" opponents built from real players' recorded play | Too much for what it adds; the bots and The Crowd are enough | 2026-11-09 | — |
+| Improving the current one-screen Host onboarding step by step | The user wants it thrown out and rebuilt from scratch as the best possible first session, not patched | 2026-11-09 | — |
 
 ## Postponed
 
@@ -46,6 +48,9 @@ Status words: **Rejected** (not doing it) · **Postponed** (maybe later, after a
 | Crash reporting SDK (Sentry) | Privacy policy must change first | 2026-11-04 | Policy updated |
 | Stag Hunt variant / Split or Steal horizon change | Classic games have SQL ports for Game of the Week; rule changes ripple into the server | 2026-11-04 | A server rules-version bump is planned anyway |
 | Read Rush leaderboard | Questions are generated on the device, so scores can't be verified by the server | 2026-11-09 | Server-side question generation |
+| Tournament Season 2 | Mid-match resume, balance and rival mastery come first | 2026-11-09 | Those three are done |
+| New classic games (Colonel Blotto, Dollar Auction) | Library size isn't the bottleneck; later, likely with Season 2 | 2026-11-09 | Season 2 planning |
+| Strategy Puzzles ("find the best move" from engine positions) | Not a separate section: fold it into the Daily rotation (Challenge / Crowd / Read Rush) as a format when built | 2026-11-09 | Next time Daily formats are worked on |
 
 ## Reshaped (done, but not as first pitched)
 
@@ -58,6 +63,11 @@ Status words: **Rejected** (not doing it) · **Postponed** (maybe later, after a
 | Locking most games for newcomers | 8 starter games shown first; the full library opens after a Tournament win or with "Show all". Nothing is locked | No dead ends from lessons, links or the Tournament | 2026-11-09 |
 | Two Ultimatum games in the library | One listed (The Ultimatum Game); the quick classic is reached from its setup screen and still used by Game of the Week and the Tournament | Less clutter, no broken records or server rules | 2026-11-09 |
 | Anonymous accounts | Google sign-in plus guest mode | Real accounts for Daily, the weekly game and progress sync | 2026-11-04 |
+| Rebalance Market (~1 % scripted win rate) and Power Play (~7 %) | Rules kept: the low numbers come from scripted players who ignore the board. A player who reads each round wins Market 86–95 % at every level; a card-counter wins Power Play 41–47 %. A difficulty test (src/arena/__tests__/difficulty.test.ts) now guards every game | The real problems were elsewhere | 2026-11-09 |
+| Mole: weaker evidence on Hard | Hard already had it (since 2026-11-04); Easy now gets clearer evidence (camera +8 points, nervous 85 %), so the levels go 90 / 79 / 62 % for exact reasoning | Easy and Normal were identical | 2026-11-09 |
+| Difficulty inversions found by the new test | Ultimatum Game: Hard Investor/Banker offers capped at Normal's. Coalition: Easy bots invite you when they can. Saboteur: no loyal slips on Easy, Easy Planner/Investigator jam like Normal | For the same player, Hard was easier than Normal (or Normal than Easy) | 2026-11-09 |
+| Persona mastery (audit idea) | Three stars per rival per game (beat, beat on Hard, name it in a mystery match), each opening one dossier page; device-only, nothing locked, no paywall | Simple replay goals without new games | 2026-11-09 |
+| Mid-game resume | Every device match is saved after each move (seed + moves, replayed on return) for 24 h, one per game and context; Continue/Discard on the game screen; no prompt | The OS closing the app lost the match | 2026-11-09 |
 
 ## Open (waiting for the user)
 
@@ -66,7 +76,6 @@ Status words: **Rejected** (not doing it) · **Postponed** (maybe later, after a
 | Analytics consent default | On with a disclosed opt-out (current code) or off until asked | 2026-11-05 |
 | PostHog data on account deletion | Keep pseudonymous data, or delete it through an Edge Function and queue (built, not deployed) | 2026-11-05 |
 | Lifetime purchase (~₹2,499) | Add or skip | 2026-11-07 |
-| Balance of Market (~1% scripted win rate) and Power Play (~7%) in Tournament matches | Rebalance or accept | 2026-11-08 |
 
 ---
 

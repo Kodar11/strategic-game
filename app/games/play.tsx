@@ -7,7 +7,10 @@ import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button } from '@/src/components/ui/Button';
 import { ListOrdered } from '@/src/components/ui/icons';
-import { LeaveGuard } from '@/src/components/game/LeaveGuard';
+import { NewStars } from '@/src/features/mastery/RivalDossiers';
+import { ResumedNote } from '@/src/features/resume/ResumedNote';
+import { cleanParams, contextOf, slotOf, useResume } from '@/src/features/resume/store';
+import { type SaveTarget, useMatchSaver, useSavedMatch } from '@/src/features/resume/useMatchSaver';
 import { MatchHeader, ScoreLine } from '@/src/components/game/MatchChrome';
 import { MatchLog } from '@/src/components/game/MatchLog';
 import { SignInRequiredScreen, useIsGuest } from '@/src/components/auth/SignInRequired';
@@ -70,19 +73,29 @@ export default function PlayScreen() {
   const bot = mystery ? null : p.bot!;
   const tournament = typeof p.t === 'string' && p.t ? p.t : undefined;
   const gauntlet = typeof p.g === 'string' && p.g ? p.g : undefined;
-  return <Practice key={`${p.game}:${bot ?? 'mystery'}:${p.difficulty}`} game={p.game} bot={bot} difficulty={p.difficulty} tournament={tournament} replay={p.r === '1'} gauntlet={gauntlet} />;
+  const target: SaveTarget = { system: 'classic', game: p.game, context: contextOf(p), params: cleanParams({ game: p.game, bot: mystery ? undefined : p.bot, opponent: mystery ? 'mystery' : undefined, difficulty: p.difficulty, t: p.t, r: p.r, g: p.g }) };
+  return <Practice key={`${p.game}:${bot ?? 'mystery'}:${p.difficulty}`} target={target} game={p.game} bot={bot} difficulty={p.difficulty} tournament={tournament} replay={p.r === '1'} gauntlet={gauntlet} />;
 }
 
 /** `bot` null: a mystery opponent. */
-function Practice({ game, bot, difficulty, tournament, replay, gauntlet }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; tournament?: string; replay?: boolean; gauntlet?: string }) {
+function Practice({ target, ...props }: { target: SaveTarget; game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; tournament?: string; replay?: boolean; gauntlet?: string }) {
   const [round, setRound] = useState(0);
-  return <PracticeSession key={round} game={game} bot={bot} difficulty={difficulty} tournament={tournament} replay={replay} gauntlet={gauntlet} onPlayAgain={() => setRound((n) => n + 1)} />;
+  // A match left mid-way on this device continues where it stopped; a rematch (round > 0) starts clean.
+  const { ready, saved } = useSavedMatch(target);
+  if (!ready) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  const again = () => {
+    useResume.getState().clear(slotOf(target.system, target.game, target.context));
+    setRound((n) => n + 1);
+  };
+  return <PracticeSession key={round} {...props} save={target} resume={round === 0 ? saved?.inputs : undefined} onPlayAgain={again} />;
 }
 
-function PracticeSession({ game, bot, difficulty, tournament, replay, gauntlet, onPlayAgain }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; tournament?: string; replay?: boolean; gauntlet?: string; onPlayAgain: () => void }) {
+function PracticeSession({ game, bot, difficulty, tournament, replay, gauntlet, onPlayAgain, save, resume }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; tournament?: string; replay?: boolean; gauntlet?: string; onPlayAgain: () => void; save: SaveTarget; resume?: unknown }) {
   // A Tournament match or a Gauntlet bout: no practice controls (play again, try another opponent).
   const ranked = !!tournament || !!gauntlet;
-  const view = usePracticeMatch(game, bot, difficulty);
+  const view = usePracticeMatch(game, bot, difficulty, resume);
+  const [openedAt] = useState(() => Date.now());
+  useMatchSaver(save, { seed: view.seed ?? 0, inputs: view.snapshot, count: view.rounds.length, guess: view.read?.current?.guess ?? null, played: view.rounds.length, total: view.totalRounds, over: view.done });
   // Game Review replays the match from its seed, so it is computed once, at the end.
   const review = useMemo(() => (view.done && view.seed !== null ? reviewClassic(ENGINES[game], game, { bot: view.bot, difficulty: view.difficulty, seed: view.seed }, view.rounds) : null), [view.done, view.seed, view.bot, view.difficulty, view.rounds, game]);
   const practise = (b: string) => (bot === b ? onPlayAgain() : router.replace({ pathname: '/games/play', params: { game, bot: b, difficulty } }));
@@ -93,6 +106,7 @@ function PracticeSession({ game, bot, difficulty, tournament, replay, gauntlet, 
       result={
         <>
         {gauntlet && view.outcome ? <GauntletResult token={gauntlet} outcome={view.outcome} /> : null}
+        <NewStars system="classic" game={game} opponent={view.bot} since={openedAt} />
         {tournament && view.outcome ? <TournamentResult matchId={tournament} outcome={view.outcome} level={difficulty === 'medium' ? 'normal' : difficulty} readCorrect={view.read?.current?.guess === view.bot} debrief={classicDebrief(view.game, view.bot, view.difficulty, view.rounds)} onRematch={onPlayAgain} replay={replay} /> : null}
         <ResultPanel
           view={view}
@@ -267,8 +281,8 @@ function MatchLayout({ view, result, tournament }: { view: MatchView; result: Re
       <Backdrop />
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: insets.top + space.xs, paddingBottom: insets.bottom + space.huge }} keyboardShouldPersistTaps="handled">
         <View style={styles.column}>
-          {view.mode === 'practice' ? <LeaveGuard started={view.rounds.length > 0} over={view.done} /> : null}
-          <MatchHeader title={g.title} meta={`${hidden ? MYSTERY_NAME : (personality(view.game, view.bot)?.name ?? view.bot)} · ${DIFFICULTY_LABEL[view.difficulty]} · ${view.mode === 'competition' ? 'Game of the Week' : view.mode === 'challenge' ? 'Friend challenge' : tournament ? 'Tournament' : 'Practice'}`} progress={`Round ${Math.min(view.rounds.length + (view.done ? 0 : 1), view.totalRounds)}/${view.totalRounds}`} backLabel={view.mode === 'practice' || view.done ? 'Back' : 'Leave — you can resume this match later'} onBack={close} />
+          {view.resumed && !view.done ? <ResumedNote /> : null}
+          <MatchHeader title={g.title} meta={`${hidden ? MYSTERY_NAME : (personality(view.game, view.bot)?.name ?? view.bot)} · ${DIFFICULTY_LABEL[view.difficulty]} · ${view.mode === 'competition' ? 'Game of the Week' : view.mode === 'challenge' ? 'Friend challenge' : tournament ? 'Tournament' : 'Practice'}`} progress={`Round ${Math.min(view.rounds.length + (view.done ? 0 : 1), view.totalRounds)}/${view.totalRounds}`} backLabel={view.done ? 'Back' : 'Leave — you can resume this match later'} onBack={close} />
           {view.done ? null : <ScoreLine you={view.totals.player} rival={view.totals.bot} rivalName={botName} />}
           {tournament ? <TournamentThought matchId={tournament} played={view.rounds.length} total={view.totalRounds} over={view.done} /> : null}
           {tournament && !view.done ? <TournamentHint matchId={tournament} /> : null}

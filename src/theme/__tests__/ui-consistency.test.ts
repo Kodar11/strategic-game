@@ -51,12 +51,10 @@ describe('navigation terms', () => {
   });
 
   it('onboarding names the tabs exactly as the tab bar does', () => {
-    const world = read('src', 'features', 'onboarding', 'ui', 'WorldStage.tsx');
-    const overlines = [...world.matchAll(/<PillarText overline="([^"]+)"/g)].map((m) => m[1]);
-    assert.deepEqual(overlines, ['Lessons', 'Games', 'Stories']);
-    // Stories live inside the Lessons tab; the other pillars are tabs.
-    for (const t of overlines) assert.ok(titles.includes(t) || (t === 'Stories' && /Stories, in the Lessons tab/.test(world)), t);
-    for (const m of world.matchAll(/accessibilityLabel=\{`(\w+) tab\./g)) assert.ok(titles.includes(m[1]), m[1]);
+    const table = read('src', 'features', 'onboarding', 'ui', 'TableStep.tsx');
+    const places = [...table.matchAll(/where: '([^']+)'/g)].map((m) => m[1].replace(/ tab$/, ''));
+    assert.ok(places.length >= 3);
+    for (const p of places) assert.ok(titles.includes(p), p);
   });
 
   it('no screen refers to a tab that doesn’t exist', () => {

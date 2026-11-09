@@ -5,9 +5,11 @@ import { type ClassicServerMatch, GameError, type ServerMatch } from '@/src/data
 import { toDataError } from '@/src/data/errors';
 import { type Difficulty, type GameId, type Outcome, type Totals, randomSeed } from '@/src/games/core';
 import { engineFor } from '@/src/games/registry';
+import { useMastery } from '@/src/features/mastery/store';
 import { useStyle } from '@/src/features/style/store';
 import { type ReadLock, lockRead, pickHidden, readIsAwaited, readIsOpen, readMinRounds, readPoints } from '@/src/games/reads';
 import type { OpponentMode } from '@/src/games/rps-insight';
+import { type PracticeSnapshot, restorePractice } from '@/src/features/resume/practice';
 
 /**
  * One match, whatever runs it. Practice: the engine on the device, with a fresh seed. Competition and challenge: the
@@ -43,6 +45,10 @@ export interface MatchView {
    * `awaiting`: every round is played but the reveal waits (`done` is still false) until the player reads or skips.
    */
   read: { current: ReadLock | null; open: boolean; awaiting: boolean; lock: (guess: string) => void; skip: () => void } | null;
+  /** Practice only: the driver's state, saved while the match runs so it can be continued. */
+  snapshot?: PracticeSnapshot;
+  /** Practice only: this match was continued from a saved snapshot. */
+  resumed?: boolean;
 }
 
 function uuid(): string {
@@ -56,10 +62,13 @@ function uuid(): string {
 /**
  * A practice match on the device, with a fresh seed. Remount it (a new React key) to play again. A null `choice` is a
  * mystery match: the opponent is picked here, at random, and kept hidden until the end (rules in src/games/reads.ts).
+ * `resume`: a saved snapshot of this driver (src/features/resume); used only when it fits this game and opponent.
  */
-export function usePracticeMatch(game: GameId, choice: string | null, difficulty: Difficulty): MatchView {
+export function usePracticeMatch(game: GameId, choice: string | null, difficulty: Difficulty, resume?: unknown): MatchView {
   const engine = engineFor(game);
-  const [current, setState] = useState(() => {
+  const [restored] = useState(() => (resume === undefined ? null : restorePractice(engine.bots, engine.rounds, choice, resume)));
+  const [current, setState] = useState<PracticeSnapshot>(() => {
+    if (restored) return restored;
     const chosen = choice !== null && engine.bots.includes(choice);
     const bot = chosen ? choice : pickHidden(engine.bots, Math.random());
     const mode: OpponentMode = chosen ? 'chosen' : 'mystery';
@@ -83,6 +92,7 @@ export function usePracticeMatch(game: GameId, choice: string | null, difficulty
     const reads = { opponent: mode, prediction: read?.guess ?? null, insightPoints: readPoints(read, bot)?.points ?? null };
     void useGames.getState().recordPractice({ id: uuid(), game, bot, difficulty, playerScore: totals.player, botScore: totals.bot, outcome: outcome!, ...reads });
     useStyle.getState().record(game, current.rounds);
+    useMastery.getState().record({ system: 'classic', game, opponent: bot, level: difficulty, outcome: outcome!, readCorrect: mode === 'mystery' && read?.guess === bot });
   }, [done, game, bot, mode, read, difficulty, totals.player, totals.bot, outcome, current.rounds]);
 
   const play = (move: unknown) => {
@@ -117,6 +127,8 @@ export function usePracticeMatch(game: GameId, choice: string | null, difficulty
     seed: current.seed,
     opponent: mode,
     read: mode === 'mystery' ? { current: read, open: readIsOpen(read, readState, minRounds), awaiting, lock, skip } : null,
+    snapshot: current,
+    resumed: restored !== null,
   };
 }
 

@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
+import { RivalDossiers } from '@/src/features/mastery/RivalDossiers';
+import { ContinueMatchCard, discardPractice } from '@/src/features/resume/ContinueMatchCard';
 import { Card, SectionLabel } from '@/src/components/ui/Card';
 import { ChoiceCard } from '@/src/components/ui/ChoiceCard';
 import { ArrowLeft, ChevronDown, CircleCheck, CircleX, Play, Target, UserPlus } from '@/src/components/ui/icons';
@@ -74,10 +76,12 @@ export default function GameScreen() {
   const mystery = bot === null;
   const play = () => {
     markSeen(gameId);
+    discardPractice('classic', gameId);
     router.push({ pathname: '/games/play', params: mystery ? { game: gameId, opponent: 'mystery', difficulty } : { game: gameId, bot, difficulty } });
   };
   const practise = (h: HistoryItem) => {
     markSeen(gameId);
+    discardPractice('classic', gameId);
     router.push({ pathname: '/games/play', params: { game: gameId, bot: h.bot, difficulty: h.difficulty } });
   };
 
@@ -161,10 +165,12 @@ export default function GameScreen() {
             )}
           </Card>
 
+          <ContinueMatchCard system="classic" game={gameId} />
           <Button label={bot === null ? `Play · ${MYSTERY_NAME.toLowerCase()}` : `Play vs ${personality(gameId, bot)?.name ?? bot}`} icon={Play} onPress={play} />
           <AppText variant="caption" color={colors.textMuted} align="center">
             {DIFFICULTY_LABEL[difficulty]} · {ENGINES[gameId].rounds} rounds
           </AppText>
+          <RivalDossiers system="classic" game={gameId} />
 
           <Pressable onPress={() => setCustomOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: customOpen }} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44 }}>
             <AppText variant="small" weight="semibold" color={colors.primaryText} style={{ flex: 1 }}>

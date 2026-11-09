@@ -356,7 +356,7 @@ function ProgressSection() {
       <Pressable
         onPress={() => router.push('/onboarding')}
         accessibilityRole="button"
-        accessibilityLabel="Replay the introduction. The Host’s welcome to the Tournament. Your progress isn’t affected."
+        accessibilityLabel="Replay the introduction. The Host’s envelope, the rivals and your first week. Your progress isn’t affected."
         style={({ pressed }) => [styles.navRow, { marginTop: space.sm }, pressed && { backgroundColor: colors.surfaceHigh }]}>
         <View style={styles.navIcon}>
           <Sparkles size={18} color={colors.primaryText} />
@@ -364,7 +364,7 @@ function ProgressSection() {
         <View style={{ flex: 1, gap: 2 }}>
           <AppText variant="bodyStrong">Replay the introduction</AppText>
           <AppText variant="small" color={colors.textMuted}>
-            The Host’s welcome to the Tournament. Your progress isn’t affected.
+            The Host’s envelope, the rivals and your first week. Your progress isn’t affected.
           </AppText>
         </View>
         <ChevronRight size={20} color={colors.textMuted} />

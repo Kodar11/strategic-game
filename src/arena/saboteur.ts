@@ -13,7 +13,7 @@ import { type ArenaEngine, CODENAMES, type Debrief, LENGTH_ROUNDS, type Setup, c
  * 3. Each team member secretly plays a card: 0–3 energy from their own budget (ENERGY_PER_MISSION × missions to start),
  *    or — the saboteur only — a JAM card worth −1 that costs no energy.
  * 4. Only the total is revealed — never the cards. A jam looks exactly like weak effort; loyal bots sometimes play a
- *    card lower than planned (25 %, seeded), so one bad total proves nothing.
+ *    card lower than planned (25 %, seeded; never on Easy), so one bad total proves nothing.
  *    Total ≥ target: success (+2 to you). Otherwise: failure (+2 to the saboteur).
  * After the last mission you accuse one bot. Right: +3 to you. Wrong: +3 to the saboteur. More points wins.
  *
@@ -88,10 +88,17 @@ const mostSuspicious = (sus: number[], among: number[], tie: number) => [...amon
  * to come, and 25 % of the time (seeded) one lower — honest crews have off days too. The saboteur uses the same card
  * when it plays clean.
  */
+/**
+ * How often a loyal bot plays one card lower than planned. Easy: never, so a weak total points at the saboteur (rules v2,
+ * 2026-11-09: before, Easy saboteurs jammed freely behind the same noise and a careful player won less on Easy than on
+ * Normal). Normal and Hard: 25 %, so one bad total proves nothing.
+ */
+export const LOYAL_SLIP: Record<Setup['level'], number> = { easy: 0, normal: 0.25, hard: 0.25 };
+
 function loyalCard(s: SaboteurState, seat: number, n: number): number {
   const left = s.missions - n;
   const target = missionTarget(s, n);
-  const want = (target >= 7 ? 3 : 2) - (draw(s.setup.seed, n, 10 + seat) < 0.25 ? 1 : 0);
+  const want = (target >= 7 ? 3 : 2) - (draw(s.setup.seed, n, 10 + seat) < LOYAL_SLIP[s.setup.level] ? 1 : 0);
   const reserve = Math.floor(s.energy[seat] / Math.max(1, left)) + 1;
   return clamp(Math.min(want, reserve), 0, Math.min(MAX_CARD, s.energy[seat]));
 }
@@ -106,10 +113,9 @@ function expectedOthers(s: SaboteurState): number {
  * The saboteur's card on a mission it is on.
  *
  * Mission Planner — plays the perfect crew member: full cards early, and jams only when it needs failures to win —
- *   Easy: only on the final mission; Normal: from the second half, whenever successes lead failures; Hard: the same,
- *   but never on a mission it leads, and never twice in a row.
- * Investigator — jams often and deflects: Easy on every mission it's on; Normal and Hard on every other one (Hard skips a
- *   jam right after a failed mission, when eyes are on the team).
+ *   from the second half, whenever successes lead failures; Hard also never jams on a mission it leads, nor twice in a row.
+ * Investigator — jams often and deflects: on every other mission it's on (Hard skips a jam right after a failed mission,
+ *   when eyes are on the team).
  * Opportunist — jams only when the jam decides the mission: it estimates the other two cards from what it has seen, and
  *   jams if the mission would succeed without the jam but fail with it. Easy just jams half the time (seeded).
  * Deceiver — clean when it leads (the leader draws attention), jams when someone else leads; Hard also stops after two
@@ -127,17 +133,14 @@ export function saboteurCard(s: SaboteurState, n: number, u: number): number {
   const jammedLast = lastOn ? lastOn.cards[me] === JAM : false;
   const fails = h.filter((m) => !m.success).length;
   const wins = h.length - fails;
-  const finalMission = n === s.missions - 1;
 
   if (persona === 'planner') {
-    if (level === 'easy') return finalMission ? JAM : MAX_CARD <= s.energy[me] ? MAX_CARD : normal;
     const late = n >= Math.floor(s.missions / 2);
     const need = wins >= fails;
     if (level === 'hard' && (leading || jammedLast)) return normal;
     return late && need ? JAM : Math.min(MAX_CARD, s.energy[me]);
   }
   if (persona === 'investigator') {
-    if (level === 'easy') return JAM;
     const myMissions = onTeam.length;
     if (level === 'hard' && h.length && !h[h.length - 1].success) return normal;
     return myMissions % 2 === 0 ? JAM : normal;

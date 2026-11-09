@@ -1,46 +1,57 @@
-# First-session experience
+# First-session experience: "The First Read"
 
-`app/onboarding.tsx`, shown once per device above the tabs, and again on request from **Settings → Replay the introduction**.
+`app/onboarding.tsx`. It opens once per device above the tabs, and again from **Settings → Replay the introduction**.
+It replaced the one-screen Host welcome on 2026-11-09; the user chose to rebuild it from scratch (see `docs/DECISIONS.md`).
 
-| Stage | What happens |
-| --- | --- |
-| Welcome | One headline and one action, with a branching-paths animation. "Skip to the app" leaves immediately. |
-| Decision | Share or take against Maya, one round, with all four outcomes shown before choosing. |
-| Reveal | Both moves, the coins, what happened, and why Maya chose that way. "Go deeper" adds her incentives, the outcome table, labelled hypotheticals and what changes when players meet again. "Play it again" restarts with the same rules. |
-| World + next step | Learn, Games and Stories previews named after the tabs (Learn also counts the decision scenarios), built from the live catalog, then one recommended lesson or "Explore on my own". |
+**Goal:** in about ninety seconds a new player has played twice, been read by the Host, read the Host back, seen what
+it means in real life, said what they want, met the rivals, had every usual doubt answered, and is in their first
+Qualifier match.
 
-## The dilemma (`src/features/onboarding/dilemma.ts`)
+| # | Part (`step`) | What happens | Doubt it answers |
+| --- | --- | --- | --- |
+| 1 | Envelope (`envelope`) | The Host seals a prediction. The player plays one Share-or-Take round against Maya, with all four outcomes shown first. Moves are revealed, then the envelope opens a beat later, with a haptic and a sound. | "What is this?" "Is it fun?" |
+| 2 | Read (`read`) | Rock-Paper-Scissors against the Host, whose habit is Rock, Paper, Scissors in order. Three wins find it. After 6 rounds the Host gives the habit away. A hint appears after two rounds without two wins in a row. | "Is it too hard?" |
+| 3 | Meaning (`meaning`) | "You read a person, and got read back." Three everyday scenes, then the promise line with the app's name. | "Why is this useful?" |
+| 4 | Goal (`goal`) | One learning goal (saved as the existing `goal`, which the Profile shows) and a daily pace (2, 5 or 10+ minutes). | "Is it for me?" |
+| 5 | Table (`table`) | The five rivals, one at a time (portrait, epithet, taunt), the season path (Qualifiers → five rivals → the Final against the Host, then the Gauntlet), and what else is inside and where. | "Will I get bored?" |
+| 6 | Plan (`plan`) | Fair questions (free, ads, account, maths, data), a first week built from the goal and pace, then **Enter the Qualifiers** or **Look around first**. | "What's the catch?" "What now?" |
 
-This is a one-shot Prisoner's Dilemma, measured in coins:
+Rules and copy live outside the screens:
 
-| | Maya shares | Maya takes |
-| --- | --- | --- |
-| **You share** | 3 / 3 | 0 / 5 |
-| **You take** | 5 / 0 | 1 / 1 |
+- `src/features/onboarding/flow.ts`: steps, the envelope, the Host's habit, the plan and the saved place. It is pure and tested.
+- `src/features/onboarding/script.ts`: every word. Rewrite the copy there.
+- `src/features/onboarding/dilemma.ts`: the Maya round, unchanged from the earlier welcome.
 
-Maya's rule: she plays only for her own coins in this single meeting, so she picks her dominant move (take). `mayaDecides()`
-takes no arguments, which means it can't see your choice. Her move is sealed when the round starts and stays hidden until you lock
-in. The dilemma uses no randomness. The module has no imports, so it can't read or write saved progress, and it doesn't touch
-any game engine. Tests are in `src/features/onboarding/__tests__/`.
+## Rules the copy must keep
 
-## Persistence
+- **No statistics about other players** unless they come from real data. The Host guesses; it never says "7 in 10". A test checks this.
+- **No IQ, "brain score" or cognitive-benefit claims.** This was rejected for legal reasons. A test checks it too.
+- **The fair answers must stay true.** Update them the day billing (Pro), ads or account rules change. Today: everything is free to play, there are no ads, guest play needs no account, and usage stats are shared only after the player says yes (UsageConsentCard, after the welcome).
+- The "Also inside" chips name a real place (`Home`, `Lessons tab`, `Games tab`). `ui-consistency.test.ts` checks that the names match the tab bar.
 
-The welcome uses the existing `settings.onboarded` flag (`src/store/settings.ts`), which is stored locally:
+## Navigation and saving
 
-- The flag is set only when the person leaves the welcome (skip, finish or Android back on the first screen).
-- If a session is interrupted, the welcome simply shows again on the next launch.
-- A save from before onboarding existed counts as onboarded, so existing users never see it.
-- The nickname and learning-goal steps from the earlier welcome are still available in Settings, Profile and the Games tab.
+- **Skip** (top right, parts 1–5) jumps to the plan, which still ends in the first match.
+- **Back** (top left) goes to the previous part.
+- **Android back** goes to the previous part. From part 1 it goes to the plan; in a replay it closes the welcome.
+- The place in the flow and the answers so far are saved in AsyncStorage (`onboarding.flow.v1`) after every change, so if the OS closes the app half-way, it resumes there. The save is cleared when the welcome ends. A replay always starts at part 1 and saves nothing until it ends.
+- `settings.onboarded` is set only when the welcome ends (either button on the plan). A save from before onboarding existed counts as onboarded.
+- The first Qualifier opens at the level its content sets (Easy). The read in part 2 doesn't change it.
 
-## Not done yet: validation with new users
+## Events (`src/observability/events.ts`)
 
-None of the following has been carried out:
+- `onboarding_step { step, replay }` for each part shown.
+- `onboarding_finished { result: completed | skipped, at_step, choice, read_solved, goal, daily_minutes, next: match | explore, replay }`.
 
-- Testing the flow with people who haven't used the app. After they finish, without explaining anything beforehand, ask them to:
-  1. Say what Tactiqo offers.
-  2. Say why Maya took.
-  3. Say what they learned.
-  4. Choose what to try next.
-- Analytics. The app has no analytics infrastructure, and none was added. Useful measures would be start and completion, skip
-  rate, time to lock-in, how many people tap the recommended lesson, and whether they start a second activity. Collect them
-  only if an approved analytics layer is added.
+These give the funnel: start → each part → finish → first match (`tournament_match_finished`).
+
+## Not done yet
+
+- **Testing with people who haven't used the app.** After they finish, without explaining anything first, ask them:
+  1. What is this app?
+  2. Who is it for?
+  3. Why did Maya take?
+  4. What would you do next?
+- **Testing on a real device**, including haptics, sound on Android and the resume after the OS closes the app. It has only been checked on web.
+- **Keeping the first-week plan after the welcome.** Home doesn't show the plan yet. Day 1 (Qualifiers) and day 2 (Daily, then the first rival) already match what Home offers.
+- **The paywall slots** (after the plan, and after the Qualifiers) are planned but not built. Billing is postponed until D7 retention is around 15%.

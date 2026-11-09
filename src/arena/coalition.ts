@@ -182,11 +182,16 @@ function split(s: CoalitionState, proposer: number, members: number[], partnerSh
  *   partner already turned down) and avoids a clear leader.
  * Fair Negotiator — the smallest-seat minimal winning coalition, split by seats (rounded; the remainder to itself). Hard
  *   picks, among equally small coalitions, one without a clear leader.
+ * Easy, everyone: chooses only among coalitions that include you, when there is one. (Rules v2, 2026-11-09: before, bots
+ *   on Easy passed cheap bills among themselves and a fair negotiator won less often on Easy than on Hard.)
  */
 export function coalitionPropose(s: CoalitionState, seat: number): Proposal {
   const persona = s.seats[seat]!;
   const { level } = s.setup;
-  const options = minimalWinning(s, seat);
+  // Easy is a friendly table: every bot invites you whenever a winning coalition with you exists.
+  const all = minimalWinning(s, seat);
+  const withYou = level === 'easy' ? all.filter((c) => c.includes(0)) : [];
+  const options = withYou.length ? withYou : all;
   const bySeats = [...options].sort((a, b) => seatsOf(s, a) - seatsOf(s, b) || a.length - b.length);
   const prop = (members: number[]) => (m: number) => proportional(s, members, m);
 

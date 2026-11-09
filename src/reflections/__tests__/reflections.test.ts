@@ -8,6 +8,7 @@ import { ARENA_IDS, type ArenaGameId, LENGTHS, LEVELS } from '../../arena/core.t
 import { lastStand, teammatePlan } from '../../arena/last-stand.ts';
 import { PRICE_MAX, PRICE_MIN } from '../../arena/market.ts';
 import { ARENA_ENGINES } from '../../arena/registry.ts';
+import { saboteur, saboteurPrompt } from '../../arena/saboteur.ts';
 import { signalPrompt } from '../../arena/signal.ts';
 import { ultPrompt, ultimatumGame } from '../../arena/ultimatum-game.ts';
 import { LESSON_IDS } from '../../content/lessons.ts';
@@ -150,6 +151,23 @@ function* sweep(): Generator<{ game: ReflectionGame; record: unknown }> {
       s = ultimatumGame.apply(s, p.terms.proposer === 'player' ? Math.floor(p.terms.pool / 2) : p.botOffer! > p.terms.walkPlayer ? 'accept' : 'reject');
     }
     yield { game: 'ultimatum-game', record: s };
+  }
+  // A crew member who spends energy to each mission's target and benches the saboteur whenever they lead — the way an
+  // operation ends with every mission a success (since Easy saboteurs jam behind no noise, the sweep above rarely does).
+  for (let seed = 1; seed <= 30; seed++) {
+    let s: any = saboteur.create({ persona: 'deceiver', level: 'easy', length: 'short', variant: 'standard', seed });
+    while (!saboteur.isOver(s)) {
+      const p = saboteurPrompt(s)!;
+      if (p.phase === 'accuse') {
+        s = saboteur.apply(s, { kind: 'accuse', suspect: s.saboteur });
+        continue;
+      }
+      const left = s.missions - s.history.length;
+      const need = Math.max(0, p.target - 4);
+      const card = Math.max(0, Math.min(3, p.energy, Math.max(need, Math.min(2, p.energy)), Math.max(need, p.energy - 2 * (left - 1))));
+      s = saboteur.apply(s, { kind: 'mission', card, bench: p.leader === 0 ? s.saboteur : undefined });
+    }
+    yield { game: 'saboteur', record: s };
   }
 }
 

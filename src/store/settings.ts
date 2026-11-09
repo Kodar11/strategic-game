@@ -14,7 +14,7 @@ export interface Settings {
   narration: boolean;
   /** Short sound cues on tournament wins, losses, rivals beaten and key cards. On for new installs. */
   sounds: boolean;
-  /** The first-session welcome (one decision against Maya, then a recommended lesson) was finished or skipped here. */
+  /** The first-session welcome ("The First Read", app/onboarding.tsx) was finished or skipped here. */
   onboarded: boolean;
   /**
    * "Share usage and crash data". A device preference, so it survives signing out, switching accounts
