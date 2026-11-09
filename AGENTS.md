@@ -1,5 +1,11 @@
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
+## Product ideas: check the decisions log first
+
+Before suggesting any new feature, mode, game or product change, read `docs/DECISIONS.md`. Don't re-propose an idea it
+lists as Rejected or Postponed unless its "Revisit if" / trigger has come true (say which). When the user rejects,
+postpones or reshapes an idea, add a one-line row there in the same turn.
+
 ## Expo has changed — do not trust your training data
 
 Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
