@@ -57,7 +57,13 @@
       "expo-sharing",
       "expo-secure-store",
       "expo-web-browser",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "color": "#081220"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -12,6 +12,8 @@ export interface Settings {
   haptics: boolean;
   /** Spoken narration and character voices. On for new installs. */
   narration: boolean;
+  /** Short sound cues on tournament wins, losses, rivals beaten and key cards. On for new installs. */
+  sounds: boolean;
   /** The first-session welcome (one decision against Maya, then a recommended lesson) was finished or skipped here. */
   onboarded: boolean;
   /**
@@ -21,9 +23,9 @@ export interface Settings {
   usageConsent: UsageConsent;
 }
 
-export const DEFAULT_SETTINGS: Settings = { reduceMotion: false, haptics: true, narration: true, onboarded: false, usageConsent: 'unset' };
+export const DEFAULT_SETTINGS: Settings = { reduceMotion: false, haptics: true, narration: true, sounds: true, onboarded: false, usageConsent: 'unset' };
 
-const BOOLEAN_KEYS = ['reduceMotion', 'haptics', 'narration', 'onboarded'] as const;
+const BOOLEAN_KEYS = ['reduceMotion', 'haptics', 'narration', 'sounds', 'onboarded'] as const;
 
 /**
  * The consent stored by a save, including saves from before `usageConsent` existed. Those had a boolean

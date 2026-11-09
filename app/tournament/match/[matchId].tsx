@@ -162,7 +162,7 @@ function Goal({ done, label }: { done: boolean; label: string }) {
 const styles = StyleSheet.create({
   column: { maxWidth: MAX_CONTENT_WIDTH, width: '100%', alignSelf: 'center', gap: space.lg },
   intel: { gap: space.sm, padding: space.lg, borderRadius: radius.lg, borderLeftWidth: 3, backgroundColor: colors.surface },
-  link: { flexDirection: 'row', alignItems: 'center', gap: space.xs, minHeight: 36 },
+  link: { flexDirection: 'row', alignItems: 'center', gap: space.xs, minHeight: 44 },
   starsPanel: { gap: space.sm, padding: space.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgRaised },
   tick: { width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' },
 });

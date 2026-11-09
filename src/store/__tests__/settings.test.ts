@@ -6,17 +6,17 @@ import { DEFAULT_SETTINGS, consentFromSave, sanitizeSettings } from '../settings
 
 describe('Settings persistence', () => {
   it('a new install has haptics and narration on, in-app reduce motion off and onboarding still to do', () => {
-    assert.deepEqual(sanitizeSettings(undefined), { reduceMotion: false, haptics: true, narration: true, onboarded: false, usageConsent: 'unset' });
+    assert.deepEqual(sanitizeSettings(undefined), { reduceMotion: false, haptics: true, narration: true, sounds: true, onboarded: false, usageConsent: 'unset' });
     assert.deepEqual(sanitizeSettings(null), DEFAULT_SETTINGS);
   });
 
   it('saved preferences survive a restart', () => {
-    const saved = JSON.parse(JSON.stringify({ reduceMotion: true, haptics: false, narration: false, onboarded: true }));
-    assert.deepEqual(sanitizeSettings(saved), { reduceMotion: true, haptics: false, narration: false, onboarded: true, usageConsent: 'unset' });
+    const saved = JSON.parse(JSON.stringify({ reduceMotion: true, haptics: false, narration: false, sounds: false, onboarded: true }));
+    assert.deepEqual(sanitizeSettings(saved), { reduceMotion: true, haptics: false, narration: false, sounds: false, onboarded: true, usageConsent: 'unset' });
   });
 
   it('a save from before onboarding existed is treated as a returning user', () => {
-    assert.deepEqual(sanitizeSettings({ reduceMotion: true, haptics: false, narration: true }), { reduceMotion: true, haptics: false, narration: true, onboarded: true, usageConsent: 'unset' });
+    assert.deepEqual(sanitizeSettings({ reduceMotion: true, haptics: false, narration: true }), { reduceMotion: true, haptics: false, narration: true, sounds: true, onboarded: true, usageConsent: 'unset' });
   });
 
   it('analytics consent defaults to unset, and only an explicit choice is kept', () => {

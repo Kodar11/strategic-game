@@ -20,7 +20,9 @@ export interface LibraryGroup {
 export const LIBRARY_GROUPS: LibraryGroup[] = [
   { id: 'trust', title: 'Cooperation and trust', blurb: 'What you can build together, and what tempts you not to.', games: [classic('split-steal'), classic('stag-hunt'), arena('cooperation'), arena('travelers'), arena('commons')] },
   { id: 'bluff', title: 'Bluffing and reading', blurb: 'Claims, habits and who to believe.', games: [classic('rps'), arena('bluff'), arena('liars-dice'), arena('power-play'), arena('signal'), arena('inspector')] },
-  { id: 'bargain', title: 'Bargaining and alliances', blurb: 'Who gets what, and who has the power to say no.', games: [arena('ultimatum-game'), classic('ultimatum'), arena('coalition')] },
+  // One Ultimatum in the library: The Ultimatum Game. The quick classic version stays playable (Game of the Week,
+  // Tournament matches, old links) and is reached from The Ultimatum Game's setup screen (RELATED below).
+  { id: 'bargain', title: 'Bargaining and alliances', blurb: 'Who gets what, and who has the power to say no.', games: [arena('ultimatum-game'), arena('coalition')] },
   { id: 'market', title: 'Markets and crowds', blurb: 'Your best move depends on everyone else’s.', games: [classic('two-thirds'), arena('auction'), arena('market')] },
   { id: 'deduce', title: 'Deduction and teamwork', blurb: 'Hidden facts, shared problems and weak clues.', games: [arena('mole'), arena('saboteur'), arena('defusal'), arena('codebreaker')] },
   { id: 'risk', title: 'Risk under pressure', blurb: 'Decide with the odds in front of you.', games: [arena('gambit'), arena('last-stand')] },
@@ -45,3 +47,13 @@ export const relatedTo = (e: LibraryEntry) => RELATED[`${e.kind}:${e.id}`] ?? nu
 export const entryHref = (e: LibraryEntry) => (e.kind === 'classic' ? (`/games/${e.id}` as const) : (`/arena/${e.id}` as const));
 
 export const LIBRARY_COUNT = LIBRARY_GROUPS.reduce((t, g) => t + g.games.length, 0);
+
+/** Library games that are reached only from another game's setup screen, not listed on their own. */
+export const UNLISTED: readonly LibraryEntry[] = [classic('ultimatum')];
+
+/**
+ * Where a newcomer starts: eight short, varied games, one or two per idea. The full library opens once they've won a
+ * Tournament match, or with one tap ("Show all games"). Nothing is locked: lessons, the Tournament and links still
+ * open any game.
+ */
+export const STARTER_GAMES: readonly LibraryEntry[] = [classic('rps'), classic('split-steal'), arena('cooperation'), classic('stag-hunt'), arena('ultimatum-game'), classic('two-thirds'), arena('mole'), arena('liars-dice')];

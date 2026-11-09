@@ -14,6 +14,7 @@ import { CalendarLegend, MonthCalendar } from '@/src/features/daily/Calendar';
 import { DAY_STATE_LABEL, type DayState, completionSummary, dayState } from '@/src/features/daily/day-state';
 import type { DailyRange } from '@/src/features/daily/content';
 import { type Day, type Month, addMonths, compareMonths, dayLabel, formatDay, monthKey, monthLabel, monthOf } from '@/src/features/daily/dates';
+import { FORMAT_LINE, FORMAT_NAME, crowdQuestionFor, dailyFormat } from '@/src/daily-mix/schedule';
 import { MAX_CONTENT_WIDTH, colors, radius, space } from '@/src/theme/tokens';
 
 const DIFFICULTY = { 1: 'Warm-up', 2: 'Standard', 3: 'Tricky' } as const;
@@ -143,15 +144,18 @@ function TodayCard({ today, state, loading, failed }: { today: Day; state: Daily
   const entry = state.entries.get(formatDay(today));
   const attempt = state.attempts.get(formatDay(today));
   if (!entry && !attempt) {
+    // No published challenge: today's Daily is The Crowd or Read Rush (src/daily-mix/schedule.ts).
+    const format = dailyFormat(today, false) as 'crowd' | 'rush';
     return (
-      <Card style={{ gap: space.xs }}>
-        <AppText variant="overline" color={colors.textMuted}>
-          Today · {dayLabel(today, today)}
+      <Card style={{ gap: space.sm }}>
+        <AppText variant="overline" color={colors.insight}>
+          Today · {FORMAT_NAME[format]}
         </AppText>
-        <AppText variant="bodyStrong">No challenge today</AppText>
+        <AppText variant="bodyStrong">{format === 'crowd' ? crowdQuestionFor(today).title : 'Read the bots, beat the clock'}</AppText>
         <AppText variant="small" color={colors.textMuted}>
-          Nothing was published for today. Earlier challenges below are open for review and practice.
+          {FORMAT_LINE[format]}
         </AppText>
+        <Button label={format === 'crowd' ? 'Open The Crowd' : 'Start Read Rush'} compact icon={ArrowRight} onPress={() => router.push(format === 'crowd' ? '/daily/crowd' : '/daily/rush')} style={{ alignSelf: 'flex-start' }} />
       </Card>
     );
   }

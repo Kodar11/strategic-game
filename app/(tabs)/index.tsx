@@ -13,6 +13,7 @@ import { Settings } from '@/src/components/ui/icons';
 import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { SignInInvite } from '@/src/features/account/SignInInvite';
 import { DailyRow } from '@/src/features/daily/DailyRow';
+import { ReminderOffer } from '@/src/features/reminders/ReminderOffer';
 import { UsageConsentCard } from '@/src/features/settings/UsageConsentCard';
 import { TournamentHome } from '@/src/features/tournament/ui/TournamentHome';
 import { WeeklyRival } from '@/src/features/tournament/ui/WeeklyRival';
@@ -59,6 +60,7 @@ export default function Home() {
             </AppText>
             <DailyRow />
             <WeeklyRival />
+            <ReminderOffer />
           </Animated.View>
 
           <UsageConsentCard />

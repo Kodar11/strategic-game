@@ -5,6 +5,7 @@ import { type ClassicServerMatch, GameError, type ServerMatch } from '@/src/data
 import { toDataError } from '@/src/data/errors';
 import { type Difficulty, type GameId, type Outcome, type Totals, randomSeed } from '@/src/games/core';
 import { engineFor } from '@/src/games/registry';
+import { useStyle } from '@/src/features/style/store';
 import { type ReadLock, lockRead, pickHidden, readIsAwaited, readIsOpen, readMinRounds, readPoints } from '@/src/games/reads';
 import type { OpponentMode } from '@/src/games/rps-insight';
 
@@ -81,7 +82,8 @@ export function usePracticeMatch(game: GameId, choice: string | null, difficulty
     recorded.current = true;
     const reads = { opponent: mode, prediction: read?.guess ?? null, insightPoints: readPoints(read, bot)?.points ?? null };
     void useGames.getState().recordPractice({ id: uuid(), game, bot, difficulty, playerScore: totals.player, botScore: totals.bot, outcome: outcome!, ...reads });
-  }, [done, game, bot, mode, read, difficulty, totals.player, totals.bot, outcome]);
+    useStyle.getState().record(game, current.rounds);
+  }, [done, game, bot, mode, read, difficulty, totals.player, totals.bot, outcome, current.rounds]);
 
   const play = (move: unknown) => {
     setState((s) => {

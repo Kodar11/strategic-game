@@ -195,5 +195,5 @@ const styles = StyleSheet.create({
   panel: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   scene: { gap: space.sm, padding: space.lg, borderRadius: radius.lg, borderLeftWidth: 3, backgroundColor: colors.bgRaised },
   match: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
-  lessonLink: { flexDirection: 'row', alignItems: 'center', gap: space.xs, minHeight: 36 },
+  lessonLink: { flexDirection: 'row', alignItems: 'center', gap: space.xs, minHeight: 44 },
 });

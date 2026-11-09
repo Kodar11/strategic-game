@@ -12,6 +12,7 @@ import { MessageScreen } from '@/src/components/ui/MessageScreen';
 import { useEnter } from '@/src/components/lesson/motion';
 import { GameRecordCard } from '@/src/features/games/ui/GameRecordCard';
 import { TournamentProfileCard } from '@/src/features/tournament/ui/TournamentProfileCard';
+import { PlayStyleCard } from '@/src/features/style/PlayStyleCard';
 import { AreaList, GrowthCard, LearningProgressCard, LinkRow, RecommendationCard, openArea } from '@/src/features/learning/ui/JourneyParts';
 import { GoalControl } from '@/src/features/learning/ui/ProfileParts';
 import { useJourney } from '@/src/features/learning/useProfile';
@@ -51,6 +52,10 @@ export default function ProfileScreen() {
         <View style={styles.column}>
           <Animated.View entering={enter(0, 'fade')}>
             <TournamentProfileCard />
+          </Animated.View>
+
+          <Animated.View entering={enter(15, 'fade')}>
+            <PlayStyleCard />
           </Animated.View>
 
           <Animated.View entering={enter(30, 'fade')}>

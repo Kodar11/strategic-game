@@ -140,3 +140,5 @@ export { default as Bug } from 'lucide-react-native/icons/bug';
 export { default as Mail } from 'lucide-react-native/icons/mail';
 export { default as LogOut } from 'lucide-react-native/icons/log-out';
 export { default as History } from 'lucide-react-native/icons/calendar-clock';
+export { default as Moon } from 'lucide-react-native/icons/moon';
+export { default as Sun } from 'lucide-react-native/icons/sun';

@@ -9,6 +9,7 @@ import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
 import { Badge, Card } from '@/src/components/ui/Card';
 import { type LessonMeta, allLessons, nextLesson } from '@/src/content/lessons';
+import { TournamentUnlock } from '@/src/features/tournament/ui/TournamentUnlock';
 import { moduleCheckpoint } from '@/src/features/assessments/content';
 import { challengesFor } from '@/src/features/challenges/content';
 import { isTried } from '@/src/features/challenges/progress';
@@ -126,6 +127,10 @@ export function Completion({
           <AppText variant="body">{reflection}</AppText>
         </Animated.View>
       ) : null}
+
+      <Animated.View entering={enter(202)}>
+        <TournamentUnlock lessonId={lesson.id} />
+      </Animated.View>
 
       {bridge ? (
         <Animated.View entering={enter(203)} style={styles.practice}>

@@ -46,6 +46,8 @@ export interface Database {
       get_competition: { Args: { request: Json }; Returns: Json };
       get_competition_history: { Args: { request: Json }; Returns: Json };
       get_champions_leaderboard: { Args: { request: Json }; Returns: Json };
+      submit_crowd_answer: { Args: { request: Json }; Returns: Json };
+      get_crowd_result: { Args: { request: Json }; Returns: Json };
     };
     Enums: { content_status: 'draft' | 'published' };
     CompositeTypes: Record<string, never>;

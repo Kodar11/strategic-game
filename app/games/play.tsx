@@ -1,5 +1,5 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -28,10 +28,13 @@ import { Panel } from '@/src/features/games/ui/parts';
 import { ResultPanel } from '@/src/features/games/ui/ResultPanel';
 import { RpsReveal, RpsRounds } from '@/src/features/games/ui/RpsReveal';
 import { ClassicReveal } from '@/src/features/games/ui/ClassicReveal';
-import { WhatIfPanel } from '@/src/features/games/ui/WhatIfPanel';
+import { GauntletResult } from '@/src/features/tournament/ui/GauntletResult';
+import { GameReview } from '@/src/features/review/GameReview';
+import { reviewClassic } from '@/src/review/review';
 import { ReadOpponentPanel } from '@/src/features/games/ui/ReadOpponentPanel';
 import { TournamentHint } from '@/src/features/tournament/ui/TournamentHint';
 import { TournamentThought } from '@/src/features/tournament/ui/TournamentThought';
+import { classicDebrief } from '@/src/features/tournament/reveal';
 import { TournamentResult } from '@/src/features/tournament/ui/TournamentResult';
 import { RepeatDone, RepeatPanel } from '@/src/features/repeat/RepeatPanel';
 import { useRepeat } from '@/src/features/repeat/useRepeat';
@@ -40,7 +43,7 @@ import { NO_REPEAT } from '@/src/repeat/plan';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
 /** `t`: a tournament match id (src/features/tournament): the result is recorded there and its reveal shown. */
-type Params = { game?: string; bot?: string; difficulty?: string; opponent?: string; mode?: string; competitionId?: string; token?: string; n?: string; t?: string; r?: string };
+type Params = { game?: string; bot?: string; difficulty?: string; opponent?: string; mode?: string; competitionId?: string; token?: string; n?: string; t?: string; r?: string; g?: string };
 
 /**
  * Playing a match. Practice (`game`, `bot`, `difficulty`) runs on the device; any game with
@@ -66,17 +69,22 @@ export default function PlayScreen() {
   }
   const bot = mystery ? null : p.bot!;
   const tournament = typeof p.t === 'string' && p.t ? p.t : undefined;
-  return <Practice key={`${p.game}:${bot ?? 'mystery'}:${p.difficulty}`} game={p.game} bot={bot} difficulty={p.difficulty} tournament={tournament} replay={p.r === '1'} />;
+  const gauntlet = typeof p.g === 'string' && p.g ? p.g : undefined;
+  return <Practice key={`${p.game}:${bot ?? 'mystery'}:${p.difficulty}`} game={p.game} bot={bot} difficulty={p.difficulty} tournament={tournament} replay={p.r === '1'} gauntlet={gauntlet} />;
 }
 
 /** `bot` null: a mystery opponent. */
-function Practice({ game, bot, difficulty, tournament, replay }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; tournament?: string; replay?: boolean }) {
+function Practice({ game, bot, difficulty, tournament, replay, gauntlet }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; tournament?: string; replay?: boolean; gauntlet?: string }) {
   const [round, setRound] = useState(0);
-  return <PracticeSession key={round} game={game} bot={bot} difficulty={difficulty} tournament={tournament} replay={replay} onPlayAgain={() => setRound((n) => n + 1)} />;
+  return <PracticeSession key={round} game={game} bot={bot} difficulty={difficulty} tournament={tournament} replay={replay} gauntlet={gauntlet} onPlayAgain={() => setRound((n) => n + 1)} />;
 }
 
-function PracticeSession({ game, bot, difficulty, tournament, replay, onPlayAgain }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; tournament?: string; replay?: boolean; onPlayAgain: () => void }) {
+function PracticeSession({ game, bot, difficulty, tournament, replay, gauntlet, onPlayAgain }: { game: GameId; bot: string | null; difficulty: 'easy' | 'medium' | 'hard'; tournament?: string; replay?: boolean; gauntlet?: string; onPlayAgain: () => void }) {
+  // A Tournament match or a Gauntlet bout: no practice controls (play again, try another opponent).
+  const ranked = !!tournament || !!gauntlet;
   const view = usePracticeMatch(game, bot, difficulty);
+  // Game Review replays the match from its seed, so it is computed once, at the end.
+  const review = useMemo(() => (view.done && view.seed !== null ? reviewClassic(ENGINES[game], game, { bot: view.bot, difficulty: view.difficulty, seed: view.seed }, view.rounds) : null), [view.done, view.seed, view.bot, view.difficulty, view.rounds, game]);
   const practise = (b: string) => (bot === b ? onPlayAgain() : router.replace({ pathname: '/games/play', params: { game, bot: b, difficulty } }));
   return (
     <MatchLayout
@@ -84,14 +92,15 @@ function PracticeSession({ game, bot, difficulty, tournament, replay, onPlayAgai
       tournament={tournament}
       result={
         <>
-        {tournament && view.outcome ? <TournamentResult matchId={tournament} outcome={view.outcome} level={difficulty === 'medium' ? 'normal' : difficulty} readCorrect={view.read?.current?.guess === view.bot} onRematch={onPlayAgain} replay={replay} /> : null}
+        {gauntlet && view.outcome ? <GauntletResult token={gauntlet} outcome={view.outcome} /> : null}
+        {tournament && view.outcome ? <TournamentResult matchId={tournament} outcome={view.outcome} level={difficulty === 'medium' ? 'normal' : difficulty} readCorrect={view.read?.current?.guess === view.bot} debrief={classicDebrief(view.game, view.bot, view.difficulty, view.rounds)} onRematch={onPlayAgain} replay={replay} /> : null}
         <ResultPanel
           view={view}
-          onPlayAgain={tournament ? undefined : onPlayAgain}
+          onPlayAgain={ranked ? undefined : onPlayAgain}
           playAgainLabel={view.opponent === 'mystery' ? 'Play again · new mystery bot' : 'Play again'}
           detail={game === 'rps' ? <RpsRounds rounds={view.rounds as RpsRound[]} /> : undefined}
-          insight={game === 'rps' ? <RpsReveal view={view} onPractise={tournament ? undefined : practise} /> : <ClassicReveal view={view} onPractise={tournament ? undefined : practise} />}>
-          <WhatIfPanel view={view} />
+          insight={game === 'rps' ? <RpsReveal view={view} onPractise={ranked ? undefined : practise} /> : <ClassicReveal view={view} onPractise={ranked ? undefined : practise} />}>
+          {review ? <GameReview review={review} /> : null}
         </ResultPanel>
         </>
       }

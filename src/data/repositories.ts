@@ -54,7 +54,9 @@ export type RpcName =
   | 'get_daily_history'
   | 'get_competition'
   | 'get_competition_history'
-  | 'get_champions_leaderboard';
+  | 'get_champions_leaderboard'
+  | 'submit_crowd_answer'
+  | 'get_crowd_result';
 
 export interface Rpc {
   /** Resolve with the function's JSON result, or throw the database / network error. */

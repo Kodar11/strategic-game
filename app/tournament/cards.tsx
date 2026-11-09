@@ -39,7 +39,7 @@ export default function CardsScreen() {
           </View>
           <AppText color={colors.textMuted}>Finish a lesson to earn its card. Beat a rival to earn theirs.</AppText>
 
-          <AppText variant="overline" color={colors.textMuted}>
+          <AppText variant="overline" color={colors.textMuted} accessibilityRole="header">
             Rivals
           </AppText>
           <View style={styles.grid}>
@@ -48,10 +48,10 @@ export default function CardsScreen() {
               return (
                 <View key={c.id} style={[styles.card, !c.owned && styles.locked]} accessible accessibilityLabel={`${r.name}, ${r.epithet}. ${c.owned ? 'Collected.' : 'Not yet.'}`}>
                   <RivalMark rival={r} size={40} dim={!c.owned} done={c.owned} />
-                  <AppText variant="bodyStrong" numberOfLines={1}>
+                  <AppText variant="bodyStrong">
                     {r.name}
                   </AppText>
-                  <AppText variant="caption" color={colors.textMuted} numberOfLines={1}>
+                  <AppText variant="caption" color={colors.textMuted}>
                     {r.epithet}
                   </AppText>
                 </View>
@@ -59,7 +59,7 @@ export default function CardsScreen() {
             })}
           </View>
 
-          <AppText variant="overline" color={colors.textMuted}>
+          <AppText variant="overline" color={colors.textMuted} accessibilityRole="header">
             Ideas
           </AppText>
           <View style={styles.grid}>
@@ -79,10 +79,10 @@ export default function CardsScreen() {
                     </AppText>
                     {c.owned ? null : <Lock size={12} color={colors.textFaint} />}
                   </View>
-                  <AppText variant="bodyStrong" numberOfLines={2} color={c.owned ? colors.text : colors.textMuted}>
+                  <AppText variant="bodyStrong" color={c.owned ? colors.text : colors.textMuted}>
                     {l.concept}
                   </AppText>
-                  <AppText variant="caption" color={colors.textMuted} numberOfLines={2}>
+                  <AppText variant="caption" color={colors.textMuted}>
                     {l.title}
                   </AppText>
                 </Pressable>

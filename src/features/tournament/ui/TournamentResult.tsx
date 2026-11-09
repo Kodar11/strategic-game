@@ -11,14 +11,13 @@ import { type Level, type Recorded, findMatch, recordOf, share, stars } from '@/
 import { colors, radius, space } from '@/src/theme/tokens';
 import { rivalOf, useTournamentContent } from '../content';
 import { useTournament } from '../store';
+import { playCue } from '../sound';
 import { useTournamentStats } from '../sync';
+import type { ResultDebrief } from '../reveal';
+import { haptic } from '@/src/utils/feedback';
 import { Kicker, RivalMark, StarRow, toneColors } from './parts';
 
-export interface ResultDebrief {
-  /** What actually happened in this match, from the engine's own analysis. */
-  moments?: readonly string[];
-  insight?: string;
-}
+export type { ResultDebrief } from '../reveal';
 
 /**
  * The tournament layer over a finished match on the existing play screens: records the game once, then shows the
@@ -38,7 +37,21 @@ export function TournamentResult({ matchId, outcome, level, readCorrect, debrief
     void useTournament
       .getState()
       .load()
-      .then(() => setRecorded(useTournament.getState().record(matchId, { outcome, level, read: readCorrect, replay })));
+      .then(() => {
+        const r = useTournament.getState().record(matchId, { outcome, level, read: readCorrect, replay });
+        setRecorded(r);
+        // The moment, felt: a crown for a rival beaten or a stage cleared, a chord for a win, a soft slip for a loss.
+        if (r?.rivalDefeated || r?.stageCleared) {
+          haptic.success();
+          playCue('defeated');
+        } else if (outcome === 'win') {
+          haptic.success();
+          playCue('win');
+        } else {
+          haptic.commit();
+          playCue('loss');
+        }
+      });
   }, [matchId, outcome, level, readCorrect, replay]);
 
   if (!found) return null;
@@ -52,8 +65,11 @@ export function TournamentResult({ matchId, outcome, level, readCorrect, debrief
   const line = pool[(games - 1) % pool.length];
   const gained = recorded ? recorded.starsAfter - recorded.starsBefore : 0;
   const lesson = match.intel.lesson ? getLesson(match.intel.lesson) : undefined;
+  // The player's first Tournament game ever (the welcome's match).
+  const firstEver = !!recorded && recorded.progress.history.length <= 1;
   const toStage = () => router.dismissTo({ pathname: '/tournament/[stageId]', params: { stageId: stage.id } });
-  const moments = (debrief?.moments ?? []).slice(0, 3);
+  // The turning point is the first decision the analysis names; the rest stay one tap away in the match log below.
+  const turning = debrief?.moments?.[0];
   const beatenShare = stats ? share(stats.won, stats.players) : null;
   const readShare = stats ? share(stats.read, stats.players) : null;
   const rare = readCorrect && readShare !== null && readShare <= 35 ? `Only ${readShare}% of players have read ${rival.name}’s style here.` : win && beatenShare !== null && beatenShare <= 50 ? `Only ${beatenShare}% of players have beaten this match.` : null;
@@ -96,36 +112,32 @@ export function TournamentResult({ matchId, outcome, level, readCorrect, debrief
         </AppText>
       ) : null}
 
-      {win ? (
-        <View style={styles.section}>
-          <AppText variant="overline" color={tone.fg}>
-            How you beat them
+      {turning ? (
+        <View style={[styles.turning, { borderLeftColor: win ? tone.solid : colors.rival }]} accessible accessibilityLabel={`${debrief?.kind === 'evidence' ? 'The evidence' : 'The turning point'}. ${turning}`}>
+          <AppText variant="overline" color={win ? tone.fg : colors.rivalText} accessibilityRole="header">
+            {debrief?.kind === 'evidence' ? 'The evidence' : 'The turning point'}
           </AppText>
-          {moments.length ? (
-            moments.map((m, i) => (
-              <AppText key={i} variant="small" color={colors.textBody}>
-                · {m}
-              </AppText>
-            ))
-          ) : (
-            <AppText variant="small" color={colors.textBody}>
-              {match.intel.counter}
-            </AppText>
-          )}
+          <AppText variant="bodyStrong">{turning}</AppText>
         </View>
-      ) : (
-        <View style={styles.section}>
-          <AppText variant="overline" color={colors.rivalText}>
-            The trap
-          </AppText>
-          <AppText variant="small" color={colors.textBody}>
-            {match.intel.tendency}
-          </AppText>
-          <AppText variant="small" color={colors.text}>
-            {debrief?.insight ?? match.intel.counter}
-          </AppText>
-        </View>
-      )}
+      ) : null}
+
+      <View style={styles.section}>
+        <AppText variant="overline" color={win ? tone.fg : colors.rivalText}>
+          {win ? `What ${rival.name} was doing` : 'The trap'}
+        </AppText>
+        <AppText variant="small" color={colors.textBody}>
+          {debrief?.opponentRead ?? match.intel.tendency}
+        </AppText>
+      </View>
+
+      <View style={styles.section}>
+        <AppText variant="overline" color={colors.insight}>
+          {win ? 'Why it worked' : 'What beats it'}
+        </AppText>
+        <AppText variant="small" color={colors.text}>
+          {win ? match.intel.counter : (debrief?.insight ?? match.intel.counter)}
+        </AppText>
+      </View>
 
       {recorded?.replayCleared ? (
         <View style={[styles.banner, { backgroundColor: colors.insightSoft }]}>
@@ -146,12 +158,22 @@ export function TournamentResult({ matchId, outcome, level, readCorrect, debrief
       ) : null}
 
       <View style={{ gap: space.sm }}>
+        {/* Play first, learn after: the very first Tournament match always offers the idea it was about. */}
+        {lesson && firstEver ? (
+          <View style={styles.idea}>
+            <AppText variant="overline" color={colors.insight}>
+              The idea you just played
+            </AppText>
+            <AppText variant="bodyStrong">{lesson.title}</AppText>
+            <Button label="Learn it in a few minutes" variant="secondary" icon={ArrowRight} onPress={() => router.push({ pathname: '/lesson/[lessonId]', params: { lessonId: lesson.id } })} />
+          </View>
+        ) : null}
         {win ? (
           <Button label="Back to the bracket" icon={ArrowRight} onPress={toStage} />
         ) : (
           <>
             <Button label="Rematch" icon={RotateCcw} iconPosition="left" onPress={onRematch} />
-            {lesson && games >= 2 ? <Button label={`Full lesson: ${lesson.title}`} variant="secondary" onPress={() => router.push({ pathname: '/lesson/[lessonId]', params: { lessonId: lesson.id } })} /> : null}
+            {lesson && games >= 2 && !firstEver ?<Button label={`Full lesson: ${lesson.title}`} variant="secondary" onPress={() => router.push({ pathname: '/lesson/[lessonId]', params: { lessonId: lesson.id } })} /> : null}
             <Button label="Back to the bracket" variant="ghost" onPress={toStage} />
           </>
         )}
@@ -161,7 +183,9 @@ export function TournamentResult({ matchId, outcome, level, readCorrect, debrief
 }
 
 const styles = StyleSheet.create({
+  idea: { gap: space.xs, padding: space.md, borderRadius: radius.lg, backgroundColor: colors.insightSoft },
   panel: { gap: space.md, padding: space.lg, borderRadius: radius.xl, borderWidth: 1, backgroundColor: colors.surface },
   section: { gap: space.xs },
+  turning: { gap: space.xs, paddingVertical: space.sm, paddingHorizontal: space.md, borderLeftWidth: 3, borderRadius: radius.sm, backgroundColor: colors.bgRaised },
   banner: { flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.sm, borderRadius: radius.md },
 });

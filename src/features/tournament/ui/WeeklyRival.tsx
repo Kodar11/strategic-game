@@ -53,7 +53,7 @@ export function WeeklyRival() {
             <Swords size={12} color={tone.fg} />
             <Kicker tone={rival.tone}>Weekly Rival</Kicker>
           </View>
-          <AppText variant="bodyStrong">
+          <AppText variant="bodyStrong" accessibilityRole="header">
             {rival.name} is back: {title}
           </AppText>
           <AppText variant="caption" color={colors.textMuted} tabular>

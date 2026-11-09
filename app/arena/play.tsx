@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,6 +19,8 @@ import { useArenaRecords } from '@/src/features/arena/records';
 import { useArenaMatch } from '@/src/features/arena/useArenaMatch';
 import { useGameTelemetry } from '@/src/observability';
 import { useOpponentRead } from '@/src/features/arena/useOpponentRead';
+import { GameReview } from '@/src/features/review/GameReview';
+import { reviewArena } from '@/src/review/review';
 import { ArenaResult } from '@/src/features/arena/ui/ArenaResult';
 import { AuctionBoard } from '@/src/features/arena/ui/AuctionBoard';
 import { CooperationMatch } from '@/src/features/arena/ui/CooperationMatch';
@@ -31,6 +33,7 @@ import { ReadPanel } from '@/src/features/arena/ui/ReadPanel';
 import { TournamentHint } from '@/src/features/tournament/ui/TournamentHint';
 import { TournamentThought } from '@/src/features/tournament/ui/TournamentThought';
 import { TournamentResult } from '@/src/features/tournament/ui/TournamentResult';
+import { GauntletResult } from '@/src/features/tournament/ui/GauntletResult';
 import { SignalBoard } from '@/src/features/arena/ui/SignalBoard';
 import { UltimatumGameBoard } from '@/src/features/arena/ui/UltimatumGameBoard';
 import { MatchReflection } from '@/src/features/reflections/ReflectionCard';
@@ -41,7 +44,8 @@ import { NO_REPEAT } from '@/src/repeat/plan';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
 
 /** `t`: a tournament match id (src/features/tournament): the result is recorded there and its reveal shown. */
-type Params = { game?: string; persona?: string; level?: string; length?: string; variant?: string; t?: string; r?: string };
+/** `g`: a Gauntlet bout token (src/features/tournament/gauntlet-store.ts): the result goes to the run. */
+type Params = { game?: string; persona?: string; level?: string; length?: string; variant?: string; t?: string; r?: string; g?: string };
 
 /** Games whose scoreboard compares you with the best of several rivals. */
 const FIELD_GAMES: ReadonlySet<ArenaGameId> = new Set(['auction', 'market', 'commons', 'coalition']);
@@ -57,26 +61,26 @@ export default function ArenaPlayScreen() {
   const p = useLocalSearchParams<Params>();
   const valid = isArenaId(p.game) && typeof p.persona === 'string' && (p.persona === MYSTERY || arenaEngine(p.game).opponents.includes(p.persona)) && isLevel(p.level) && isLength(p.length) && arenaEngine(p.game).variants.includes(p.variant);
   if (!valid) return <MessageScreen title="Game not found" body="That game, opponent or setting isn’t available." />;
-  return <Rematches key={`${p.game}:${p.persona}:${p.level}:${p.length}:${p.variant}`} game={p.game as ArenaGameId} persona={p.persona!} level={p.level as Level} length={p.length as MatchLength} variant={p.variant!} tournament={typeof p.t === 'string' && p.t ? p.t : undefined} replay={p.r === '1'} />;
+  return <Rematches key={`${p.game}:${p.persona}:${p.level}:${p.length}:${p.variant}`} game={p.game as ArenaGameId} persona={p.persona!} level={p.level as Level} length={p.length as MatchLength} variant={p.variant!} tournament={typeof p.t === 'string' && p.t ? p.t : undefined} replay={p.r === '1'} gauntlet={typeof p.g === 'string' && p.g ? p.g : undefined} />;
 }
 
-function Rematches(props: { game: ArenaGameId; persona: string; level: Level; length: MatchLength; variant: string; tournament?: string; replay?: boolean }) {
+function Rematches(props: { game: ArenaGameId; persona: string; level: Level; length: MatchLength; variant: string; tournament?: string; replay?: boolean; gauntlet?: string }) {
   // A fresh seed for every match; the seed doubles as the session key, so a rematch remounts from a clean state.
   const [seed, setSeed] = useState(randomSeed);
   const again = () => setSeed(randomSeed());
   const mystery = props.persona === MYSTERY;
   const persona = mystery ? hiddenOpponent(arenaEngine(props.game).opponents, seed) : props.persona;
   if (props.game === 'cooperation') {
-    return <CooperationMatch key={seed} persona={persona as CoopOpponent} mystery={mystery} level={props.level} length={props.length} variant={props.variant as CoopVariant} seed={seed} onPlayAgain={again} tournament={props.tournament} replay={props.replay} />;
+    return <CooperationMatch key={seed} persona={persona as CoopOpponent} mystery={mystery} level={props.level} length={props.length} variant={props.variant as CoopVariant} seed={seed} onPlayAgain={again} tournament={props.tournament} replay={props.replay} gauntlet={props.gauntlet} />;
   }
   return <Session key={seed} {...props} persona={persona} mystery={mystery} seed={seed} onPlayAgain={again} />;
 }
 
-function Session({ game, persona, mystery, level, length, variant, seed, onPlayAgain, tournament, replay }: { game: ArenaGameId; persona: string; mystery: boolean; level: Level; length: MatchLength; variant: string; seed: number; onPlayAgain: () => void; tournament?: string; replay?: boolean }) {
+function Session({ game, persona, mystery, level, length, variant, seed, onPlayAgain, tournament, replay, gauntlet }: { game: ArenaGameId; persona: string; mystery: boolean; level: Level; length: MatchLength; variant: string; seed: number; onPlayAgain: () => void; tournament?: string; replay?: boolean; gauntlet?: string }) {
   const insets = useSafeAreaInsets();
   const engine = arenaEngine(game);
   const setup: Setup<string, string> = { persona, level, length, variant, seed };
-  const { state, act, over, result, refusal, newBest } = useArenaMatch(engine, setup);
+  const { state, act, over, result, refusal, newBest, actions } = useArenaMatch(engine, setup);
   const coached = useArenaRecords((s) => s.coached[game]);
   const [tipHidden, setTipHidden] = useState(false);
   const g = ARENA[game];
@@ -117,6 +121,9 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
 
   const live = result ?? engine.result(state);
   const finished = over && !!result && read.revealed && !repeat.holding;
+  // Computed once the match is over: it replays the match a few hundred times, so never while playing.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `actions` is a stable ref, complete once `over`.
+  const review = useMemo(() => (over ? reviewArena(engine, setup, actions) : null), [over, engine, seed]);
   useGameTelemetry({ game_id: game, system: 'arena', mode: tournament ? 'tournament' : 'practice', level, variant, length, mystery }, { round: playedRounds, roundsTotal: total, finished, outcome: result?.outcome ?? null });
   const challenge = g.variants.find((v) => v.id === variant && v.challenge);
   const roundLabel = g.roundWord === 'lots' ? 'Lot' : g.roundWord === 'turns' ? 'Turn' : 'Round';
@@ -168,6 +175,7 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
           {finished && result ? (
             <View onLayout={(e) => toResult(e.nativeEvent.layout.y)} style={{ gap: space.md }}>
               {tournament ? <TournamentResult matchId={tournament} outcome={result.outcome} level={level} readCorrect={read.verdict === 'correct'} debrief={engine.debrief(state)} onRematch={onPlayAgain} replay={replay} /> : null}
+              {gauntlet ? <GauntletResult token={gauntlet} outcome={result.outcome} /> : null}
               <ArenaResult
                 unmasked={game === 'mole' || game === 'saboteur' ? unmaskedLine(game, state) : null}
                 game={game}
@@ -181,8 +189,9 @@ function Session({ game, persona, mystery, level, length, variant, seed, onPlayA
                 onLibrary={() => router.navigate('/games')}
                 read={mystery && read.verdict ? { guess: read.guess, verdict: read.verdict } : null}
                 reflection={<MatchReflection game={game} record={state} />}
-                practice={!tournament}
+                practice={!tournament && !gauntlet}
               />
+              {review ? <GameReview review={review} unit={g.unit} /> : null}
               <MatchLog title="Final board" summary="How the match ended">
                 {board}
               </MatchLog>

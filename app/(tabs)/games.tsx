@@ -9,11 +9,12 @@ import { AppText } from '@/src/components/ui/AppText';
 import { Backdrop } from '@/src/components/ui/Backdrop';
 import { Button, IconButton } from '@/src/components/ui/Button';
 import { Badge } from '@/src/components/ui/Card';
-import { ArrowRight, Clock, Crown, History, ListOrdered, Play, RefreshCw, Settings, Trophy } from '@/src/components/ui/icons';
+import { ArrowRight, Clock, Crown, History, ListOrdered, Play, RefreshCw, Settings, Trophy, Users } from '@/src/components/ui/icons';
 import type { Competition, GamesOverview } from '@/src/data/games';
 import { useGames } from '@/src/data/games-session';
 import { GAMES } from '@/src/games/catalog';
-import { LIBRARY_COUNT, LIBRARY_GROUPS } from '@/src/games/library';
+import { LIBRARY_COUNT, LIBRARY_GROUPS, STARTER_GAMES } from '@/src/games/library';
+import { useTournament } from '@/src/features/tournament/store';
 import { ordinal, timeLeft, weekLabel } from '@/src/games/competition';
 import { type GameId, isGameId } from '@/src/games/core';
 import { ENGINES } from '@/src/games/registry';
@@ -42,7 +43,11 @@ export default function GamesScreen() {
   const overview = useGames((s) => s.overview);
   const loadOverview = useGames((s) => s.loadOverview);
   const [group, setGroup] = useState('all');
-  const groups = LIBRARY_GROUPS.filter((g) => group === 'all' || g.id === group);
+  // Newcomers see the eight starter games first; the full library after their first Tournament win, or on request.
+  const tournamentWin = useTournament((s) => Object.values(s.matches).some((r) => r.won));
+  const [showAll, setShowAll] = useState(false);
+  const starter = !tournamentWin && !showAll;
+  const groups = starter ? [{ id: 'start', title: 'Start here', blurb: 'Eight quick games, each about a different idea.', games: [...STARTER_GAMES] }] : LIBRARY_GROUPS.filter((g) => group === 'all' || g.id === group);
   // The first group of game cards draws with the screen; the rest (each with its artwork) follow frame by frame.
   const shownGroups = useStagedCount(groups.length, 1, 1);
 
@@ -83,15 +88,31 @@ export default function GamesScreen() {
 
           {overview.status === 'ready' && overview.data.lastWeek ? <LastWeek data={overview.data.lastWeek} /> : null}
 
+          <Pressable onPress={() => router.push('/party')} accessibilityRole="button" accessibilityLabel="Party mode. Play with friends on one phone: The Traitors, Two-Thirds and The Pot." style={({ pressed }) => [styles.party, pressed && { opacity: 0.88 }]}>
+            <View style={styles.partyIcon}>
+              <Users size={22} color={colors.rivalText} strokeWidth={2.2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppText variant="overline" color={colors.rivalText}>
+                Party mode
+              </AppText>
+              <AppText variant="bodyStrong">Play with friends on one phone</AppText>
+              <AppText variant="caption" color={colors.textMuted}>
+                The Traitors, Two-Thirds and The Pot · 3–10 players
+              </AppText>
+            </View>
+            <ArrowRight size={18} color={colors.textMuted} />
+          </Pressable>
+
           <View style={{ gap: 2, marginTop: space.sm }}>
             <AppText variant="heading" accessibilityRole="header">
-              All {LIBRARY_COUNT} games
+              {starter ? 'Start here' : `All ${LIBRARY_COUNT} games`}
             </AppText>
             <AppText variant="small" color={colors.textMuted}>
-              Each has four hidden personalities to figure out. Practice never affects rankings.
+              {starter ? 'Eight quick games to begin with. Win a Tournament match and the whole library opens.' : 'Each has four hidden personalities to figure out. Practice never affects rankings.'}
             </AppText>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.xs }} accessibilityRole="tablist">
+          {starter ? null : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.xs }} accessibilityRole="tablist">
             {[{ id: 'all', title: 'All' }, ...LIBRARY_GROUPS].map((g) => {
               const on = group === g.id;
               return (
@@ -102,17 +123,19 @@ export default function GamesScreen() {
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </ScrollView>}
           {groups.slice(0, shownGroups).map((g) => (
             <View key={g.id} style={{ gap: space.xs }}>
-              <View style={{ gap: 1, marginTop: space.xs }}>
-                <AppText variant="bodyStrong" accessibilityRole="header">
-                  {g.title}
-                </AppText>
-                <AppText variant="caption" color={colors.textMuted}>
-                  {g.blurb}
-                </AppText>
-              </View>
+              {starter ? null : (
+                <View style={{ gap: 1, marginTop: space.xs }}>
+                  <AppText variant="bodyStrong" accessibilityRole="header">
+                    {g.title}
+                  </AppText>
+                  <AppText variant="caption" color={colors.textMuted}>
+                    {g.blurb}
+                  </AppText>
+                </View>
+              )}
               {g.games.map((e) =>
                 e.kind === 'classic' ? (
                   <GameCard key={e.id} id={e.id} featured={overview.status === 'ready' && overview.data.competition?.game === e.id && overview.data.competition.phase === 'active'} />
@@ -122,6 +145,7 @@ export default function GamesScreen() {
               )}
             </View>
           ))}
+          {starter ? <Button label={`Show all ${LIBRARY_COUNT} games`} variant="secondary" onPress={() => setShowAll(true)} /> : null}
         </View>
       </ScrollView>
     </View>
@@ -381,6 +405,8 @@ function GameCard({ id, featured }: { id: GameId; featured: boolean }) {
 }
 
 const styles = StyleSheet.create({
+  party: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.lg, borderWidth: 1, borderColor: 'rgba(249,115,22,0.35)', backgroundColor: colors.surface },
+  partyIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.rivalSoft, alignItems: 'center', justifyContent: 'center' },
   column: { maxWidth: MAX_CONTENT_WIDTH, width: '100%', alignSelf: 'center', gap: space.lg },
   weekly: { padding: space.lg, borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(253,186,116,0.35)', backgroundColor: colors.bgRaised },
   me: { flexDirection: 'row', gap: space.md, padding: space.md, borderRadius: radius.md, backgroundColor: colors.surface },

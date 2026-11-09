@@ -35,7 +35,7 @@ export function TournamentHint({ matchId }: { matchId: string }) {
 
   if (!owned) {
     return lesson ? (
-      <Pressable onPress={() => router.push({ pathname: '/lesson/[lessonId]', params: { lessonId: lesson.id } })} accessibilityRole="link" accessibilityLabel={`Card hint locked. Finish lesson ${lesson.number}, ${lesson.title}, to use it.`} style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingVertical: space.xs }}>
+      <Pressable onPress={() => router.push({ pathname: '/lesson/[lessonId]', params: { lessonId: lesson.id } })} accessibilityRole="link" accessibilityLabel={`Card hint locked. Finish lesson ${lesson.number}, ${lesson.title}, to use it.`} style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs, minHeight: 44 }}>
         <Lock size={13} color={colors.textFaint} />
         <AppText variant="caption" color={colors.textMuted}>
           Card hint: finish “{lesson.title}” to unlock
@@ -46,7 +46,7 @@ export function TournamentHint({ matchId }: { matchId: string }) {
 
   if (!open) {
     return (
-      <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel={`Use your ${lesson?.concept ?? 'strategy'} card for a hint. One per game.`} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: space.xs, alignSelf: 'flex-start', minHeight: 36, paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(253,186,116,0.35)', backgroundColor: colors.insightSoft }, pressed && { opacity: 0.85 }]}>
+      <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel={`Use your ${lesson?.concept ?? 'strategy'} card for a hint. One per game.`} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: space.xs, alignSelf: 'flex-start', minHeight: 44, paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(253,186,116,0.35)', backgroundColor: colors.insightSoft }, pressed && { opacity: 0.85 }]}>
         <Layers size={14} color={colors.insight} />
         <AppText variant="caption" color={colors.insight}>
           Use a card hint · one per game

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { type ReactNode, memo, useEffect, useRef, useState } from 'react';
+import { type ReactNode, memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 import Svg, { Line, Polyline } from 'react-native-svg';
@@ -27,6 +27,9 @@ import { useGameTelemetry } from '@/src/observability';
 import { TournamentHint } from '@/src/features/tournament/ui/TournamentHint';
 import { TournamentThought } from '@/src/features/tournament/ui/TournamentThought';
 import { TournamentResult } from '@/src/features/tournament/ui/TournamentResult';
+import { GauntletResult } from '@/src/features/tournament/ui/GauntletResult';
+import { GameReview } from '@/src/features/review/GameReview';
+import { reviewArena } from '@/src/review/review';
 import { useArenaMatch } from '../useArenaMatch';
 import { useOpponentRead } from '../useOpponentRead';
 import { CoopResults } from './CoopResults';
@@ -61,6 +64,7 @@ export function CooperationMatch({
   resultSlot,
   tournament,
   replay = false,
+  gauntlet,
 }: {
   persona: CoopOpponent;
   /** The personality is hidden until the end, with an optional prediction (src/arena/reads.ts). */
@@ -81,11 +85,15 @@ export function CooperationMatch({
   tournament?: string;
   /** The tournament match is played in the Hard Replay. */
   replay?: boolean;
+  /** A Gauntlet bout token: the result goes to the run. */
+  gauntlet?: string;
 }) {
   const insets = useSafeAreaInsets();
   const setup: CoopSetup = { persona, level, length, variant, seed };
   const local = useArenaMatch(cooperation, setup);
   const { state, act, result, newBest } = server ? { ...server, newBest: false } : local;
+  // Game Review needs the seed, so practice and tournament matches only (a ranked match's seed stays on the server).
+  const review = useMemo(() => (!server && result ? reviewArena(cooperation, setup, state.rounds.map((r, i) => ({ move: r.pi, round: i }))) : null), [server, result, state.rounds, seed]); // eslint-disable-line react-hooks/exhaustive-deps
   // Server mode: the round just committed, waiting for the server's resolution before the reveal.
   const [awaiting, setAwaiting] = useState<number | null>(null);
   // …and whether the server has started on it (so "idle and not arrived" means refused, not "not sent yet").
@@ -189,7 +197,9 @@ export function CooperationMatch({
           ) : view === 'results' && result ? (
             <>
               {tournament ? <TournamentResult matchId={tournament} outcome={result.outcome} level={level} readCorrect={read.verdict === 'correct'} debrief={cooperation.debrief(state)} onRematch={onPlayAgain} replay={replay} /> : null}
-              <CoopResults state={state} result={result} newBest={newBest} onRematch={onPlayAgain} onChange={change} onLibrary={() => router.navigate('/games')} read={mystery && read.verdict ? { guess: read.guess, verdict: read.verdict } : null} practice={!tournament} />
+              {gauntlet ? <GauntletResult token={gauntlet} outcome={result.outcome} /> : null}
+              <CoopResults state={state} result={result} newBest={newBest} onRematch={onPlayAgain} onChange={change} onLibrary={() => router.navigate('/games')} read={mystery && read.verdict ? { guess: read.guess, verdict: read.verdict } : null} practice={!tournament && !gauntlet} />
+              {review ? <GameReview review={review} /> : null}
             </>
           ) : (
             <>

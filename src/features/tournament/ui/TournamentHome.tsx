@@ -1,9 +1,11 @@
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/src/components/ui/AppText';
 import { Button } from '@/src/components/ui/Button';
-import { ArrowRight, Brain, ChevronRight, CircleCheck, Layers, Lock } from '@/src/components/ui/icons';
+import { ArrowRight, Brain, ChevronRight, CircleCheck, Layers, Lock, Swords } from '@/src/components/ui/icons';
+import { useGauntlet } from '../gauntlet-store';
 import { LESSON_IDS, allLessons } from '@/src/content/lessons';
 import { cardSet, mindCheckOffer, nextMatch, replayStatus, type StageStatus } from '@/src/tournament/progress';
 import { colors, radius, space } from '@/src/theme/tokens';
@@ -27,13 +29,20 @@ export function TournamentHome() {
   const owned = cards.filter((c) => c.owned).length;
   const offer = mindCheckOffer(season, progress);
   const replay = replayStatus(season, progress);
+  useEffect(() => {
+    void useGauntlet.getState().load(season);
+  }, [season]);
+  const gauntletBest = useGauntlet((s) => s.best);
+  const gauntletLive = useGauntlet((s) => !!s.run && !s.run.over);
+  // Shown once a stage is cleared (locked until the season is done), so players know what's waiting.
+  const showGauntlet = done || stages.some((s) => s.cleared && s.stage.kind !== 'side');
   const label = !t.started ? 'Play your first match' : done ? (replay.next ? 'Next Hard Replay match' : 'Open the bracket') : next ? (next.duel ? `Face ${rival.name}` : 'Next match') : 'Open the stage';
 
   return (
     <View style={{ gap: space.md }}>
       <View style={styles.head}>
         <View style={{ flex: 1 }}>
-          <AppText variant="overline" color={colors.insight}>
+          <AppText variant="overline" color={colors.insight} accessibilityRole="header">
             {doc.title} · {season.title}
           </AppText>
           <AppText variant="small" color={colors.textMuted}>
@@ -56,7 +65,7 @@ export function TournamentHome() {
           <View style={{ flex: 1, gap: 2 }}>
             <Kicker tone={rival.tone}>{done ? `${season.title} complete` : `${current.stage.title} · ${current.stage.theme}`}</Kicker>
             <AppText variant="heading">{rival.name}</AppText>
-            <AppText variant="small" color={colors.textMuted} numberOfLines={2}>
+            <AppText variant="small" color={colors.textMuted}>
               {done ? (replay.next ? 'Every rival beaten. The Hard Replay is open: every match again, on Hard, with harder rules.' : 'Every rival beaten, twice. You have finished the Hard Replay.') : `${rival.epithet} · ${rival.bio}`}
             </AppText>
           </View>
@@ -69,6 +78,23 @@ export function TournamentHome() {
         </View>
         <Button label={label} icon={ArrowRight} onPress={() => (done ? (replay.next ? openMatch(replay.next.match.id) : openStage(current.stage.id)) : next ? openMatch(next.id) : openStage(current.stage.id))} />
       </View>
+
+      {showGauntlet ? (
+        <Pressable onPress={() => router.push('/tournament/gauntlet')} accessibilityRole="button" accessibilityLabel={done ? `The Gauntlet. Six rivals in a row, one life.${gauntletBest ? ` Best run ${gauntletBest} of 6.` : ''}` : 'The Gauntlet. Opens when you finish the season.'} style={({ pressed }) => [styles.row, done && { borderColor: 'rgba(249,115,22,0.45)' }, pressed && styles.pressed]}>
+          <View style={[styles.icon, { backgroundColor: colors.rivalSoft }]}>
+            {done ? <Swords size={18} color={colors.rivalText} strokeWidth={2.2} /> : <Lock size={16} color={colors.textMuted} />}
+          </View>
+          <View style={{ flex: 1 }}>
+            <AppText variant="bodyStrong" color={done ? colors.text : colors.textMuted}>
+              The Gauntlet
+            </AppText>
+            <AppText variant="caption" color={colors.textMuted}>
+              {!done ? 'Opens when you finish the season' : gauntletLive ? 'Your run is waiting' : gauntletBest ? `Six rivals, one life · best ${gauntletBest} of 6` : 'Six rivals in a row, one life'}
+            </AppText>
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} />
+        </Pressable>
+      ) : null}
 
       {offer ? (
         <Pressable onPress={() => router.push({ pathname: '/tournament/mind-check', params: { form: offer } })} accessibilityRole="button" style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
@@ -95,7 +121,7 @@ export function TournamentHome() {
 
       {sides.length ? (
         <View style={{ gap: space.xs }}>
-          <AppText variant="overline" color={colors.textMuted}>
+          <AppText variant="overline" color={colors.textMuted} accessibilityRole="header">
             Side trials
           </AppText>
           {sides.map((s) => (

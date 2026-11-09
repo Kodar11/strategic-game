@@ -10,6 +10,7 @@ import { ArrowRight } from '@/src/components/ui/icons';
 import { rivalOf, useTournamentContent } from '@/src/features/tournament/content';
 import { Kicker, RivalMark } from '@/src/features/tournament/ui/parts';
 import { track } from '@/src/observability';
+import { playMatch } from '@/src/features/tournament/games';
 import { mainStages } from '@/src/tournament/progress';
 import { useProgress } from '@/src/store/progress';
 import { MAX_CONTENT_WIDTH, colors, space } from '@/src/theme/tokens';
@@ -27,7 +28,8 @@ export default function OnboardingScreen() {
   const { doc, season } = useTournamentContent();
   const host = rivalOf(doc, doc.host);
   const lines = doc.welcome.length ? doc.welcome : FALLBACK;
-  const first = mainStages(season)[0]?.matches[0];
+  const firstStage = mainStages(season)[0];
+  const first = firstStage?.matches[0];
   const replayed = useRef(useProgress.getState().settings.onboarded);
 
   useEffect(() => {
@@ -37,10 +39,11 @@ export default function OnboardingScreen() {
   const end = useCallback((play: boolean) => {
     track('onboarding_finished', { result: play ? 'completed' : 'skipped', at_step: 'host', next: play ? 'match' : 'explore', replay: replayed.current });
     useProgress.getState().setSetting('onboarded', true);
-    if (play && first) router.replace({ pathname: '/tournament/match/[matchId]', params: { matchId: first.id } });
+    // Play first, learn after: the welcome opens the first match itself; its result points to the idea behind it.
+    if (play && first && firstStage) playMatch(firstStage, first, first.level, { replace: true });
     else if (router.canGoBack()) router.back();
     else router.replace('/');
-  }, [first]);
+  }, [first, firstStage]);
 
   // Android back leaves the welcome, like "Skip".
   useFocusEffect(

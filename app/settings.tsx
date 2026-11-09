@@ -23,6 +23,7 @@ import { Sensitive } from '@/src/observability';
 import { LINKS, versionLabel } from '@/src/features/settings/about';
 import { openPage } from '@/src/features/settings/ui';
 import { appVersion } from '@/src/features/settings/version';
+import { disableReminders, enableReminders, remindersSupported, useReminders } from '@/src/features/reminders/reminders';
 import { useProgress } from '@/src/store/progress';
 import { useMotionReduced } from '@/src/utils/feedback';
 import { MAX_CONTENT_WIDTH, colors, fonts, radius, space } from '@/src/theme/tokens';
@@ -166,6 +167,7 @@ function GoalRow() {
 
 function ExperienceSection() {
   const settings = useProgress((s) => s.settings);
+  const reminders = useReminders((s) => s.enabled);
   const setSetting = useProgress((s) => s.setSetting);
   // With the device's reduce-motion setting on, motion is reduced whatever the app says, so the switch shows that.
   const systemReduced = useReducedMotion();
@@ -188,6 +190,10 @@ function ExperienceSection() {
         {Platform.OS !== 'web' ? (
           <ToggleRow title="Haptic feedback" body="A light tap on selections and milestones." value={settings.haptics} onChange={(v) => setSetting('haptics', v)} />
         ) : null}
+        {remindersSupported ? (
+          <ToggleRow title="Reminders" body="An evening nudge for your Daily streak, and a note when a rival is waiting." value={reminders} onChange={(v) => void (v ? enableReminders() : disableReminders())} />
+        ) : null}
+        <ToggleRow title="Game sounds" body="A short sound when you win, lose, beat a rival or earn a key card." value={settings.sounds} onChange={(v) => setSetting('sounds', v)} />
         {Platform.OS !== 'web' ? (
           <ToggleRow
             title="Share usage and crash data"
