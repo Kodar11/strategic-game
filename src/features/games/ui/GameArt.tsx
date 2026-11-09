@@ -36,9 +36,13 @@ export function GameArt({ game, size = 64 }: { game: GameId; size?: number }) {
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants">
       {game === 'rps' ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: icon * 2.1, justifyContent: 'center', gap: 2 }}>
-          <HandFist size={icon} color={t.fg} strokeWidth={2} />
-          <Hand size={icon} color={t.fg} strokeWidth={2} />
+        // Two explicit rows (rock and paper, then scissors), never a wrap: a wrap width rounded too tight stacked all
+        // three in one column, taller than a small tile, and clipped the rock and the scissors.
+        <View style={{ alignItems: 'center', gap: 2 }}>
+          <View style={{ flexDirection: 'row', gap: 2 }}>
+            <HandFist size={icon} color={t.fg} strokeWidth={2} />
+            <Hand size={icon} color={t.fg} strokeWidth={2} />
+          </View>
           <Scissors size={icon} color={t.fg} strokeWidth={2} />
         </View>
       ) : game === 'two-thirds' ? (

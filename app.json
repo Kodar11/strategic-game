@@ -10,6 +10,7 @@
       "strategicgame"
     ],
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#081220",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tactiqo.app"
@@ -58,6 +59,14 @@
       "expo-secure-store",
       "expo-web-browser",
       "expo-sqlite",
+      [
+        "expo-navigation-bar",
+        {
+          "enforceContrast": false,
+          "style": "light"
+        }
+      ],
+      "expo-system-ui",
       [
         "expo-notifications",
         {

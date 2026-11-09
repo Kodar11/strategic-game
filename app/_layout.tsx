@@ -6,7 +6,9 @@ import { useFonts } from 'expo-font';
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import Head from 'expo-router/head';
 import * as SplashScreen from 'expo-splash-screen';
+import { NavigationBar } from 'expo-navigation-bar';
 import { StatusBar } from 'expo-status-bar';
+import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
@@ -26,6 +28,11 @@ export { ErrorBoundary } from '@/src/observability';
 export const unstable_settings = { initialRouteName: '(tabs)' };
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+// Android draws the app edge to edge, so the navigation bar shows whatever is behind it: the tab bar's navy on the
+// tabs, each screen's own background elsewhere. The window behind every screen is our navy too, so nothing pale
+// shows through during transitions. app.json sets the same colour for builds; this also covers Expo Go.
+SystemUI.setBackgroundColorAsync(colors.bg).catch(() => undefined);
 
 const theme = {
   ...DarkTheme,
@@ -57,6 +64,9 @@ export default function RootLayout() {
     <FontsReadyContext.Provider value={loaded && !error}>
       <ThemeProvider value={theme}>
         <StatusBar style="light" />
+        {/* Light navigation buttons on our dark bars (Android only). The see-through grey contrast scrim is switched
+            off by the expo-navigation-bar plugin in app.json (`enforceContrast: false`), which needs a new build. */}
+        <NavigationBar style="light" />
         {/* The browser tab title on web; does nothing on native. */}
         <Head>
           <title>{APP_NAME}</title>
