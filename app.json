@@ -10,7 +10,7 @@
       "strategicgame"
     ],
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#081220",
+    "backgroundColor": "#0B1A2E",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tactiqo.app"

@@ -23,7 +23,8 @@ Status words: **Rejected** (not doing it) · **Postponed** (maybe later, after a
 | LLM-generated feedback, content or opponents | Cost and accuracy risk; deterministic, tested reflections are a strength | 2026-11-05 | — |
 | "Brain score", IQ-style or cognitive-benefit claims | Legal risk (FTC vs Lumosity) and off-thesis. Profiles describe habits, never ability | 2026-11-05 | — |
 | Email/password or OTP sign-in | Google plus guest mode covers it; one less attack surface | 2026-11-05 | A real market without Google accounts |
-| Ads | The monetization model is a freemium subscription with no ads | 2026-11-07 | — |
+| Ads | The monetization model is a freemium subscription with no ads. Re-confirmed 2026-11-17 on premium feel alone | 2026-11-07 | — |
+| Lifetime as a standing paywall option (~₹2,499) | Replaced by a launch-only Founder pass (see Postponed: Paywall) that includes all current and future Pro features, except any feature with ongoing per-use cost, which would be a separate add-on | 2026-11-17 | — |
 | A separate "Read Rush" mode | Folded into Daily as a third format instead (see Reshaped) | 2026-11-09 | — |
 | The Gauntlet as its own top-level mode | Lives inside the Tournament instead (see Reshaped) | 2026-11-09 | — |
 | Copying scripts, characters or scenes from films, games or Nicky Case's work | Copyright. Stories and modes are original works that are only inspired by those sources | 2026-10-30 | — |
@@ -36,7 +37,7 @@ Status words: **Rejected** (not doing it) · **Postponed** (maybe later, after a
 | Idea | Why not now | Date | Trigger to revisit |
 |---|---|---|---|
 | "Seen on screen" movie moments in lessons (Dark Knight ferries, A Beautiful Mind, Dr. Strangelove…) | Few players would engage with it yet | 2026-11-09 | Lesson completion data shows the abstract lessons losing players |
-| Paywall / billing (RevenueCat, ₹199/mo, ₹999/yr) | Decided but not built: wait for retention evidence | 2026-11-07 | D7 retention around 15% or more (see memory: monetization decision) |
+| Paywall / billing (RevenueCat; prices revised 2026-11-17: India ₹249/mo + ₹1,499/yr, US/UK/EU $7.99/mo + $49.99/yr, mid tier ~$2.99/mo + $19.99/yr; 7-day trial on yearly only; time-limited Founder lifetime ₹3,999 / $99.99 at launch). 2026-11-17 build plan accepted: build now behind a server on/off switch (Supabase, default off, tester allowlist); Google sign-in required to buy; test ladder ending in Play internal track + license testers; RevenueCat = revenue truth, PostHog = consented behaviour (no RevenueCat→PostHog integration); 7-day no-questions refund once per account, refund-and-revoke; no grandfather pass (no existing players). Also accepted 2026-11-17: Party mode, Daily, Crowd, GOTW free; Tournament first 2 stages free; Game Review 1/day free; paywall only on locked tap, after lesson 5 win, or from Settings/badge, max once/day unprompted; switch remembers last value, off if never fetched; set up Play merchant profile first; override prices for India, mid tier, low tier; Founder pass sold 60 days from public launch with visible end date, never again; 7-day trial once per Google account ("never had any subscription" eligibility in Play), no extra device tracking | Decided but not built: public switch-on waits for retention evidence | 2026-11-07 | D7 retention around 15% or more (see memory: monetization decision) |
 | Merging the Weekly screens (Past weeks into the leaderboard; Hall of Fame vs Champions overlap) | Small cleanup; the area already feels like one place | 2026-11-09 | Next time the Games tab or leaderboards are touched |
 | Illustrated rival portraits | Code-drawn cast portraits are good enough for launch | 2026-11-08 | Budget for an illustrator |
 | Hindi localization | Wire i18n only when the content pipeline is stable | 2026-11-05 | Content stops changing weekly |
@@ -75,7 +76,6 @@ Status words: **Rejected** (not doing it) · **Postponed** (maybe later, after a
 |---|---|---|
 | Analytics consent default | On with a disclosed opt-out (current code) or off until asked | 2026-11-05 |
 | PostHog data on account deletion | Keep pseudonymous data, or delete it through an Edge Function and queue (built, not deployed) | 2026-11-05 |
-| Lifetime purchase (~₹2,499) | Add or skip | 2026-11-07 |
 
 ---
 

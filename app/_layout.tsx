@@ -29,10 +29,10 @@ export const unstable_settings = { initialRouteName: '(tabs)' };
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
-// Android draws the app edge to edge, so the navigation bar shows whatever is behind it: the tab bar's navy on the
-// tabs, each screen's own background elsewhere. The window behind every screen is our navy too, so nothing pale
-// shows through during transitions. app.json sets the same colour for builds; this also covers Expo Go.
-SystemUI.setBackgroundColorAsync(colors.bg).catch(() => undefined);
+// The window behind every screen is the tab bar's colour (colors.bgRaised), so wherever Android's navigation bar shows
+// the window (Expo Go, or any screen that doesn't draw behind the bar) it matches the tab bar exactly.
+// app.json `backgroundColor` sets the same colour for builds; this call also covers Expo Go.
+SystemUI.setBackgroundColorAsync(colors.bgRaised).catch(() => undefined);
 
 const theme = {
   ...DarkTheme,
